@@ -1,30 +1,30 @@
 const MCQQuestion = ({ question, index, answers, setAnswers }) => {
-  const handleChange = (option) => {
+  const handleChange = (opt) => {
     setAnswers({
       ...answers,
-      [index]: option,
+      [index]: opt,
     });
+
+    sessionStorage.setItem("answers", JSON.stringify({
+      ...answers,
+      [index]: opt,
+    }));
   };
 
   return (
     <div className="mb-4">
-      <p className="font-semibold">
-        {index + 1}. {question.question_text}
-      </p>
+      <p>{index + 1}. {question.question_text}</p>
 
       {question.options.map((opt, i) => (
-        <div key={i}>
-          <label>
-            <input
-              type="radio"
-              name={`q-${index}`}
-              value={opt}
-              checked={answers[index] === opt}
-              onChange={() => handleChange(opt)}
-            />
-            {opt}
-          </label>
-        </div>
+        <label key={i} className="block">
+          <input
+            type="radio"
+            name={`q-${index}`}
+            checked={answers[index] === opt}
+            onChange={() => handleChange(opt)}
+          />
+          {opt}
+        </label>
       ))}
     </div>
   );

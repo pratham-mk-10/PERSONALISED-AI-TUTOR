@@ -1,17 +1,24 @@
 import MCQQuestion from "./MCQQuestion";
 
-const QuizPanel = ({ questions, answers, setAnswers }) => {
+const QuizPanel = ({ questions, answers, setAnswers, onSubmit }) => {
   return (
-    <div>
-      {questions.map((q, index) => (
+    <div className="p-6 max-w-2xl mx-auto">
+      {questions.map((q, i) => (
         <MCQQuestion
-          key={index}
+          key={i}
+          index={i}
           question={q}
-          index={index}
           answers={answers}
           setAnswers={setAnswers}
         />
       ))}
+
+      <button
+        onClick={onSubmit}
+        className="mt-6 px-6 py-3 bg-blue-600 text-white rounded"
+      >
+        Submit
+      </button>
     </div>
   );
 };
