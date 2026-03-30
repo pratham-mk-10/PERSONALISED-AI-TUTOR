@@ -1,0 +1,24 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from orchestrator.routes import router
+
+# ✅ CREATE APP FIRST
+app = FastAPI()
+
+# ✅ ADD CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ INCLUDE ROUTES
+app.include_router(router)
+
+# Optional root check
+@app.get("/")
+def home():
+    return {"message": "Backend is running"}

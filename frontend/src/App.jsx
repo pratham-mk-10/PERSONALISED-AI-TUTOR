@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-
+import QuizPage from "./components/quiz/QuizPage";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
 import Dashboard from "./components/dashboard/Dashboard";
@@ -95,12 +95,7 @@ function App() {
 
       {stage === "test" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Comprehension Quiz</h2>
-          <p style={styles.explanation}>Quiz will be connected to backend.</p>
-
-          <button style={styles.btnSecondary} onClick={() => setStage("tell")}>
-            ← Back
-          </button>
+          <QuizPage />
         </div>
       )}
     </div>
