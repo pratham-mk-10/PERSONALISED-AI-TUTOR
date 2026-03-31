@@ -18,7 +18,7 @@
 //   </AnimationPlayer>
 // ============================================================
 
-import React,{ useState, useEffect, useCallback } from "react";
+import React,{ useState, useEffect, useCallback, useRef } from "react";
 
 const AnimationPlayer = ({
   children,          // render prop: ({ progress }) => JSX
@@ -33,6 +33,17 @@ const AnimationPlayer = ({
   const [playing,  setPlaying]      = useState(true);
   const [done,     setDone]         = useState(false);
   const [showTry,  setShowTry]      = useState(false);
+  const completeTimerRef = useRef(null);
+
+  const finishAnimation = useCallback(() => {
+    setPlaying(false);
+    setDone(true);
+    if (showTryIt) {
+      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+      completeTimerRef.current = setTimeout(() => setShowTry(true), 400);
+    }
+    if (onComplete) onComplete();
+  }, [onComplete, showTryIt]);
 
   // ── ANIMATION LOOP ──────────────────────────────────────
   useEffect(() => {
@@ -46,10 +57,7 @@ const AnimationPlayer = ({
         const next = p + step;
         if (next >= 1) {
           clearInterval(interval);
-          setPlaying(false);
-          setDone(true);
-          if (showTryIt) setTimeout(() => setShowTry(true), 400);
-          if (onComplete) onComplete();
+          finishAnimation();
           return 1;
         }
         return next;
@@ -57,7 +65,13 @@ const AnimationPlayer = ({
     }, frameInterval);
 
     return () => clearInterval(interval);
-  }, [playing, duration, onComplete, showTryIt]);
+  }, [playing, duration, finishAnimation]);
+
+  useEffect(() => {
+    return () => {
+      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    };
+  }, []);
 
   // ── REPLAY ──────────────────────────────────────────────
   const handleReplay = useCallback(() => {
@@ -66,6 +80,26 @@ const AnimationPlayer = ({
     setShowTry(false);
     setPlaying(true);
   }, []);
+
+  const handleSkip = useCallback(() => {
+    if (done) return;
+    setProgress(1);
+    finishAnimation();
+  }, [done, finishAnimation]);
+
+  const handleSeek = useCallback(
+    (event) => {
+      const next = Number(event.target.value) / 100;
+      setProgress(next);
+      if (next >= 1) {
+        finishAnimation();
+      } else {
+        setDone(false);
+        setShowTry(false);
+      }
+    },
+    [finishAnimation]
+  );
 
   // ── PAUSE / RESUME ──────────────────────────────────────
   const handlePauseResume = useCallback(() => {
@@ -94,6 +128,18 @@ const AnimationPlayer = ({
         <div style={{ ...styles.progressBarFill, width: `${progress * 100}%` }} />
       </div>
 
+      {/* Seek slider */}
+      <input
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value={Math.round(progress * 100)}
+        onChange={handleSeek}
+        aria-label="Seek animation"
+        style={styles.slider}
+      />
+
       {/* Controls */}
       <div style={styles.controls}>
 
@@ -108,6 +154,13 @@ const AnimationPlayer = ({
         <button onClick={handleReplay} style={styles.btnSecondary}>
           🔁 Replay
         </button>
+
+        {/* Skip to end */}
+        {!done && (
+          <button onClick={handleSkip} style={styles.btnSecondary}>
+            ⏭ Skip
+          </button>
+        )}
 
         {/* Try it yourself — appears after animation completes */}
         {showTry && showTryIt && (
@@ -157,6 +210,11 @@ const styles = {
     background: "#2563EB",
     borderRadius: "2px",
     transition: "width 0.03s linear",
+  },
+  slider: {
+    width: "100%",
+    maxWidth: "400px",
+    cursor: "pointer",
   },
   controls: {
     display: "flex",
