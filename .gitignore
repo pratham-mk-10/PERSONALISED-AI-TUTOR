@@ -1,0 +1,8 @@
+__pycache__/
+venv/
+.venv/
+env/
+*.egg-info/
+*.dist-info/
+pip-wheel-metadata/
+.pytest_cache/
