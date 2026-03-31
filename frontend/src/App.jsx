@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
@@ -8,8 +8,57 @@ function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("tell");
 
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [results, setResults] = useState(null);
+
+  const studentId = 1; // static for now
+
   const stages = ["tell", "show", "try", "test"];
   const currentIndex = stages.indexOf(stage);
+
+  // 🔥 Fetch questions when entering test stage
+  useEffect(() => {
+    if (stage === "test") {
+      fetch(`http://localhost:8000/questions/${studentId}`)
+        .then(res => res.json())
+        .then(data => {
+          setQuestions(data.questions);
+          setResults(null);
+          setAnswers({});
+        });
+    }
+  }, [stage]);
+
+  // Handle answer input
+  const handleAnswerChange = (qid, value) => {
+    setAnswers(prev => ({
+      ...prev,
+      [qid]: value,
+    }));
+  };
+
+  // Submit answers
+  const handleSubmit = async () => {
+    const formattedAnswers = questions.map(q => ({
+      question: q,
+      answer: answers[q.id] || "",
+    }));
+
+    const res = await fetch("http://localhost:8000/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        student_id: studentId,
+        answers: formattedAnswers,
+      }),
+    });
+
+    const data = await res.json();
+    setResults(data.results);
+  };
 
   const renderSession = () => (
     <div style={styles.sessionPage}>
@@ -39,11 +88,17 @@ function App() {
               color: i === currentIndex ? "#FFFFFF" : "#374151",
             }}
           >
-            {{ tell: "1. Learn", show: "2. Watch", try: "3. Try", test: "4. Quiz" }[s]}
+            {{
+              tell: "1. Learn",
+              show: "2. Watch",
+              try: "3. Try",
+              test: "4. Quiz",
+            }[s]}
           </div>
         ))}
       </div>
 
+      {/* TELL */}
       {stage === "tell" && (
         <div style={styles.card}>
           <h2 style={styles.h2}>Laws of Reflection</h2>
@@ -64,7 +119,9 @@ function App() {
           </p>
 
           <div style={styles.lawBox}>
-            <p style={styles.lawText}>1. Angle of incidence = Angle of reflection</p>
+            <p style={styles.lawText}>
+              1. Angle of incidence = Angle of reflection
+            </p>
             <p style={styles.lawText}>2. Measured from the Normal</p>
           </div>
 
@@ -74,12 +131,14 @@ function App() {
         </div>
       )}
 
+      {/* SHOW */}
       {stage === "show" && (
         <div style={styles.card}>
           <LawsOfReflectionAnimation onTryItClicked={() => setStage("try")} />
         </div>
       )}
 
+      {/* TRY */}
       {stage === "try" && (
         <div style={styles.card}>
           <AngleSlider attempt={1} misconceptionTag="" onInteracted={() => {}} />
@@ -93,14 +152,81 @@ function App() {
         </div>
       )}
 
+      {/* TEST (CONNECTED TO BACKEND) */}
       {stage === "test" && (
         <div style={styles.card}>
           <h2 style={styles.h2}>Comprehension Quiz</h2>
-          <p style={styles.explanation}>Quiz will be connected to backend.</p>
 
-          <button style={styles.btnSecondary} onClick={() => setStage("tell")}>
-            ← Back
-          </button>
+          {!results && questions.map((q, index) => (
+            <div key={q.id} style={{ marginBottom: "16px" }}>
+              <p>
+                <b>{index + 1}. {q.question}</b>
+              </p>
+
+              {/* MCQ */}
+              {q.type === "mcq" &&
+                q.options.map((opt, i) => (
+                  <div key={i}>
+                    <input
+                      type="radio"
+                      name={`q-${q.id}`}
+                      value={opt}
+                      onChange={(e) =>
+                        handleAnswerChange(q.id, e.target.value)
+                      }
+                    />
+                    {opt}
+                  </div>
+                ))}
+
+              {/* Short / Long */}
+              {(q.type === "short" || q.type === "long") && (
+                <textarea
+                  rows="3"
+                  style={{ width: "100%" }}
+                  onChange={(e) =>
+                    handleAnswerChange(q.id, e.target.value)
+                  }
+                />
+              )}
+            </div>
+          ))}
+
+          {/* Submit */}
+          {!results && questions.length > 0 && (
+            <button style={styles.btnPrimary} onClick={handleSubmit}>
+              Submit Answers
+            </button>
+          )}
+
+          {/* Results */}
+          {results && (
+            <div style={{ marginTop: "20px" }}>
+              <h3>Results</h3>
+
+              {results.map((r, i) => (
+                <div key={i} style={{ marginBottom: "10px" }}>
+                  <p>
+                    <b>Q{r.question_id}:</b>{" "}
+                    {r.correct ? "✅ Correct" : "❌ Wrong"}
+                  </p>
+
+                  {r.feedback && (
+                    <p style={{ color: "#DC2626" }}>
+                      <b>Feedback:</b> {r.feedback}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              <button
+                style={styles.btnSecondary}
+                onClick={() => setStage("tell")}
+              >
+                ← Back to Learning
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -110,20 +236,6 @@ function App() {
     return <div style={styles.page}>{renderSession()}</div>;
   }
 
-  if (view === "dashboard") {
-    return (
-      <div style={styles.page}>
-        <Dashboard
-          onStartTopic={() => {
-            setStage("tell");
-            setView("session");
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Fallback: default to dashboard
   return (
     <div style={styles.page}>
       <Dashboard
@@ -140,7 +252,8 @@ const styles = {
   page: {
     minHeight: "100vh",
     background: "#F0F4FF",
-    fontFamily: "Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily:
+      "Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   sessionPage: {
     maxWidth: "900px",
