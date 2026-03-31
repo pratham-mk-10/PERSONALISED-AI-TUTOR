@@ -1,3 +1,4 @@
+import react from "react";
 import React, { useState } from "react";
 import QuizPage from "./components/quiz/QuizPage";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
