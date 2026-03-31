@@ -27,25 +27,3 @@ def detect_misconception(answers):
         return None
 
     return Counter(wrong_tags).most_common(1)[0][0]
-
-
-def detect_for_answer(question_id, selected_option):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute(
-        """
-        SELECT mt.tag
-        FROM question_misconceptions qm
-        JOIN misconception_tags mt ON mt.id = qm.misconception_tag_id
-        WHERE qm.question_id = %s
-          AND (qm.option_index = %s OR qm.option_index IS NULL)
-        ORDER BY CASE WHEN qm.option_index IS NULL THEN 1 ELSE 0 END
-        LIMIT 1
-        """,
-        (question_id, selected_option),
-    )
-
-    row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
