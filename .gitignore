@@ -6,3 +6,14 @@ env/
 *.dist-info/
 pip-wheel-metadata/
 .pytest_cache/
+git rm -r --cached .
+git add .
+git commit -m "Reapply .gitignore"
+__pycache__/
+venv/
+.venv/
+env/
+*.egg-info/
+*.dist-info/
+pip-wheel-metadata/
+.pytest_cache/
