@@ -21,7 +21,8 @@ function App() {
   // 🔥 Fetch questions when entering test stage
   useEffect(() => {
     if (stage === "test") {
-      fetch(`http://localhost:8000/questions/${studentId}`)
+      fetch("http://localhost:8000/get-questions",{method:"POST"})
+        
         .then(res => res.json())
         .then(data => {
           setQuestions(data.questions);
@@ -161,7 +162,7 @@ function App() {
           {!results && questions.map((q, index) => (
             <div key={q.id} style={{ marginBottom: "16px" }}>
               <p>
-                <b>{index + 1}. {q.question}</b>
+                <b>{index + 1}. {q.question_text}</b>
               </p>
 
               {/* MCQ */}

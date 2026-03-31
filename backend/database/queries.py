@@ -1,64 +1,56 @@
+import random
 from database.connection import get_connection
 
 def fetch_questions():
     conn = get_connection()
     cur = conn.cursor()
 
+    # 🔹 Get questions
     cur.execute("""
-        SELECT id, question_text, options, correct
-        FROM mcq_questions
+        SELECT id, question_text, correct_option_index
+        FROM mcq_bank_questions
         WHERE topic = 'Laws of Reflection'
         ORDER BY RANDOM()
         LIMIT 10;
     """)
 
-    rows = cur.fetchall()
-    conn.close()
+    questions_data = cur.fetchall()
 
-    questions = []
+    final_questions = []
 
-    for r in rows:
-        # 🔥 FIX: convert PostgreSQL array string → Python list
-        options = r[2]
+    for q in questions_data:
+        qid, text, correct_idx = q
 
-        if isinstance(options, str):
-            options = options.strip("{}").split(",")
+        # 🔹 Get options for this question
+        cur.execute("""
+            SELECT option_index, option_text
+            FROM mcq_bank_options
+            WHERE question_id = %s
+        """, (qid,))
 
-        questions.append({
-            "id": r[0],
-            "question_text": r[1],
-            "options": options,
-            "correct": r[3]
+        options_data = cur.fetchall()
+
+        # Convert to list
+        options = [{"index": o[0], "text": o[1]} for o in options_data]
+
+        # 🔥 Shuffle options
+        random.shuffle(options)
+
+        # 🔥 Find new correct index
+        new_correct = next(
+            i for i, opt in enumerate(options) if opt["index"] == correct_idx
+        )
+
+        # Extract only text for frontend
+        option_texts = [opt["text"] for opt in options]
+
+        final_questions.append({
+            "id": qid,
+            "question_text": text,
+            "options": option_texts,
+            "correct": new_correct,
+            "type": "mcq"
         })
 
-    return questions
-
-def fetch_by_misconception(tag):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT q.id, q.question_text, q.correct_index,
-               ARRAY_AGG(o.option_text ORDER BY o.option_index)
-        FROM questions q
-        JOIN options o ON q.id = o.question_id
-        JOIN question_misconceptions qm ON q.id = qm.question_id
-        JOIN misconception_tags mt ON mt.id = qm.misconception_tag_id
-        WHERE mt.tag = %s
-        GROUP BY q.id
-        ORDER BY RANDOM()
-        LIMIT 10;
-    """, (tag,))
-
-    rows = cur.fetchall()
-
     conn.close()
-
-    return [
-        {
-            "id": r[0],
-            "question_text": r[1],
-            "correct": r[2],
-            "options": r[3]
-        } for r in rows
-    ]
+    return final_questions
