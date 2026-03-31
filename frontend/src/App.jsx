@@ -1,5 +1,5 @@
 import react from "react";
-import React, { useState } from "react";
+import React, { useState ,useEffect} from "react";
 import QuizPage from "./components/quiz/QuizPage";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
