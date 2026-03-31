@@ -73,6 +73,34 @@ def get_questions(data: GetQuestionsRequest | None = None):
     return {"questions": questions}
 
 
+@router.post("/submit")
+def submit(data: dict):
+    answers = data.get("answers", [])
+    results = []
+
+    for item in answers:
+        q = item.get("question", {})
+        user_ans = item.get("answer")
+        options = q.get("options", [])
+        correct_idx = q.get("correct")
+
+        correct_option = None
+        if isinstance(correct_idx, int) and 0 <= correct_idx < len(options):
+            correct_option = options[correct_idx]
+
+        is_correct = user_ans == correct_option if correct_option is not None else False
+
+        results.append(
+            {
+                "question_id": q.get("id"),
+                "correct": is_correct,
+                "feedback": None if is_correct else "Revise concept",
+            }
+        )
+
+    return {"results": results}
+
+
 @router.post("/submit-answers")
 def submit_answers(data: SubmitAnswersRequest):
     tags = []

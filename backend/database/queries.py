@@ -1,3 +1,5 @@
+import random
+
 from database.connection import get_connection
 
 def _has_column(table_name, column_name):
@@ -33,53 +35,81 @@ def _fetch_columns(table_name):
     return cols
 
 
+def _has_table(table_name):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_name = %s
+        LIMIT 1
+        """,
+        (table_name,),
+    )
+    found = cur.fetchone() is not None
+    conn.close()
+    return found
+
+
+def _shuffle_options(option_rows, correct_idx):
+    options = [{"index": o[0], "text": o[1]} for o in option_rows]
+    random.shuffle(options)
+    new_correct = next(
+        i for i, opt in enumerate(options) if opt["index"] == correct_idx
+    )
+    return [opt["text"] for opt in options], new_correct
+
+
 def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
     conn = get_connection()
     cur = conn.cursor()
 
-    has_topic = _has_column("questions", "topic")
-    has_difficulty = _has_column("questions", "difficulty")
+    has_questions_table = _has_table("questions")
 
-    where = []
-    params = []
+    if has_questions_table:
+        has_topic = _has_column("questions", "topic")
+        has_difficulty = _has_column("questions", "difficulty")
 
-    if topic and has_topic:
-        where.append("q.topic = %s")
-        params.append(topic)
-    if difficulty and has_difficulty:
-        where.append("q.difficulty = %s")
-        params.append(difficulty)
-    if exclude_ids:
-        where.append("NOT (q.id = ANY(%s))")
-        params.append(exclude_ids)
+        where = []
+        params = []
 
-    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-    params.append(limit)
+        if topic and has_topic:
+            where.append("q.topic = %s")
+            params.append(topic)
+        if difficulty and has_difficulty:
+            where.append("q.difficulty = %s")
+            params.append(difficulty)
+        if exclude_ids:
+            where.append("NOT (q.id = ANY(%s))")
+            params.append(exclude_ids)
 
-    topic_select = "MAX(q.topic)" if has_topic else "NULL"
-    difficulty_select = "MAX(q.difficulty)" if has_difficulty else "NULL"
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        params.append(limit)
 
-    cur.execute(
-        f"""
-        SELECT q.id, q.question_text, q.correct_index,
-               ARRAY_AGG(o.option_text ORDER BY o.option_index),
-               {topic_select} AS topic,
-               {difficulty_select} AS difficulty
-        FROM questions q
-        JOIN options o ON q.id = o.question_id
-        {where_sql}
-        GROUP BY q.id
-        ORDER BY RANDOM()
-        LIMIT %s;
-    """,
-        tuple(params),
-    )
+        topic_select = "MAX(q.topic)" if has_topic else "NULL"
+        difficulty_select = "MAX(q.difficulty)" if has_difficulty else "NULL"
 
-    rows = cur.fetchall()
+        cur.execute(
+            f"""
+            SELECT q.id, q.question_text, q.correct_index,
+                   ARRAY_AGG(o.option_text ORDER BY o.option_index),
+                   {topic_select} AS topic,
+                   {difficulty_select} AS difficulty
+            FROM questions q
+            JOIN options o ON q.id = o.question_id
+            {where_sql}
+            GROUP BY q.id
+            ORDER BY RANDOM()
+            LIMIT %s;
+        """,
+            tuple(params),
+        )
 
-    questions = []
-    for r in rows:
-        questions.append(
+        rows = cur.fetchall()
+        conn.close()
+
+        return [
             {
                 "id": r[0],
                 "question_text": r[1],
@@ -87,11 +117,66 @@ def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
                 "options": r[3],
                 "topic": r[4],
                 "difficulty": r[5],
+                "type": "mcq",
+            }
+            for r in rows
+        ]
+
+    has_mcq_table = _has_table("mcq_bank_questions") and _has_table("mcq_bank_options")
+    if not has_mcq_table:
+        conn.close()
+        return []
+
+    params = []
+    filters = []
+    if topic:
+        filters.append("topic = %s")
+        params.append(topic)
+    if exclude_ids:
+        filters.append("NOT (id = ANY(%s))")
+        params.append(exclude_ids)
+    where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+    params.append(limit)
+
+    cur.execute(
+        f"""
+        SELECT id, question_text, correct_option_index, topic
+        FROM mcq_bank_questions
+        {where_sql}
+        ORDER BY RANDOM()
+        LIMIT %s;
+        """,
+        tuple(params),
+    )
+
+    question_rows = cur.fetchall()
+    final_questions = []
+    for qid, text, correct_idx, row_topic in question_rows:
+        cur.execute(
+            """
+            SELECT option_index, option_text
+            FROM mcq_bank_options
+            WHERE question_id = %s
+            """,
+            (qid,),
+        )
+        options_data = cur.fetchall()
+        option_texts, new_correct = _shuffle_options(options_data, correct_idx)
+
+        final_questions.append(
+            {
+                "id": qid,
+                "question_text": text,
+                "options": option_texts,
+                "correct": new_correct,
+                "topic": row_topic,
+                "difficulty": None,
+                "type": "mcq",
             }
         )
 
     conn.close()
-    return questions
+    return final_questions
 
 
 def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
