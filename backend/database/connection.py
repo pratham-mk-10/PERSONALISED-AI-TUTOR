@@ -3,7 +3,7 @@ import os
 import psycopg2
 
 try:
-    from demo_api.config import (
+    from config import (
         DB_HOST as CFG_DB_HOST,
         DB_NAME as CFG_DB_NAME,
         DB_PASSWORD as CFG_DB_PASSWORD,

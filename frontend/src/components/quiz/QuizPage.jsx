@@ -5,6 +5,7 @@ import {
   getQuestions,
   submitAnswers,
 } from "../../services/api";
+import { useSessionStore } from "../../state/sessionStore";
 
 
 const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
@@ -30,6 +31,15 @@ const saveQuestionHistory = (ids) => {
 };
 
 
+const mapTopicIdToQuestionTopic = (topicId) => {
+  if (!topicId) return null;
+  const id = String(topicId).toLowerCase();
+  if (id.includes("reflection") || id.includes("mirror")) return "reflection";
+  if (id.includes("refraction")) return "refraction";
+  return null;
+};
+
+
 const shuffle = (items) => {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -40,6 +50,8 @@ const shuffle = (items) => {
 };
 
 const QuizPage = () => {
+  const currentTopicId = useSessionStore((s) => s.currentTopicId);
+  const user = useSessionStore((s) => s.user);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -59,12 +71,24 @@ const QuizPage = () => {
     setCurrentIndex(0);
 
     const seenIds = loadQuestionHistory();
+    const activeTopic = mapTopicIdToQuestionTopic(currentTopicId) || "reflection";
+    const studentId = user?.id || user?.name || "guest-student";
 
     try {
-      let data = await getQuestions({ askedQuestionIds: seenIds, limit: 5 });
+      let data = await getQuestions({
+        askedQuestionIds: seenIds,
+        limit: 5,
+        topic: activeTopic,
+        studentId,
+      });
       if (!data.questions || data.questions.length === 0) {
         saveQuestionHistory([]);
-        data = await getQuestions({ askedQuestionIds: [], limit: 5 });
+        data = await getQuestions({
+          askedQuestionIds: [],
+          limit: 5,
+          topic: activeTopic,
+          studentId,
+        });
       }
 
       const nextQuestions = shuffle(data.questions || []);
@@ -102,18 +126,22 @@ const QuizPage = () => {
     }
 
     try {
+      const activeTopic = mapTopicIdToQuestionTopic(currentTopicId) || "reflection";
+      const studentId = user?.id || user?.name || "guest-student";
+
       const formatted = questions.map(q => ({
         question_id: q.id,
         selected: answers[q.id],
         correct: q.correct,
-        misconception_map: q.misconception_map || {}
+        misconception_map: q.misconception_map || {},
+        topic: q.topic || activeTopic,
       }));
 
-      const res = await submitAnswers(formatted);
+      const res = await submitAnswers({ answers: formatted, topic: activeTopic, studentId });
 
       const reason = await getMisconceptionReason(
         res.main_misconception,
-        "reflection_refraction"
+        activeTopic
       );
 
       const total = questions.length;

@@ -1,6 +1,6 @@
 const BASE_URL = "http://localhost:8000";
 
-export const getQuestions = async ({ askedQuestionIds = [], limit = 5 } = {}) => {
+export const getQuestions = async ({ askedQuestionIds = [], limit = 5, topic = null, studentId = null } = {}) => {
   const res = await fetch(`${BASE_URL}/get-questions`, {
     method: "POST",
     headers: {
@@ -8,7 +8,9 @@ export const getQuestions = async ({ askedQuestionIds = [], limit = 5 } = {}) =>
     },
     body: JSON.stringify({
       asked_question_ids: askedQuestionIds,
-      limit
+      limit,
+      topic,
+      student_id: studentId,
     })
   });
 
@@ -20,13 +22,13 @@ export const getQuestions = async ({ askedQuestionIds = [], limit = 5 } = {}) =>
   return res.json();
 };
 
-export const submitAnswers = async (answers) => {
+export const submitAnswers = async ({ answers, topic = null, studentId = null }) => {
   const res = await fetch(`${BASE_URL}/submit-answers`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ answers })
+    body: JSON.stringify({ answers, topic, student_id: studentId })
   });
 
   if (!res.ok) {

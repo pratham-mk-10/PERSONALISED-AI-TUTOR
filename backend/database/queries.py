@@ -17,6 +17,22 @@ def _has_column(table_name, column_name):
     return found
 
 
+def _fetch_columns(table_name):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s
+        """,
+        (table_name,),
+    )
+    cols = {row[0] for row in cur.fetchall()}
+    conn.close()
+    return cols
+
+
 def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
     conn = get_connection()
     cur = conn.cursor()
@@ -40,10 +56,15 @@ def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     params.append(limit)
 
+    topic_select = "MAX(q.topic)" if has_topic else "NULL"
+    difficulty_select = "MAX(q.difficulty)" if has_difficulty else "NULL"
+
     cur.execute(
         f"""
         SELECT q.id, q.question_text, q.correct_index,
-               ARRAY_AGG(o.option_text ORDER BY o.option_index)
+               ARRAY_AGG(o.option_text ORDER BY o.option_index),
+               {topic_select} AS topic,
+               {difficulty_select} AS difficulty
         FROM questions q
         JOIN options o ON q.id = o.question_id
         {where_sql}
@@ -58,31 +79,47 @@ def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
 
     questions = []
     for r in rows:
-        questions.append({
-            "id": r[0],
-            "question_text": r[1],
-            "correct": r[2],
-            "options": r[3]
-        })
+        questions.append(
+            {
+                "id": r[0],
+                "question_text": r[1],
+                "correct": r[2],
+                "options": r[3],
+                "topic": r[4],
+                "difficulty": r[5],
+            }
+        )
 
     conn.close()
     return questions
 
 
-def fetch_by_misconception(tag, limit=10, exclude_ids=None):
+def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
     conn = get_connection()
     cur = conn.cursor()
 
+    cols = _fetch_columns("questions")
+    has_topic = "topic" in cols
+    has_difficulty = "difficulty" in cols
+
+    topic_select = "MAX(q.topic)" if has_topic else "NULL"
+    difficulty_select = "MAX(q.difficulty)" if has_difficulty else "NULL"
+
     extra_where = ""
     params = [tag]
+    if topic and has_topic:
+        extra_where += " AND q.topic = %s"
+        params.append(topic)
     if exclude_ids:
-        extra_where = " AND NOT (q.id = ANY(%s))"
+        extra_where += " AND NOT (q.id = ANY(%s))"
         params.append(exclude_ids)
     params.append(limit)
 
     cur.execute(f"""
         SELECT q.id, q.question_text, q.correct_index,
-               ARRAY_AGG(o.option_text ORDER BY o.option_index)
+               ARRAY_AGG(o.option_text ORDER BY o.option_index),
+               {topic_select} AS topic,
+               {difficulty_select} AS difficulty
         FROM questions q
         JOIN options o ON q.id = o.question_id
         JOIN question_misconceptions qm ON q.id = qm.question_id
@@ -102,7 +139,9 @@ def fetch_by_misconception(tag, limit=10, exclude_ids=None):
             "id": r[0],
             "question_text": r[1],
             "correct": r[2],
-            "options": r[3]
+            "options": r[3],
+            "topic": r[4],
+            "difficulty": r[5],
         } for r in rows
     ]
 
