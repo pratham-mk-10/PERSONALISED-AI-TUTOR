@@ -5,27 +5,32 @@ def fetch_questions():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT q.id, q.question_text, q.correct_index,
-               ARRAY_AGG(o.option_text ORDER BY o.option_index)
-        FROM questions q
-        JOIN options o ON q.id = o.question_id
-        GROUP BY q.id
+        SELECT id, question_text, options, correct
+        FROM mcq_questions
+        WHERE topic = 'Laws of Reflection'
         ORDER BY RANDOM()
         LIMIT 10;
     """)
 
     rows = cur.fetchall()
+    conn.close()
 
     questions = []
+
     for r in rows:
+        # 🔥 FIX: convert PostgreSQL array string → Python list
+        options = r[2]
+
+        if isinstance(options, str):
+            options = options.strip("{}").split(",")
+
         questions.append({
             "id": r[0],
             "question_text": r[1],
-            "correct": r[2],
-            "options": r[3]
+            "options": options,
+            "correct": r[3]
         })
 
-    conn.close()
     return questions
 
 def fetch_by_misconception(tag):
