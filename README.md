@@ -10,6 +10,15 @@ A 3-agent AI system that detects **why** a student fails — not just **that** t
 **Instead of:** "Wrong answer. Try again."
 
 **Our system does:** Detects the exact misconception → shows a red/green visual correction → regenerates a completely different explanation + interactive diagram.
+## 🎤 AI Voice Integration
+
+We use pre-generated AI narration (via ElevenLabs) 
+to synchronize audio explanations with SVG animations.
+
+This ensures:
+- smooth playback (no latency)
+- precise timing with visuals
+- better learning experience
 
 ---
 

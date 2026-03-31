@@ -8,7 +8,7 @@
 // ============================================================
 
 import React from "react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import AnimationPlayer from "../../shared/AnimationPlayer";
 import {
   incidentRayStart,
@@ -49,8 +49,10 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
     if (step === 0) audioFile = "/audio/mirror.mp3";
     if (step === 1) audioFile = "/audio/normal.mp3";
     if (step === 2) audioFile = "/audio/incident.mp3";
-    if (step === 3) audioFile = "/audio/reflected.mp3";
-    if (step === 4) audioFile = "/audio/law.mp3";
+    if (step === 3) audioFile = "/audio/inc_angle.mp3";
+    if (step === 4) audioFile = "/audio/reflected.mp3";
+    if (step === 5) audioFile = "/audio/ref_angle.mp3";
+    if (step === 6) audioFile = "/audio/law.mp3";
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -72,22 +74,26 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
       {({ progress }) => {
         let step = 0;
 
-        if (progress < 0.2) step = 0;
-        else if (progress < 0.4) step = 1;
-        else if (progress < 0.65) step = 2;
-        else if (progress < 0.85) step = 3;
-        else step = 4;
+        if (progress < 0.15) step = 0;
+        else if (progress < 0.3) step = 1;
+        else if (progress < 0.45) step = 2;
+        else if (progress < 0.6) step = 3;
+        else if (progress < 0.75) step = 4;
+        else if (progress < 0.9) step = 5;
+        else step = 6;
 
         // Play audio for current step
         playAudio(step);
 
         // ── PHASES (SLOW + TEACHING STYLE) ──
-        const mirrorOpacity = clamp(progress / 0.2, 0, 1);
+        const mirrorOpacity = clamp(progress / 0.15, 0, 1);
 
-        const incPhase = clamp((progress - 0.4) / 0.25, 0, 1);
-        const refPhase = clamp((progress - 0.65) / 0.2, 0, 1);
+        const incPhase = clamp((progress - 0.3) / 0.15, 0, 1);
+        const refPhase = clamp((progress - 0.6) / 0.15, 0, 1);
 
-        const labelOpacity = clamp((progress - 0.85) / 0.15, 0, 1);
+        const showIncArc = step >= 3;
+        const showRefArc = step >= 5;
+        const showLaw = step === 6;
 
         const incTip = lerp(incStart.x, incStart.y, CX, CY, incPhase);
         const refTip = lerp(CX, CY, refEnd.x, refEnd.y, refPhase);
@@ -113,7 +119,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
 
               {/* Highlight mirror during explanation */}
               
-              {progress < 0.2 && (
+              {step === 0 && (
                 <line
                   x1={60} x2={360}
                   y1={CY} y2={CY}
@@ -174,38 +180,46 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
             </defs>
 
             {/* ── ANGLES + LABELS ── */}
-            <g opacity={labelOpacity}>
-              <AngleArc
-                pathD={incArcPath}
-                color="#2563EB"
-                label={`${ANGLE}°`}
-                labelX={incLabelX - 6}
-                labelY={incLabelY}
-              />
-              <AngleArc
-                pathD={refArcPath}
-                color="#DC2626"
-                label={`${ANGLE}°`}
-                labelX={refLabelX + 6}
-                labelY={refLabelY}
-              />
+            {showIncArc && (
+              <>
+                <AngleArc
+                  pathD={incArcPath}
+                  color="#2563EB"
+                  label="i"
+                  labelX={incLabelX - 6}
+                  labelY={incLabelY}
+                />
+              </>
+            )}
 
-              <Label x={incLabelX - 22} y={incLabelY + 2} text="i" color="#2563EB" size={14} bold />
-              <Label x={refLabelX + 22} y={refLabelY + 2} text="r" color="#DC2626" size={14} bold />
+            {showRefArc && (
+              <>
+                <AngleArc
+                  pathD={refArcPath}
+                  color="#DC2626"
+                  label="r"
+                  labelX={refLabelX + 6}
+                  labelY={refLabelY}
+                />
+              </>
+            )}
 
-              <rect x={90} y={55} width={240} height={28} rx={6}
-                fill="#EFF6FF" stroke="#BFDBFE" />
-              <Label
-                x={210} y={29}
-                text="∠i = ∠r  (both from Normal)"
-                color="#1E40AF"
-                size={12}
-                bold
-              />
-            </g>
+            {showLaw && (
+              <>
+                <rect x={90} y={55} width={240} height={28} rx={6} fill="#EFF6FF" stroke="#BFDBFE" />
+                <Label
+                  x={210}
+                  y={29}
+                  text="∠i = ∠r  (both from Normal)"
+                  color="#1E40AF"
+                  size={12}
+                  bold
+                />
+              </>
+            )}
 
             {/* ── TEACHER CAPTIONS (KEY CHANGE) ── */}
-            {progress < 0.2 && (
+            {step === 0 && (
               <Label
                 x={210}
                 y={CY + 25}
@@ -216,7 +230,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
                 bold
               />
             )}
-            {progress >= 0.2 && progress < 0.4 && (
+            {step === 1 && (
               <Label
                 x={210} y={40}
                 text="This dotted line is called the Normal"
@@ -227,7 +241,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
               />
             )}
 
-            {progress >= 0.4 && progress < 0.65 && (
+            {step === 2 && (
               <Label
                 x={210} y={40}
                 text="This blue line is the Incident Ray"
@@ -238,7 +252,30 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
               />
             )}
 
-            {progress >= 0.65 && progress < 0.85 && (
+            {step === 3 && (
+              <>
+                <Label
+                  x={210}
+                  y={30}
+                  text="The angle made by the incident ray with the normal"
+                  color="#2563EB"
+                  size={12}
+                  anchor="middle"
+                  bold
+                />
+                <Label
+                  x={210}
+                  y={48}
+                  text="is called the angle of incidence."
+                  color="#2563EB"
+                  size={12}
+                  anchor="middle"
+                  bold
+                />
+              </>
+            )}
+
+            {step === 4 && (
               <Label
                 x={210} y={40}
                 text="This red line is the Reflected Ray"
@@ -249,7 +286,30 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
               />
             )}
 
-            {progress >= 0.85 && (
+            {step === 5 && (
+              <>
+                <Label
+                  x={210}
+                  y={30}
+                  text="The angle made by the reflected ray with the normal"
+                  color="#DC2626"
+                  size={12}
+                  anchor="middle"
+                  bold
+                />
+                <Label
+                  x={210}
+                  y={48}
+                  text="is called the angle of reflection."
+                  color="#DC2626"
+                  size={12}
+                  anchor="middle"
+                  bold
+                />
+              </>
+            )}
+
+            {step === 6 && (
               <Label
                 x={210}
                 y={50}
