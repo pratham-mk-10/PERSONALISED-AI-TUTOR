@@ -71,6 +71,13 @@ def fetch_questions(topic=None, difficulty=None, limit=10, exclude_ids=None):
         has_topic = _has_column("questions", "topic")
         has_difficulty = _has_column("questions", "difficulty")
 
+        # If a topic is requested but the table cannot filter by topic,
+        # defer to topic-aware fallback tables below.
+        if topic and not has_topic:
+            has_questions_table = False
+
+    if has_questions_table:
+
         where = []
         params = []
 
@@ -214,20 +221,8 @@ def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
         ORDER BY RANDOM()
         LIMIT %s;
     """, tuple(params))
-
-        # Convert to list
-        options = [{"index": o[0], "text": o[1]} for o in options_data]
-
-        # 🔥 Shuffle options
-        random.shuffle(options)
-
-        # 🔥 Find new correct index
-        new_correct = next(
-            i for i, opt in enumerate(options) if opt["index"] == correct_idx
-        )
-
-        # Extract only text for frontend
-        option_texts = [opt["text"] for opt in options]
+    rows = cur.fetchall()
+    conn.close()
 
     return [
         {
@@ -237,7 +232,9 @@ def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
             "options": r[3],
             "topic": r[4],
             "difficulty": r[5],
-        } for r in rows
+            "type": "mcq",
+        }
+        for r in rows
     ]
 
 

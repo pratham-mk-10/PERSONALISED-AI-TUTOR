@@ -68,8 +68,6 @@ def get_questions(data: GetQuestionsRequest | None = None):
     questions = fetch_questions(topic=topic, limit=limit, exclude_ids=asked_ids)
     if not questions and asked_ids:
         questions = fetch_questions(topic=topic, limit=limit)
-    if not questions and topic:
-        questions = fetch_questions(limit=limit)
     return {"questions": questions}
 
 
