@@ -6,9 +6,9 @@ env/
 *.dist-info/
 pip-wheel-metadata/
 .pytest_cache/
-git rm -r --cached .
-git add .
-git commit -m "Reapply .gitignore"
+.env
+.env.*
+!.env.example
 __pycache__/
 venv/
 .venv/

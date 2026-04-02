@@ -1,5 +1,4 @@
-import react from "react";
-import React, { useState ,useEffect} from "react";
+import React, { useState } from "react";
 import QuizPage from "./components/quiz/QuizPage";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
@@ -9,58 +8,8 @@ function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("tell");
 
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({});
-  const [results, setResults] = useState(null);
-
-  const studentId = 1; // static for now
-
   const stages = ["tell", "show", "try", "test"];
   const currentIndex = stages.indexOf(stage);
-
-  // 🔥 Fetch questions when entering test stage
-  useEffect(() => {
-    if (stage === "test") {
-      fetch("http://localhost:8000/get-questions",{method:"POST"})
-        
-        .then(res => res.json())
-        .then(data => {
-          setQuestions(data.questions);
-          setResults(null);
-          setAnswers({});
-        });
-    }
-  }, [stage]);
-
-  // Handle answer input
-  const handleAnswerChange = (qid, value) => {
-    setAnswers(prev => ({
-      ...prev,
-      [qid]: value,
-    }));
-  };
-
-  // Submit answers
-  const handleSubmit = async () => {
-    const formattedAnswers = questions.map(q => ({
-      question: q,
-      answer: answers[q.id] || "",
-    }));
-
-    const res = await fetch("http://localhost:8000/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        student_id: studentId,
-        answers: formattedAnswers,
-      }),
-    });
-
-    const data = await res.json();
-    setResults(data.results);
-  };
 
   const renderSession = () => (
     <div style={styles.sessionPage}>
@@ -154,81 +103,10 @@ function App() {
         </div>
       )}
 
-      {/* TEST (CONNECTED TO BACKEND) */}
+      {/* TEST */}
       {stage === "test" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Comprehension Quiz</h2>
-
-          {!results && questions.map((q, index) => (
-            <div key={q.id} style={{ marginBottom: "16px" }}>
-              <p>
-                <b>{index + 1}. {q.question_text}</b>
-              </p>
-
-              {/* MCQ */}
-              {q.type === "mcq" &&
-                q.options.map((opt, i) => (
-                  <div key={i}>
-                    <input
-                      type="radio"
-                      name={`q-${q.id}`}
-                      value={opt}
-                      onChange={(e) =>
-                        handleAnswerChange(q.id, e.target.value)
-                      }
-                    />
-                    {opt}
-                  </div>
-                ))}
-
-              {/* Short / Long */}
-              {(q.type === "short" || q.type === "long") && (
-                <textarea
-                  rows="3"
-                  style={{ width: "100%" }}
-                  onChange={(e) =>
-                    handleAnswerChange(q.id, e.target.value)
-                  }
-                />
-              )}
-            </div>
-          ))}
-
-          {/* Submit */}
-          {!results && questions.length > 0 && (
-            <button style={styles.btnPrimary} onClick={handleSubmit}>
-              Submit Answers
-            </button>
-          )}
-
-          {/* Results */}
-          {results && (
-            <div style={{ marginTop: "20px" }}>
-              <h3>Results</h3>
-
-              {results.map((r, i) => (
-                <div key={i} style={{ marginBottom: "10px" }}>
-                  <p>
-                    <b>Q{r.question_id}:</b>{" "}
-                    {r.correct ? "✅ Correct" : "❌ Wrong"}
-                  </p>
-
-                  {r.feedback && (
-                    <p style={{ color: "#DC2626" }}>
-                      <b>Feedback:</b> {r.feedback}
-                    </p>
-                  )}
-                </div>
-              ))}
-
-              <button
-                style={styles.btnSecondary}
-                onClick={() => setStage("tell")}
-              >
-                ← Back to Learning
-              </button>
-            </div>
-          )}
+          <QuizPage />
         </div>
       )}
     </div>

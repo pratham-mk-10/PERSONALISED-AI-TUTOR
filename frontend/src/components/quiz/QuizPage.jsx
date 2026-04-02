@@ -133,16 +133,23 @@ const QuizPage = () => {
         question_id: q.id,
         selected: answers[q.id],
         correct: q.correct,
+        difficulty: q.difficulty,
         misconception_map: q.misconception_map || {},
         topic: q.topic || activeTopic,
       }));
 
       const res = await submitAnswers({ answers: formatted, topic: activeTopic, studentId });
+      let reason = {
+        reason: res.reason,
+        focus_area: res.focus_area,
+      };
 
-      const reason = await getMisconceptionReason(
-        res.main_misconception,
-        activeTopic
-      );
+      if (!reason.reason) {
+        reason = await getMisconceptionReason(
+          res.main_misconception,
+          activeTopic
+        );
+      }
 
       const total = questions.length;
       const correctCount = questions.reduce((count, q) => {

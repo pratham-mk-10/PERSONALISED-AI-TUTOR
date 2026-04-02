@@ -7,7 +7,10 @@ from pydantic import BaseModel
 from database.models import (
     get_student,
     get_student_profile,
+    log_student_behavior,
     set_student_current_topic,
+    update_student,
+    update_student_level,
     update_student_topic_resolution,
 )
 from database.queries import fetch_by_misconception, fetch_misconception_for_answer, fetch_questions
@@ -44,6 +47,15 @@ class MisconceptionReasonRequest(BaseModel):
     misconception_tag: str
     topic: str = "reflection_refraction"
 
+
+def _difficulty_weight(value: Any) -> float:
+    level = str(value or "").strip().lower()
+    if level == "hard":
+        return 2.0
+    if level == "medium":
+        return 1.5
+    return 1.0
+
 @router.post("/get-questions")
 def get_questions(data: GetQuestionsRequest | None = None):
     limit = 5
@@ -61,15 +73,9 @@ def get_questions(data: GetQuestionsRequest | None = None):
     if data and data.student_id and topic:
         set_student_current_topic(data.student_id, topic)
 
-    if data and data.student_id and data.topic:
-        question = select_question(data.student_id, data.topic)
-        return {"questions": [question] if question else []}
-
     questions = fetch_questions(topic=topic, limit=limit, exclude_ids=asked_ids)
     if not questions and asked_ids:
         questions = fetch_questions(topic=topic, limit=limit)
-    if not questions and topic:
-        questions = fetch_questions(limit=limit)
     return {"questions": questions}
 
 
@@ -103,9 +109,12 @@ def submit(data: dict):
 
 @router.post("/submit-answers")
 def submit_answers(data: SubmitAnswersRequest):
+    student_id = data.student_id or "guest-student"
     tags = []
     attempted_question_ids = []
     topic = data.topic
+    total_weight = 0.0
+    correct_weight = 0.0
     for ans in data.answers:
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
@@ -115,9 +124,11 @@ def submit_answers(data: SubmitAnswersRequest):
 
         selected = str(selected_raw)
         correct = str(correct_raw)
-
-        if selected == correct:
-            continue
+        is_correct = selected == correct
+        weight = _difficulty_weight(ans.get("difficulty"))
+        total_weight += weight
+        if is_correct:
+            correct_weight += weight
 
         misconception_map = (
             ans.get("misconception_map")
@@ -125,13 +136,15 @@ def submit_answers(data: SubmitAnswersRequest):
             or {}
         )
 
-        guessed = (
-            misconception_map.get(selected)
-            or misconception_map.get(selected_raw)
-            or ans.get("misconception_tag")
-        )
+        guessed = None
+        if not is_correct:
+            guessed = (
+                misconception_map.get(selected)
+                or misconception_map.get(selected_raw)
+                or ans.get("misconception_tag")
+            )
 
-        if not guessed and ans.get("question_id") is not None:
+        if not is_correct and not guessed and ans.get("question_id") is not None:
             try:
                 guessed = fetch_misconception_for_answer(
                     int(ans["question_id"]), int(selected_raw)
@@ -148,13 +161,40 @@ def submit_answers(data: SubmitAnswersRequest):
         if not topic and ans.get("topic"):
             topic = str(ans.get("topic"))
 
+        update_student(student_id, guessed)
+        log_student_behavior(
+            student_id=student_id,
+            topic=topic,
+            selected_option=selected,
+            correct_option=correct,
+            is_correct=is_correct,
+            misconception_tag=guessed,
+        )
+
         if guessed:
             tags.append(guessed)
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
-    student_id = data.student_id or "guest-student"
+    weighted_accuracy = correct_weight / total_weight if total_weight else 0
+    student = get_student(student_id)
+    accuracy = weighted_accuracy
+    if accuracy < 0.4:
+        level = "beginner"
+    elif accuracy < 0.7:
+        level = "intermediate"
+    else:
+        level = "advanced"
+    student = update_student_level(student_id, level)
+
     update_student_topic_resolution(student_id, topic, main_misconception)
+
+    reason_payload = {
+        "reason": "Great work. Keep practicing to strengthen your understanding.",
+        "focus_area": "N/A",
+    }
+    if main_misconception != "none":
+        reason_payload = generate_reasoning(main_misconception, topic or "reflection_refraction")
 
     follow_up = []
     if main_misconception != "none":
@@ -182,6 +222,10 @@ def submit_answers(data: SubmitAnswersRequest):
 
     return {
         "main_misconception": main_misconception,
+        "level": student.get("level"),
+        "attempt": student.get("attempts"),
+        "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
+        "focus_area": reason_payload.get("focus_area", "N/A"),
         "questions": follow_up,
     }
 
