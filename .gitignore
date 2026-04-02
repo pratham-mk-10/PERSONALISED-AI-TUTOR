@@ -23,5 +23,7 @@ backend/.venv/
 backend/env/
 backend/*.egg-info/
 backend/*.dist-info/
-backend/database/pycache/
+backend/database/pycache/*
+backend/orchestrator/pycache/*
 backend/database/venv/
+frontend/node_modules/*

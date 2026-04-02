@@ -260,3 +260,15 @@ def evaluate_answer(req: EvaluationRequest):
 def get_student(student_id: str):
     profile = get_student_profile(student_id)
     return profile or {"student": None, "behavior": []}
+
+from assessment_agent.question_engine import generate_questions
+
+
+@router.post("/generate-questions")
+def generate(data: dict):
+    topic = data.get("topic", "Laws of Reflection")
+    difficulty = data.get("difficulty", "easy")
+
+    questions = generate_questions(topic, difficulty)
+
+    return {"questions": questions}
