@@ -1,7 +1,10 @@
 import json
 import os
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 
 FALLBACK_MODELS = [
@@ -34,7 +37,7 @@ def _friendly_error_message(exc):
 
 def _get_client():
 	api_key = _get_api_key()
-	if not api_key:
+	if not api_key or genai is None:
 		return None
 	genai.configure(api_key=api_key)
 	return genai
