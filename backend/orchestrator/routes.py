@@ -115,6 +115,8 @@ def submit_answers(data: SubmitAnswersRequest):
     topic = data.topic
     total_weight = 0.0
     correct_weight = 0.0
+    misconception_context = {}  # Store context for main misconception
+    
     for ans in data.answers:
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
@@ -173,6 +175,12 @@ def submit_answers(data: SubmitAnswersRequest):
 
         if guessed:
             tags.append(guessed)
+            # Store question context for this misconception
+            misconception_context[guessed] = {
+                "question_text": ans.get("question_text"),
+                "student_answer": selected,
+                "correct_answer": correct,
+            }
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
@@ -194,7 +202,49 @@ def submit_answers(data: SubmitAnswersRequest):
         "focus_area": "N/A",
     }
     if main_misconception != "none":
-        reason_payload = generate_reasoning(main_misconception, topic or "reflection_refraction")
+        # Get context for the main misconception
+        context = misconception_context.get(main_misconception, {})
+        reason_payload = generate_reasoning(
+            main_misconception, 
+            topic or "reflection_refraction",
+            question_text=context.get("question_text"),
+            student_answer=context.get("student_answer"),
+            correct_answer=context.get("correct_answer"),
+        )
+
+    follow_up = []
+    if main_misconception != "none":
+        try:
+            follow_up = fetch_by_misconception(
+                main_misconception,
+                topic=topic,
+                limit=5,
+                exclude_ids=attempted_question_ids,
+            )
+        except Exception:
+            follow_up = fetch_questions(topic=topic, limit=5, exclude_ids=attempted_question_ids)
+
+    if not follow_up:
+        follow_up = fetch_questions(topic=topic, limit=5, exclude_ids=attempted_question_ids)
+    if not follow_up and not topic:
+        follow_up = fetch_questions(limit=5, exclude_ids=attempted_question_ids)
+
+    if len(follow_up) < 5:
+        already = attempted_question_ids + [q["id"] for q in follow_up]
+        top_up = fetch_questions(topic=topic, limit=5 - len(follow_up), exclude_ids=already)
+        if not top_up and not topic:
+            top_up = fetch_questions(limit=5 - len(follow_up), exclude_ids=already)
+        follow_up.extend(top_up)
+
+    return {
+        "main_misconception": main_misconception,
+        "level": student.get("level"),
+        "attempt": student.get("attempts"),
+        "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
+        "focus_area": reason_payload.get("focus_area", "N/A"),
+        "questions": follow_up,
+    }
+
 
     follow_up = []
     if main_misconception != "none":

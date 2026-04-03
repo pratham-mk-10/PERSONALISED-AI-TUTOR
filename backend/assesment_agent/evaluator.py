@@ -24,6 +24,7 @@ class Evaluator:
 		correct_option,
 		misconception_map,
 		topic,
+		question_text=None,
 	):
 		is_correct = str(selected_option) == str(correct_option)
 
@@ -55,7 +56,15 @@ class Evaluator:
 		}
 
 		if USE_LLM and not is_correct:
-			response.update(generate_reasoning(misconception_tag, topic))
+			response.update(
+				generate_reasoning(
+					misconception_tag, 
+					topic,
+					question_text=question_text,
+					student_answer=selected_option,
+					correct_answer=correct_option,
+				)
+			)
 
 		return response
 

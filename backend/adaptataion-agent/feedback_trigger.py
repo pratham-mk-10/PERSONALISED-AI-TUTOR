@@ -68,7 +68,7 @@ def _extract_json(raw):
 		return None
 
 
-def generate_reasoning(misconception_tag, topic):
+def generate_reasoning(misconception_tag, topic, question_text=None, student_answer=None, correct_answer=None):
 	client = _get_client()
 
 	if not client:
@@ -77,13 +77,23 @@ def generate_reasoning(misconception_tag, topic):
 			"focus_area": "N/A",
 		}
 
+	# Build context with available information
+	context = f"Topic: {topic}\nMisconception: {misconception_tag}"
+	
+	if question_text:
+		context += f"\n\nQuestion: {question_text}"
+	if student_answer is not None:
+		context += f"\n\nStudent's Answer: {student_answer}"
+	if correct_answer is not None:
+		context += f"\nCorrect Answer: {correct_answer}"
+
 	prompt = f"""
 A student made a mistake in {topic}.
 
-Misconception: {misconception_tag}
+{context}
 
-Explain the mistake clearly in one sentence.
-Also suggest which part of the diagram should be highlighted.
+Explain why the student's answer is incorrect and what the correct concept is. Keep explanation clear and concise in 2-3 sentences.
+Also suggest which part of the diagram should be highlighted for learning.
 
 Output JSON only with keys: reason, focus_area.
 """.strip()
