@@ -1,29 +1,72 @@
-__pycache__/
-venv/
-.venv/
-env/
-*.egg-info/
-*.dist-info/
-pip-wheel-metadata/
-.pytest_cache/
+# Environment files
 .env
 .env.*
 !.env.example
+
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+
+# Python virtual environments
 venv/
 .venv/
 env/
-*.egg-info/
-*.dist-info/
-pip-wheel-metadata/
-.pytest_cache/
-backend/__pycache__/
+ENV/
 backend/venv/
 backend/.venv/
 backend/env/
-backend/*.egg-info/
-backend/*.dist-info/
-backend/database/pycache/*
-backend/orchestrator/pycache/*
-backend/database/venv/
-frontend/node_modules/*
+
+# Python packaging/build
+*.egg-info/
+*.dist-info/
+pip-wheel-metadata/
+build/
+dist/
+
+# Python test/tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.nox/
+.tox/
+
+# Frontend / Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.cache/
+
+# Node package manager logs/cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+
+# Coverage
+coverage/
+.coverage
+.coverage.*
+
+# IDE / Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc runtime files
+*.log
+*.tmp
+*.swp

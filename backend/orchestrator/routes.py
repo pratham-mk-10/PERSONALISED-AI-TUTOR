@@ -261,14 +261,23 @@ def get_student(student_id: str):
     profile = get_student_profile(student_id)
     return profile or {"student": None, "behavior": []}
 
-from assessment_agent.question_engine import generate_questions
+from question_engine import SYLLABUS_SCOPE, generate_questions
 
 
 @router.post("/generate-questions")
 def generate(data: dict):
     topic = data.get("topic", "Laws of Reflection")
     difficulty = data.get("difficulty", "easy")
+    syllabus_scope = data.get("syllabus_scope") or SYLLABUS_SCOPE
+    question_count = data.get("question_count", 5)
+    tutor_context = data.get("tutor_context")
 
-    questions = generate_questions(topic, difficulty)
+    questions = generate_questions(
+        topic,
+        difficulty,
+        syllabus_scope=syllabus_scope,
+        question_count=question_count,
+        tutor_context=tutor_context,
+    )
 
     return {"questions": questions}
