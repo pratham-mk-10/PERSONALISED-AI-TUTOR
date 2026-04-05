@@ -22,6 +22,35 @@ export const getQuestions = async ({ askedQuestionIds = [], limit = 5, topic = n
   return res.json();
 };
 
+export const getGeneratedQuestions = async ({
+  topic = null,
+  difficulty = "easy",
+  syllabusScope = null,
+  questionCount = 5,
+  tutorContext = null,
+} = {}) => {
+  const res = await fetch(`${BASE_URL}/generate-questions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      topic,
+      difficulty,
+      syllabus_scope: syllabusScope,
+      question_count: questionCount,
+      tutor_context: tutorContext,
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to load generated questions (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
 export const submitAnswers = async ({ answers, topic = null, studentId = null }) => {
   const res = await fetch(`${BASE_URL}/submit-answers`, {
     method: "POST",

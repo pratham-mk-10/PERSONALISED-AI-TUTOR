@@ -2,13 +2,31 @@ import React, { useEffect, useState } from "react";
 import QuizCard from "./QuizCard";
 import {
   getMisconceptionReason,
-  getQuestions,
+  getGeneratedQuestions,
   submitAnswers,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
 
 
 const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
+
+const TOPIC_CONTEXTS = {
+  "laws-reflection": {
+    title: "Laws of Reflection",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the two laws of reflection: (1) angle of incidence equals angle of reflection (i = r), and (2) incident ray, reflected ray, and normal lie in the same plane. Do NOT include image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
+  },
+  "plane-mirror": {
+    title: "Plane Mirror Basics",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to plane mirror image characteristics, laws of reflection, and related Class 10 NCERT ideas.",
+  },
+  "refraction-intro": {
+    title: "Introduction to Refraction",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to refraction, refractive index, optical density, Snell's law, and rectangular glass slab refraction.",
+  },
+};
 
 
 const loadQuestionHistory = () => {
@@ -28,15 +46,6 @@ const saveQuestionHistory = (ids) => {
   } catch {
     // ignore storage errors
   }
-};
-
-
-const mapTopicIdToQuestionTopic = (topicId) => {
-  if (!topicId) return null;
-  const id = String(topicId).toLowerCase();
-  if (id.includes("reflection") || id.includes("mirror")) return "reflection";
-  if (id.includes("refraction")) return "refraction";
-  return null;
 };
 
 
@@ -60,6 +69,7 @@ const questionKey = (question, fallbackIndex = 0) => {
 const QuizPage = () => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
+  const progress = useSessionStore((s) => s.progress);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -79,25 +89,18 @@ const QuizPage = () => {
     setCurrentIndex(0);
 
     const seenIds = loadQuestionHistory();
-    const activeTopic = mapTopicIdToQuestionTopic(currentTopicId) || "reflection";
+    const quizTopicContext = getQuizTopicContext(currentTopicId);
+    const personalization = getPersonalization(currentTopicId, progress);
     const studentId = user?.id || user?.name || "guest-student";
 
     try {
-      let data = await getQuestions({
-        askedQuestionIds: seenIds,
-        limit: 5,
-        topic: activeTopic,
-        studentId,
+      const data = await getGeneratedQuestions({
+        topic: quizTopicContext.title,
+        difficulty: personalization.difficulty,
+        syllabusScope: quizTopicContext.syllabusScope,
+        questionCount: personalization.questionCount,
+        tutorContext: personalization.tutorContext,
       });
-      if (!data.questions || data.questions.length === 0) {
-        saveQuestionHistory([]);
-        data = await getQuestions({
-          askedQuestionIds: [],
-          limit: 5,
-          topic: activeTopic,
-          studentId,
-        });
-      }
 
       const nextQuestions = shuffle(data.questions || []).map((q, idx) => ({
         ...q,
@@ -137,7 +140,7 @@ const QuizPage = () => {
     }
 
     try {
-      const activeTopic = mapTopicIdToQuestionTopic(currentTopicId) || "reflection";
+      const quizTopicContext = getQuizTopicContext(currentTopicId);
       const studentId = user?.id || user?.name || "guest-student";
 
       const formatted = questions.map(q => ({
@@ -147,10 +150,10 @@ const QuizPage = () => {
         correct: q.correct,
         difficulty: q.difficulty,
         misconception_map: q.misconception_map || {},
-        topic: q.topic || activeTopic,
+        topic: q.topic || quizTopicContext.title,
       }));
 
-      const res = await submitAnswers({ answers: formatted, topic: activeTopic, studentId });
+      const res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId });
       let reason = {
         reason: res.reason,
         focus_area: res.focus_area,
@@ -159,7 +162,7 @@ const QuizPage = () => {
       if (!reason.reason) {
         reason = await getMisconceptionReason(
           res.main_misconception,
-          activeTopic
+          quizTopicContext.title
         );
       }
 
