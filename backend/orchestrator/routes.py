@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from database.models import (
-    get_student,
+    get_student as get_student_record,
     get_student_profile,
     log_student_behavior,
     set_student_current_topic,
@@ -16,7 +16,7 @@ from database.models import (
     update_student_topic_resolution,
 )
 from assesment_agent.evaluator import Evaluator
-from assesment_agent.question_gen import generate_questions
+from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
 
 
 def _load_adaptation_feedback_module():
@@ -102,14 +102,14 @@ def get_questions(data: GetQuestionsRequest | None = None):
     if data and data.topic:
         topic = data.topic
     if not topic and data and data.student_id:
-        student = get_student(data.student_id)
+        student = get_student_record(data.student_id)
         topic = student.get("current_topic")
         student_level = student.get("level", "beginner")
     if data and data.student_id and topic:
         set_student_current_topic(data.student_id, topic)
 
     if data and data.student_id and student_level == "beginner":
-        student_level = get_student(data.student_id).get("level", "beginner")
+        student_level = get_student_record(data.student_id).get("level", "beginner")
 
     difficulty = _difficulty_from_level(student_level)
     questions = generate_questions(topic or "reflection_refraction", difficulty)
@@ -163,6 +163,7 @@ def submit_answers(data: SubmitAnswersRequest):
     misconception_context = {}  # Store context for main misconception
     wrong_question_context = []
     per_question_feedback = []
+    db_sync_error = None
     
     for ans in data.answers:
         selected_raw = ans.get("selected")
@@ -232,15 +233,19 @@ def submit_answers(data: SubmitAnswersRequest):
                 }
             )
 
-        update_student(student_id, guessed)
-        log_student_behavior(
-            student_id=student_id,
-            topic=topic,
-            selected_option=selected,
-            correct_option=correct,
-            is_correct=is_correct,
-            misconception_tag=guessed,
-        )
+        try:
+            update_student(student_id, guessed)
+            log_student_behavior(
+                student_id=student_id,
+                topic=topic,
+                selected_option=selected,
+                correct_option=correct,
+                is_correct=is_correct,
+                misconception_tag=guessed,
+            )
+        except Exception as exc:
+            # Keep quiz flow usable even if DB is temporarily unreachable.
+            db_sync_error = str(exc)
 
         if guessed:
             tags.append(guessed)
@@ -256,7 +261,10 @@ def submit_answers(data: SubmitAnswersRequest):
         main_misconception = "general_concept_gap"
 
     weighted_accuracy = correct_weight / total_weight if total_weight else 0
-    student = get_student(student_id)
+    student = {
+        "level": "beginner",
+        "attempts": 0,
+    }
     accuracy = weighted_accuracy
     if accuracy < 0.4:
         level = "beginner"
@@ -264,9 +272,13 @@ def submit_answers(data: SubmitAnswersRequest):
         level = "intermediate"
     else:
         level = "advanced"
-    student = update_student_level(student_id, level)
 
-    update_student_topic_resolution(student_id, topic, main_misconception)
+    try:
+        student = update_student_level(student_id, level)
+        update_student_topic_resolution(student_id, topic, main_misconception)
+    except Exception as exc:
+        db_sync_error = str(exc)
+        student["level"] = level
 
     reason_payload = {
         "reason": "Great work. Keep practicing to strengthen your understanding.",
@@ -305,6 +317,7 @@ def submit_answers(data: SubmitAnswersRequest):
         "focus_area": reason_payload.get("focus_area", "N/A"),
         "question_feedback": per_question_feedback,
         "questions": follow_up,
+        "db_sync_warning": _trim_feedback(db_sync_error, 180) if db_sync_error else None,
     }
 
 
@@ -319,7 +332,7 @@ def misconception_reason(req: MisconceptionReasonRequest):
 
 @router.get("/question/{student_id}/{topic}")
 def get_adaptive_question(student_id: str, topic: str):
-    student = get_student(student_id)
+    student = get_student_record(student_id)
     difficulty = _difficulty_from_level(student.get("level"))
     questions = generate_questions(topic, difficulty)
     return (questions[0] if questions else {})
@@ -337,7 +350,7 @@ def evaluate_answer(req: EvaluationRequest):
 
 
 @router.get("/student/{student_id}")
-def get_student(student_id: str):
+def get_student_route(student_id: str):
     profile = get_student_profile(student_id)
     return profile or {"student": None, "behavior": []}
 
