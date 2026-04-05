@@ -1,7 +1,7 @@
 // ============================================================
 // LawsOfReflectionAnimation.jsx (UPDATED - PANEL FRIENDLY)
 // Changes:
-// - Slower animation (9000ms)
+// - Slower animation (42000ms)
 // - Step-by-step teaching captions
 // - Pause-based flow (LKG style)
 // - Minimal highlights (no styling changes)
@@ -44,15 +44,17 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
 
     lastStepRef.current = step;
 
-    let audioFile = "";
+    const audioFiles = {
+      0: ["/audio/mirror.wav"],
+      1: ["/audio/normal.wav"],
+      2: ["/audio/incident.wav"],
+      3: ["/audio/AngleOfIncidence.wav"],
+      4: ["/audio/reflected.wav"],
+      5: ["/audio/AngleOfReflection.wav"],
+      6: ["/audio/law.wav"],
+    };
 
-    if (step === 0) audioFile = "/audio/mirror.mp3";
-    if (step === 1) audioFile = "/audio/normal.mp3";
-    if (step === 2) audioFile = "/audio/incident.mp3";
-    if (step === 3) audioFile = "/audio/inc_angle.mp3";
-    if (step === 4) audioFile = "/audio/reflected.mp3";
-    if (step === 5) audioFile = "/audio/ref_angle.mp3";
-    if (step === 6) audioFile = "/audio/law.mp3";
+    const [audioFile, fallbackFile] = audioFiles[step] || [];
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -61,12 +63,20 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
     const audio = new Audio(audioFile);
     audioRef.current = audio;
 
+    audio.onerror = () => {
+      if (!fallbackFile) return;
+
+      const fallbackAudio = new Audio(fallbackFile);
+      audioRef.current = fallbackAudio;
+      fallbackAudio.play().catch(() => {});
+    };
+
     audio.play().catch(() => {});
   };
 
   return (
     <AnimationPlayer
-      duration={21000}
+      duration={42000}
       title="Watch: Law of Reflection"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
@@ -74,22 +84,22 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
       {({ progress }) => {
         let step = 0;
 
-        if (progress < 0.15) step = 0;
-        else if (progress < 0.3) step = 1;
-        else if (progress < 0.45) step = 2;
-        else if (progress < 0.6) step = 3;
-        else if (progress < 0.75) step = 4;
-        else if (progress < 0.9) step = 5;
+        if (progress < 0.10) step = 0;
+        else if (progress < 0.22) step = 1;
+        else if (progress < 0.40) step = 2;
+        else if (progress < 0.56) step = 3;
+        else if (progress < 0.74) step = 4;
+        else if (progress < 0.94) step = 5;
         else step = 6;
 
         // Play audio for current step
         playAudio(step);
 
         // ── PHASES (SLOW + TEACHING STYLE) ──
-        const mirrorOpacity = clamp(progress / 0.15, 0, 1);
+        const mirrorOpacity = clamp(progress / 0.10, 0, 1);
 
-        const incPhase = clamp((progress - 0.3) / 0.15, 0, 1);
-        const refPhase = clamp((progress - 0.6) / 0.15, 0, 1);
+        const incPhase = clamp((progress - 0.22) / 0.18, 0, 1);
+        const refPhase = clamp((progress - 0.56) / 0.20, 0, 1);
 
         const showIncArc = step >= 3;
         const showRefArc = step >= 5;
@@ -313,7 +323,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
               <Label
                 x={210}
                 y={50}
-                text="Both angles are equal"
+                text="The angle of incidence equals the angle of reflection (∠i = ∠r)"
                 color="#1E40AF"
                 size={14}
                 anchor="middle"
