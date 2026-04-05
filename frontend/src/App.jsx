@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-
+import React, { useState, useEffect } from "react";
+import QuizPage from "./components/quiz/QuizPage";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
 import Dashboard from "./components/dashboard/Dashboard";
@@ -67,11 +67,17 @@ function App() {
               color: i === currentIndex ? "#FFFFFF" : "#374151",
             }}
           >
-            {{ tell: "1. Learn", show: "2. Watch", try: "3. Try", test: "4. Quiz" }[s]}
+            {{
+              tell: "1. Learn",
+              show: "2. Watch",
+              try: "3. Try",
+              test: "4. Quiz",
+            }[s]}
           </div>
         ))}
       </div>
 
+      {/* TELL */}
       {stage === "tell" && (
         <div style={styles.card}>
           <h2 style={styles.h2}>Laws of Reflection</h2>
@@ -92,7 +98,9 @@ function App() {
           </p>
 
           <div style={styles.lawBox}>
-            <p style={styles.lawText}>1. Angle of incidence = Angle of reflection</p>
+            <p style={styles.lawText}>
+              1. Angle of incidence = Angle of reflection
+            </p>
             <p style={styles.lawText}>2. Measured from the Normal</p>
           </div>
           <button
@@ -110,6 +118,7 @@ function App() {
         </div>
       )}
 
+      {/* SHOW */}
       {stage === "show" && (
         <div style={styles.card}>
           {content && content.explanation_text && (
@@ -126,6 +135,7 @@ function App() {
         </div>
       )}
 
+      {/* TRY */}
       {stage === "try" && (
         <div style={styles.card}>
           <AngleSlider
@@ -143,72 +153,10 @@ function App() {
         </div>
       )}
 
+      {/* TEST */}
       {stage === "test" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Comprehension Quiz</h2>
-          <p style={styles.explanation}>
-            In which direction is the angle of incidence measured in the law of reflection?
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-            <button
-              style={styles.btnSecondary}
-              onClick={() => {
-                // Simulate correct answer — no misconception.
-                setMisconceptionTag("");
-                setContent(null);
-                setAttempt(1);
-                setShowFeedback(false);
-                setStage("tell");
-              }}
-            >
-              From the Normal (correct)
-            </button>
-
-            <button
-              style={styles.btnSecondary}
-              onClick={async () => {
-                // Simulate assessment engine detecting angle_from_surface misconception.
-                const tag = "angle_from_surface";
-                const nextAttempt = attempt + 1;
-                try {
-                  await handleLoadContent(nextAttempt, tag);
-                  setShowFeedback(true);
-                } catch (e) {
-                  // handleLoadContent already sets contentError; keep UI simple here.
-                }
-                setStage("test");
-              }}
-            >
-              From the mirror surface (misconception)
-            </button>
-          </div>
-
-          {contentError && (
-            <p style={{ color: "#DC2626", fontSize: "13px", marginTop: 8 }}>
-              {contentError}
-            </p>
-          )}
-
-          {showFeedback && (
-            <div style={{ marginTop: 16 }}>
-              <ReflectionFeedback misconceptionTag={misconceptionTag} />
-              <button
-                style={{ ...styles.btnPrimary, marginTop: 12 }}
-                onClick={() => {
-                  setShowFeedback(false);
-                  setStage("show");
-                }}
-                disabled={loadingContent}
-              >
-                Continue → See explanation
-              </button>
-            </div>
-          )}
-
-          <button style={styles.btnSecondary} onClick={() => setStage("tell")}>
-            ← Back
-          </button>
+          <QuizPage />
         </div>
       )}
     </div>
@@ -218,20 +166,6 @@ function App() {
     return <div style={styles.page}>{renderSession()}</div>;
   }
 
-  if (view === "dashboard") {
-    return (
-      <div style={styles.page}>
-        <Dashboard
-          onStartTopic={() => {
-            setStage("tell");
-            setView("session");
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Fallback: default to dashboard
   return (
     <div style={styles.page}>
       <Dashboard
@@ -248,7 +182,8 @@ const styles = {
   page: {
     minHeight: "100vh",
     background: "#F0F4FF",
-    fontFamily: "Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily:
+      "Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   sessionPage: {
     maxWidth: "900px",

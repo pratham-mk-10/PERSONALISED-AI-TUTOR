@@ -1,3 +1,8 @@
 {
+<<<<<<< HEAD
   "css.lint.unknownAtRules": "ignore"
 }
+=======
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+}
+>>>>>>> c40d52cdb02ccf22c923d6bce4920fb1af9a0545
