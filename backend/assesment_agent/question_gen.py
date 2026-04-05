@@ -1,6 +1,7 @@
+from importlib.util import module_from_spec, spec_from_file_location
 import json
+from pathlib import Path
 import re
-from assesment_agent.question_gen_llm_service import generate_text
 
 base_dir = Path(__file__).resolve().parent
 llm_spec = spec_from_file_location("assesment_agent.question_gen_llm_service", base_dir / "question_gen_llm_service.py")

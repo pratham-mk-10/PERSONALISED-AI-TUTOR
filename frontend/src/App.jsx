@@ -7,29 +7,6 @@ import Dashboard from "./components/dashboard/Dashboard";
 function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("tell");
-  const [questions, setQuestions] = useState([]);
-  const [results, setResults] = useState(null);
-  const [answers, setAnswers] = useState({});
-
-  useEffect(() => {
-    if (stage === "test") {
-      fetch("http://localhost:8000/generate-questions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic: "Laws of Reflection",
-          difficulty: "easy"
-        })
-      })
-        .then(res => res.json())
-        .then(data => {
-          setQuestions(data.questions);
-          setResults(null);
-          setAnswers({});
-        })
-        .catch(err => console.error("Error fetching questions:", err));
-    }
-  }, [stage]);
 
   const stages = ["tell", "show", "try", "test"];
   const currentIndex = stages.indexOf(stage);

@@ -66,6 +66,40 @@ const questionKey = (question, fallbackIndex = 0) => {
   return `gen-${fallbackIndex}-${text}`;
 };
 
+const getQuizTopicContext = (topicId) => {
+  if (topicId && TOPIC_CONTEXTS[topicId]) {
+    return TOPIC_CONTEXTS[topicId];
+  }
+  return TOPIC_CONTEXTS["laws-reflection"];
+};
+
+const getPersonalization = (topicId, progress) => {
+  const topicProgress = progress?.[topicId] || {};
+  const mastery = Number(topicProgress?.mastery ?? 0);
+
+  let difficulty = "easy";
+  let questionCount = 5;
+
+  if (mastery >= 70) {
+    difficulty = "hard";
+    questionCount = 6;
+  } else if (mastery >= 40) {
+    difficulty = "medium";
+    questionCount = 5;
+  }
+
+  const tutorContext =
+    topicProgress?.misconception && String(topicProgress.misconception).trim()
+      ? `Primary misconception observed: ${topicProgress.misconception}`
+      : "No prior misconception data for this topic.";
+
+  return {
+    difficulty,
+    questionCount,
+    tutorContext,
+  };
+};
+
 const QuizPage = () => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
@@ -171,6 +205,27 @@ const QuizPage = () => {
         return count + (answers[q._key] === q.correct ? 1 : 0);
       }, 0);
 
+      const detailedResults = questions.map((q, idx) => {
+        const selectedIndex = answers[q._key];
+        const correctIndex = q.correct;
+        const isCorrect = selectedIndex === correctIndex;
+
+        const matchedFeedback = (Array.isArray(res.question_feedback) ? res.question_feedback : []).find(
+          (item) => item?.question_id !== undefined && item?.question_id === q.id
+        );
+
+        return {
+          index: idx + 1,
+          questionText: q.question_text,
+          options: Array.isArray(q.options) ? q.options : [],
+          selectedIndex,
+          correctIndex,
+          isCorrect,
+          reason: matchedFeedback?.reason || (isCorrect ? "Correct answer." : "Review this concept once more."),
+          focusArea: matchedFeedback?.focus_area || null,
+        };
+      });
+
       setReport({
         total,
         correctCount,
@@ -179,6 +234,8 @@ const QuizPage = () => {
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
         questionFeedback: Array.isArray(res.question_feedback) ? res.question_feedback : [],
+        detailedResults,
+        dbSyncWarning: res.db_sync_warning || null,
       });
     } catch (err) {
       setError(err?.message || "Unable to submit answers");
@@ -223,6 +280,85 @@ const QuizPage = () => {
             <strong>Focus Area:</strong> {report.focusArea}
           </p>
         </div>
+
+        {report.dbSyncWarning && (
+          <div style={{ marginTop: "12px", padding: "10px 12px", border: "1px solid #f5c2c7", borderRadius: "8px", background: "#fff5f5", color: "#842029" }}>
+            Could not sync this attempt to database right now. Quiz result is shown locally.
+          </div>
+        )}
+
+        {!!report.detailedResults?.length && (
+          <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
+            <h3 style={{ marginTop: 0 }}>Answer Review</h3>
+            <p style={{ marginTop: 0, color: "#4b5563" }}>
+              Green = correct option, Red = your wrong selected option.
+            </p>
+
+            {report.detailedResults.map((item, idx) => (
+              <div
+                key={`review-${idx}`}
+                style={{
+                  marginTop: idx === 0 ? 0 : "12px",
+                  paddingTop: idx === 0 ? 0 : "12px",
+                  borderTop: idx === 0 ? "none" : "1px solid #eef2ff",
+                }}
+              >
+                <p style={{ margin: "0 0 8px", fontWeight: 700 }}>
+                  Question {item.index}
+                </p>
+                <p style={{ margin: "0 0 8px", color: "#111827" }}>{item.questionText}</p>
+
+                <div style={{ display: "grid", gap: "6px" }}>
+                  {item.options.map((opt, optionIdx) => {
+                    const isSelected = optionIdx === item.selectedIndex;
+                    const isCorrectOption = optionIdx === item.correctIndex;
+
+                    let background = "#f9fafb";
+                    let border = "1px solid #e5e7eb";
+                    let color = "#111827";
+
+                    if (isCorrectOption) {
+                      background = "#ecfdf3";
+                      border = "1px solid #86efac";
+                      color = "#166534";
+                    }
+
+                    if (isSelected && !isCorrectOption) {
+                      background = "#fef2f2";
+                      border = "1px solid #fca5a5";
+                      color = "#991b1b";
+                    }
+
+                    return (
+                      <div
+                        key={`opt-${item.index}-${optionIdx}`}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: "8px",
+                          border,
+                          background,
+                          color,
+                          fontWeight: isSelected || isCorrectOption ? 700 : 500,
+                        }}
+                      >
+                        {opt}
+                        {isSelected ? " (Your answer)" : ""}
+                        {isCorrectOption ? " (Correct)" : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {!item.isCorrect && (
+                  <p style={{ margin: "8px 0 0", color: "#374151" }}>
+                    <strong>Why wrong:</strong> {item.reason}
+                    {item.focusArea ? ` | Focus: ${item.focusArea}` : ""}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {!!report.questionFeedback?.length && (
           <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
