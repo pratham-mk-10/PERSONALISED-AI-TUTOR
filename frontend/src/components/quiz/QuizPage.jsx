@@ -49,6 +49,14 @@ const shuffle = (items) => {
   return arr;
 };
 
+const questionKey = (question, fallbackIndex = 0) => {
+  if (question?.id !== undefined && question?.id !== null) {
+    return `id-${question.id}`;
+  }
+  const text = String(question?.question_text || "").slice(0, 24);
+  return `gen-${fallbackIndex}-${text}`;
+};
+
 const QuizPage = () => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
@@ -91,11 +99,14 @@ const QuizPage = () => {
         });
       }
 
-      const nextQuestions = shuffle(data.questions || []);
+      const nextQuestions = shuffle(data.questions || []).map((q, idx) => ({
+        ...q,
+        _key: questionKey(q, idx),
+      }));
       setQuestions(nextQuestions);
 
       const nextIds = [
-        ...new Set([...seenIds, ...nextQuestions.map(q => q.id)])
+        ...new Set([...seenIds, ...nextQuestions.map(q => q.id).filter((id) => id !== undefined && id !== null)])
       ].slice(-50);
       saveQuestionHistory(nextIds);
 
@@ -119,7 +130,7 @@ const QuizPage = () => {
   // 🔹 Submit answers
   const handleSubmit = async () => {
     setError("");
-    const unanswered = questions.filter(q => answers[q.id] === undefined);
+    const unanswered = questions.filter(q => answers[q._key] === undefined);
     if (unanswered.length > 0) {
       setError("Please answer all questions before submitting.");
       return;
@@ -131,7 +142,8 @@ const QuizPage = () => {
 
       const formatted = questions.map(q => ({
         question_id: q.id,
-        selected: answers[q.id],
+        question_text: q.question_text,
+        selected: answers[q._key],
         correct: q.correct,
         difficulty: q.difficulty,
         misconception_map: q.misconception_map || {},
@@ -153,7 +165,7 @@ const QuizPage = () => {
 
       const total = questions.length;
       const correctCount = questions.reduce((count, q) => {
-        return count + (answers[q.id] === q.correct ? 1 : 0);
+        return count + (answers[q._key] === q.correct ? 1 : 0);
       }, 0);
 
       setReport({
@@ -163,6 +175,7 @@ const QuizPage = () => {
         accuracy: Math.round((correctCount / total) * 100),
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
+        questionFeedback: Array.isArray(res.question_feedback) ? res.question_feedback : [],
       });
     } catch (err) {
       setError(err?.message || "Unable to submit answers");
@@ -208,6 +221,20 @@ const QuizPage = () => {
           </p>
         </div>
 
+        {!!report.questionFeedback?.length && (
+          <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
+            <h3 style={{ marginTop: 0 }}>Per-Question Feedback</h3>
+            {report.questionFeedback.map((item, idx) => (
+              <div key={`${item.question_id || "q"}-${idx}`} style={{ marginTop: idx === 0 ? 0 : "10px", paddingTop: idx === 0 ? 0 : "10px", borderTop: idx === 0 ? "none" : "1px solid #eef2ff" }}>
+                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Question {idx + 1}</p>
+                <p style={{ margin: "0 0 6px", color: "#111827" }}>{item.question_text}</p>
+                <p style={{ margin: "0 0 6px" }}>{item.reason}</p>
+                <p style={{ margin: 0 }}><strong>Focus:</strong> {item.focus_area}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
           <button onClick={restartSameQuiz} style={{ padding: "10px 16px", cursor: "pointer" }}>
             Retry Same Quiz
@@ -237,7 +264,7 @@ const QuizPage = () => {
   }
 
   const currentQuestion = questions[currentIndex];
-  const selectedForCurrent = answers[currentQuestion.id];
+  const selectedForCurrent = answers[currentQuestion._key];
   const isLast = currentIndex === questions.length - 1;
 
   return (
@@ -254,9 +281,10 @@ const QuizPage = () => {
       )}
 
       <QuizCard
-        key={currentQuestion.id}
+        key={currentQuestion._key}
         question={currentQuestion}
         index={currentIndex}
+        questionKey={currentQuestion._key}
         selected={selectedForCurrent}
         onSelect={handleSelect}
       />

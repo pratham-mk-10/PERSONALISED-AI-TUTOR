@@ -1,5 +1,6 @@
 import json
-from assessment_agent.llm_service import generate_text
+import re
+from assesment_agent.question_gen_llm_service import generate_text
 
 
 def build_prompt(topic, difficulty="easy"):
@@ -39,6 +40,12 @@ def generate_questions(topic, difficulty="easy"):
         json_str = raw_output[start:end]
 
         questions = json.loads(json_str)
+
+        for q in questions:
+          text = str(q.get("question_text", "")).strip()
+          # Remove common numbering prefixes like "1.", "Q1:", or "(2)".
+          text = re.sub(r"^\s*(?:q\s*)?\(?\d+\)?[\.:\-\)]\s*", "", text, flags=re.IGNORECASE)
+          q["question_text"] = text
 
         return questions
 

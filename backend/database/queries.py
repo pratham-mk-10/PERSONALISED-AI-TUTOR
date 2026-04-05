@@ -222,19 +222,8 @@ def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
         LIMIT %s;
     """, tuple(params))
 
-        # Convert to list
-        options = [{"index": o[0], "text": o[1]} for o in options_data]
-
-        # 🔥 Shuffle options
-        random.shuffle(options)
-
-        # 🔥 Find new correct index
-        new_correct = next(
-            i for i, opt in enumerate(options) if opt["index"] == correct_idx
-        )
-
-        # Extract only text for frontend
-        option_texts = [opt["text"] for opt in options]
+    rows = cur.fetchall()
+    conn.close()
 
     return [
         {
