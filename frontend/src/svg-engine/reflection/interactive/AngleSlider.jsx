@@ -38,10 +38,12 @@ const ARC_R   = 48;
 const HINTS = {
   angle_from_surface:
     "⚠️ Remember: angles are always measured from the Normal (dashed line), NOT from the mirror surface.",
-  normal_orientation:
+  normal_orientation_wrong:
     "⚠️ The Normal is always perpendicular (90°) to the mirror at the point of contact.",
   reflection_not_equal:
     "⚠️ Notice: angle i always equals angle r — no matter how you move the slider!",
+  plane_not_same:
+    "⚠️ Incident ray, reflected ray and normal must all lie in the same plane.",
   default:
     "💡 Drag the slider and watch how the reflected ray changes.",
 };

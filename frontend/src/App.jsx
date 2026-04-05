@@ -3,10 +3,38 @@ import React, { useState } from "react";
 import LawsOfReflectionAnimation from "./svg-engine/reflection/animations/LawsOfReflectionAnimation";
 import AngleSlider from "./svg-engine/reflection/interactive/AngleSlider";
 import Dashboard from "./components/dashboard/Dashboard";
+import ReflectionFeedback from "./svg-engine/feedback/ReflectionFeedback";
+import { getContent } from "./services/api";
 
 function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("tell");
+  const [attempt, setAttempt] = useState(1);
+  const [misconceptionTag, setMisconceptionTag] = useState("");
+  const [content, setContent] = useState(null);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const [contentError, setContentError] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  const handleLoadContent = async (nextAttempt = attempt, tag = misconceptionTag) => {
+    try {
+      setLoadingContent(true);
+      setContentError("");
+      const data = await getContent({
+        subtopic: "laws_of_reflection",
+        misconception_tag: tag,
+        attempt: nextAttempt,
+      });
+      setContent(data);
+      setAttempt(data.attempt ?? nextAttempt);
+      setMisconceptionTag(data.misconception_tag ?? tag);
+    } catch (err) {
+      setContentError("Could not load adaptive content. Please try again.");
+      console.error(err);
+    } finally {
+      setLoadingContent(false);
+    }
+  };
 
   const stages = ["tell", "show", "try", "test"];
   const currentIndex = stages.indexOf(stage);
@@ -67,8 +95,16 @@ function App() {
             <p style={styles.lawText}>1. Angle of incidence = Angle of reflection</p>
             <p style={styles.lawText}>2. Measured from the Normal</p>
           </div>
-
-          <button style={styles.btnPrimary} onClick={() => setStage("show")}>
+          <button
+            style={styles.btnPrimary}
+            onClick={() => {
+              // First time: no misconception, no AI call yet.
+              setAttempt(1);
+              setMisconceptionTag("");
+              setContent(null);
+              setStage("show");
+            }}
+          >
             Watch it in action →
           </button>
         </div>
@@ -76,13 +112,27 @@ function App() {
 
       {stage === "show" && (
         <div style={styles.card}>
-          <LawsOfReflectionAnimation onTryItClicked={() => setStage("try")} />
+          {content && content.explanation_text && (
+            <p style={styles.explanation}>{content.explanation_text}</p>
+          )}
+
+          <LawsOfReflectionAnimation
+            attempt={content?.attempt ?? attempt}
+            misconceptionTag={content?.misconception_tag ?? misconceptionTag}
+            onTryItClicked={async () => {
+              setStage("try");
+            }}
+          />
         </div>
       )}
 
       {stage === "try" && (
         <div style={styles.card}>
-          <AngleSlider attempt={1} misconceptionTag="" onInteracted={() => {}} />
+          <AngleSlider
+            attempt={content?.attempt ?? attempt}
+            misconceptionTag={content?.misconception_tag ?? misconceptionTag}
+            onInteracted={() => {}}
+          />
 
           <button
             style={{ ...styles.btnPrimary, marginTop: "16px" }}
@@ -96,7 +146,65 @@ function App() {
       {stage === "test" && (
         <div style={styles.card}>
           <h2 style={styles.h2}>Comprehension Quiz</h2>
-          <p style={styles.explanation}>Quiz will be connected to backend.</p>
+          <p style={styles.explanation}>
+            In which direction is the angle of incidence measured in the law of reflection?
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+            <button
+              style={styles.btnSecondary}
+              onClick={() => {
+                // Simulate correct answer — no misconception.
+                setMisconceptionTag("");
+                setContent(null);
+                setAttempt(1);
+                setShowFeedback(false);
+                setStage("tell");
+              }}
+            >
+              From the Normal (correct)
+            </button>
+
+            <button
+              style={styles.btnSecondary}
+              onClick={async () => {
+                // Simulate assessment engine detecting angle_from_surface misconception.
+                const tag = "angle_from_surface";
+                const nextAttempt = attempt + 1;
+                try {
+                  await handleLoadContent(nextAttempt, tag);
+                  setShowFeedback(true);
+                } catch (e) {
+                  // handleLoadContent already sets contentError; keep UI simple here.
+                }
+                setStage("test");
+              }}
+            >
+              From the mirror surface (misconception)
+            </button>
+          </div>
+
+          {contentError && (
+            <p style={{ color: "#DC2626", fontSize: "13px", marginTop: 8 }}>
+              {contentError}
+            </p>
+          )}
+
+          {showFeedback && (
+            <div style={{ marginTop: 16 }}>
+              <ReflectionFeedback misconceptionTag={misconceptionTag} />
+              <button
+                style={{ ...styles.btnPrimary, marginTop: 12 }}
+                onClick={() => {
+                  setShowFeedback(false);
+                  setStage("show");
+                }}
+                disabled={loadingContent}
+              >
+                Continue → See explanation
+              </button>
+            </div>
+          )}
 
           <button style={styles.btnSecondary} onClick={() => setStage("tell")}>
             ← Back

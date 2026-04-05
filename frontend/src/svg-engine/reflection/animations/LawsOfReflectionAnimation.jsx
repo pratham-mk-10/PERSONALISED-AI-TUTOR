@@ -37,7 +37,7 @@ const RAY_LEN  = 160;
 const ANGLE    = 35;    // angle of incidence in degrees
 const ARC_R    = 45;    // radius of angle arc
 
-const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
+const LawsOfReflectionAnimation = ({ attempt = 1, misconceptionTag = "", onTryItClicked }) => {
 
   const incStart  = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
   const refEnd    = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
