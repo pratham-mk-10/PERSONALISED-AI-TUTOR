@@ -221,6 +221,7 @@ def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
         ORDER BY RANDOM()
         LIMIT %s;
     """, tuple(params))
+
     rows = cur.fetchall()
     conn.close()
 
@@ -232,9 +233,7 @@ def fetch_by_misconception(tag, topic=None, limit=10, exclude_ids=None):
             "options": r[3],
             "topic": r[4],
             "difficulty": r[5],
-            "type": "mcq",
-        }
-        for r in rows
+        } for r in rows
     ]
 
 

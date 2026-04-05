@@ -1,4 +1,6 @@
 from collections import Counter
+import importlib.util
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
@@ -13,10 +15,24 @@ from database.models import (
     update_student_level,
     update_student_topic_resolution,
 )
-from database.queries import fetch_by_misconception, fetch_misconception_for_answer, fetch_questions
-from evaluator import Evaluator
-from llm_helper import generate_reasoning
-from question_selector import select_question
+from assesment_agent.evaluator import Evaluator
+from assesment_agent.question_gen import generate_questions
+
+
+def _load_adaptation_feedback_module():
+    backend_root = Path(__file__).resolve().parents[1]
+    file_path = backend_root / "adaptataion-agent" / "feedback_trigger.py"
+    spec = importlib.util.spec_from_file_location("adaptation_feedback_trigger", file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load module from {file_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_adaptation_feedback = _load_adaptation_feedback_module()
+generate_reasoning = _adaptation_feedback.generate_reasoning
 
 router = APIRouter()
 evaluator = Evaluator()
@@ -25,7 +41,7 @@ evaluator = Evaluator()
 class GetQuestionsRequest(BaseModel):
     student_id: str | None = None
     topic: str | None = None
-    asked_question_ids: list[int] | None = None
+    asked_question_ids: list[int | None] | None = None
     limit: int | None = 5
 
 
@@ -56,26 +72,54 @@ def _difficulty_weight(value: Any) -> float:
         return 1.5
     return 1.0
 
+
+def _difficulty_from_level(level: str | None) -> str:
+    normalized = str(level or "beginner").strip().lower()
+    if normalized == "advanced":
+        return "hard"
+    if normalized == "intermediate":
+        return "medium"
+    return "easy"
+
+
+def _trim_feedback(text: str, max_len: int = 220) -> str:
+    cleaned = " ".join(str(text or "").split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    return cleaned[: max_len - 3].rstrip() + "..."
+
 @router.post("/get-questions")
 def get_questions(data: GetQuestionsRequest | None = None):
     limit = 5
     asked_ids = []
     topic = None
+    student_level = "beginner"
 
     if data and data.limit:
         limit = max(1, min(data.limit, 10))
     if data and data.asked_question_ids:
-        asked_ids = data.asked_question_ids
+        asked_ids = [qid for qid in data.asked_question_ids if isinstance(qid, int)]
     if data and data.topic:
         topic = data.topic
     if not topic and data and data.student_id:
-        topic = get_student(data.student_id).get("current_topic")
+        student = get_student(data.student_id)
+        topic = student.get("current_topic")
+        student_level = student.get("level", "beginner")
     if data and data.student_id and topic:
         set_student_current_topic(data.student_id, topic)
 
-    questions = fetch_questions(topic=topic, limit=limit, exclude_ids=asked_ids)
-    if not questions and asked_ids:
-        questions = fetch_questions(topic=topic, limit=limit)
+    if data and data.student_id and student_level == "beginner":
+        student_level = get_student(data.student_id).get("level", "beginner")
+
+    difficulty = _difficulty_from_level(student_level)
+    questions = generate_questions(topic or "reflection_refraction", difficulty)
+
+    # Filter already-asked ids if generated questions include ids.
+    if asked_ids:
+        asked_ids_set = set(asked_ids)
+        questions = [q for q in questions if q.get("id") not in asked_ids_set]
+
+    questions = questions[:limit]
     return {"questions": questions}
 
 
@@ -115,6 +159,11 @@ def submit_answers(data: SubmitAnswersRequest):
     topic = data.topic
     total_weight = 0.0
     correct_weight = 0.0
+    incorrect_count = 0
+    misconception_context = {}  # Store context for main misconception
+    wrong_question_context = []
+    per_question_feedback = []
+    
     for ans in data.answers:
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
@@ -129,6 +178,8 @@ def submit_answers(data: SubmitAnswersRequest):
         total_weight += weight
         if is_correct:
             correct_weight += weight
+        else:
+            incorrect_count += 1
 
         misconception_map = (
             ans.get("misconception_map")
@@ -143,14 +194,8 @@ def submit_answers(data: SubmitAnswersRequest):
                 or misconception_map.get(selected_raw)
                 or ans.get("misconception_tag")
             )
-
-        if not is_correct and not guessed and ans.get("question_id") is not None:
-            try:
-                guessed = fetch_misconception_for_answer(
-                    int(ans["question_id"]), int(selected_raw)
-                )
-            except (TypeError, ValueError):
-                guessed = None
+            if not guessed:
+                guessed = "general_concept_gap"
 
         if ans.get("question_id") is not None:
             try:
@@ -160,6 +205,32 @@ def submit_answers(data: SubmitAnswersRequest):
 
         if not topic and ans.get("topic"):
             topic = str(ans.get("topic"))
+
+        question_text = str(ans.get("question_text") or "").strip()
+
+        if not is_correct:
+            item_feedback = generate_reasoning(
+                guessed or "general_concept_gap",
+                topic or "reflection_refraction",
+                question_text=question_text,
+                student_answer=selected,
+                correct_answer=correct,
+            )
+            wrong_question_context.append(
+                {
+                    "question_text": question_text,
+                    "student_answer": selected,
+                    "correct_answer": correct,
+                }
+            )
+            per_question_feedback.append(
+                {
+                    "question_id": ans.get("question_id"),
+                    "question_text": question_text,
+                    "reason": _trim_feedback(item_feedback.get("reason", "Let's revisit this concept."), 220),
+                    "focus_area": _trim_feedback(item_feedback.get("focus_area", "N/A"), 120),
+                }
+            )
 
         update_student(student_id, guessed)
         log_student_behavior(
@@ -173,8 +244,16 @@ def submit_answers(data: SubmitAnswersRequest):
 
         if guessed:
             tags.append(guessed)
+            # Store question context for this misconception
+            misconception_context[guessed] = {
+                "question_text": ans.get("question_text"),
+                "student_answer": selected,
+                "correct_answer": correct,
+            }
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
+    if main_misconception == "none" and incorrect_count > 0:
+        main_misconception = "general_concept_gap"
 
     weighted_accuracy = correct_weight / total_weight if total_weight else 0
     student = get_student(student_id)
@@ -194,31 +273,29 @@ def submit_answers(data: SubmitAnswersRequest):
         "focus_area": "N/A",
     }
     if main_misconception != "none":
-        reason_payload = generate_reasoning(main_misconception, topic or "reflection_refraction")
-
-    follow_up = []
-    if main_misconception != "none":
-        try:
-            follow_up = fetch_by_misconception(
-                main_misconception,
-                topic=topic,
-                limit=5,
-                exclude_ids=attempted_question_ids,
+        # Build an aggregate context so overall feedback reflects all wrong questions.
+        summary_lines = []
+        for idx, item in enumerate(wrong_question_context[:5], start=1):
+            summary_lines.append(
+                f"{idx}) Q: {item.get('question_text') or 'N/A'} | Student: {item.get('student_answer')} | Correct: {item.get('correct_answer')}"
             )
-        except Exception:
-            follow_up = fetch_questions(topic=topic, limit=5, exclude_ids=attempted_question_ids)
+        context_text = "\n".join(summary_lines)
 
-    if not follow_up:
-        follow_up = fetch_questions(topic=topic, limit=5, exclude_ids=attempted_question_ids)
-    if not follow_up and not topic:
-        follow_up = fetch_questions(limit=5, exclude_ids=attempted_question_ids)
+        reason_payload = generate_reasoning(
+            main_misconception, 
+            topic or "reflection_refraction",
+            question_text=context_text,
+            student_answer=f"{incorrect_count} incorrect out of {len(data.answers)}",
+            correct_answer="Review all incorrect questions and associated concepts",
+        )
 
-    if len(follow_up) < 5:
-        already = attempted_question_ids + [q["id"] for q in follow_up]
-        top_up = fetch_questions(topic=topic, limit=5 - len(follow_up), exclude_ids=already)
-        if not top_up and not topic:
-            top_up = fetch_questions(limit=5 - len(follow_up), exclude_ids=already)
-        follow_up.extend(top_up)
+    reason_payload = {
+        "reason": _trim_feedback(reason_payload.get("reason", "Let's review this concept from a different angle."), 220),
+        "focus_area": _trim_feedback(reason_payload.get("focus_area", "N/A"), 120),
+    }
+
+    next_difficulty = _difficulty_from_level(student.get("level"))
+    follow_up = generate_questions(topic or "reflection_refraction", next_difficulty)[:5]
 
     return {
         "main_misconception": main_misconception,
@@ -226,6 +303,7 @@ def submit_answers(data: SubmitAnswersRequest):
         "attempt": student.get("attempts"),
         "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
         "focus_area": reason_payload.get("focus_area", "N/A"),
+        "question_feedback": per_question_feedback,
         "questions": follow_up,
     }
 
@@ -241,8 +319,10 @@ def misconception_reason(req: MisconceptionReasonRequest):
 
 @router.get("/question/{student_id}/{topic}")
 def get_adaptive_question(student_id: str, topic: str):
-    question = select_question(student_id, topic)
-    return question or {}
+    student = get_student(student_id)
+    difficulty = _difficulty_from_level(student.get("level"))
+    questions = generate_questions(topic, difficulty)
+    return (questions[0] if questions else {})
 
 
 @router.post("/evaluate")
@@ -260,8 +340,6 @@ def evaluate_answer(req: EvaluationRequest):
 def get_student(student_id: str):
     profile = get_student_profile(student_id)
     return profile or {"student": None, "behavior": []}
-
-from question_engine import SYLLABUS_SCOPE, generate_questions
 
 
 @router.post("/generate-questions")

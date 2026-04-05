@@ -1,6 +1,6 @@
 import json
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
+import re
+from assesment_agent.question_gen_llm_service import generate_text
 
 base_dir = Path(__file__).resolve().parent
 llm_spec = spec_from_file_location("assesment_agent.question_gen_llm_service", base_dir / "question_gen_llm_service.py")
@@ -77,6 +77,12 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         json_str = raw_output[start:end]
 
         questions = json.loads(json_str)
+
+        for q in questions:
+          text = str(q.get("question_text", "")).strip()
+          # Remove common numbering prefixes like "1.", "Q1:", or "(2)".
+          text = re.sub(r"^\s*(?:q\s*)?\(?\d+\)?[\.:\-\)]\s*", "", text, flags=re.IGNORECASE)
+          q["question_text"] = text
 
         return questions
 
