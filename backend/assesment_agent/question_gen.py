@@ -32,16 +32,16 @@ Do not go outside this chapter or introduce topics from other physics chapters.
 def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=None, tutor_context=None):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
-  requested_count = None
-  if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
-    requested_count = max(2, min(int(question_count), 10))
+    requested_count = None
+    if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
+        requested_count = max(2, min(int(question_count), 10))
     syllabus_scope = (syllabus_scope or SYLLABUS_SCOPE).strip()
     tutor_context = (tutor_context or "").strip()
 
-  if requested_count is None:
-    count_rule = "Decide the number of questions yourself based on topic breadth and difficulty. Return only high-quality unique questions, usually between 2 and 10."
-  else:
-    count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
+    if requested_count is None:
+        count_rule = "Decide the number of questions yourself based on topic breadth and difficulty. Return only high-quality unique questions, usually between 2 and 10."
+    else:
+        count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
 
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
@@ -136,35 +136,40 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     tutor_context=tutor_context,
   )
 
-    raw_output = generate_text(prompt)
+  raw_output = generate_text(prompt)
 
-    try:
-        # 🔥 Extract JSON safely
-        start = raw_output.find("[")
-        end = raw_output.rfind("]") + 1
+  try:
+    # Extract JSON safely
+    start = raw_output.find("[")
+    end = raw_output.rfind("]") + 1
+    if start < 0 or end <= start:
+      raise RuntimeError("LLM output did not contain a valid JSON array")
 
-        json_str = raw_output[start:end]
+    json_str = raw_output[start:end]
+    questions = json.loads(json_str)
+    if not isinstance(questions, list):
+      raise RuntimeError("LLM output JSON is not a question array")
 
-        questions = json.loads(json_str)
+    for q in questions:
+      text = str(q.get("question_text", "")).strip()
+      # Remove common numbering prefixes like "1.", "Q1:", or "(2)".
+      text = re.sub(r"^\s*(?:q\s*)?\(?\d+\)?[\.:\-\)]\s*", "", text, flags=re.IGNORECASE)
+      q["question_text"] = text
 
-        if not isinstance(questions, list):
-          return []
+    unique_questions = _dedupe_questions(questions)
+    if not unique_questions:
+      raise RuntimeError("LLM returned no valid unique questions")
 
-        for q in questions:
-          text = str(q.get("question_text", "")).strip()
-          # Remove common numbering prefixes like "1.", "Q1:", or "(2)".
-          text = re.sub(r"^\s*(?:q\s*)?\(?\d+\)?[\.:\-\)]\s*", "", text, flags=re.IGNORECASE)
-          q["question_text"] = text
+    if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
+      max_count = max(2, min(int(question_count), 10))
+      return unique_questions[:max_count]
 
-        unique_questions = _dedupe_questions(questions)
-        if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
-          max_count = max(2, min(int(question_count), 10))
-          return unique_questions[:max_count]
+    # Safety cap only; count selection is otherwise left to the model.
+    return unique_questions[:10]
 
-        # Safety cap only; count selection is otherwise left to the model.
-        return unique_questions[:10]
-
-    except Exception as e:
-        print("Parsing error:", e)
-        print(raw_output)
-        return []
+  except RuntimeError:
+    raise
+  except Exception as e:
+    print("Parsing error:", e)
+    print(raw_output)
+    raise RuntimeError("Failed to parse LLM question response") from e

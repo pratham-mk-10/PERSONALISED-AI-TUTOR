@@ -7,14 +7,16 @@ git add .
 git commit -m "Reapply .gitignore"
 __pycache__/
 *.py[cod]
+*.pyc
+*.cpython-*.pyc
 *.pyo
 *.pyd
 *.so
 .python-version
-/backend/__pycache__/
-/backend/database/__pycache__/
-/backend/assesment_agent/__pycache__/
-.backend/orchestrator/__pycache__/
+/backend/__pycache__/*
+/backend/database/__pycache__/*
+/backend/assesment_agent/__pycache__/*
+.backend/orchestrator/__pycache__/*
 
 # Python virtual environments
 venv/
@@ -40,7 +42,7 @@ dist/
 .hypothesis/
 .nox/
 .tox/
-*.cpython
+*.cpython-*-*.egg/
 
 # Frontend / Node
 node_modules/

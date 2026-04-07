@@ -196,30 +196,43 @@ const QuizPage = () => {
         topic: q.topic || quizTopicContext.title,
       }));
 
-      const res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId });
-      let reason = {
-        reason: res.reason,
-        focus_area: res.focus_area,
-      };
-
-      if (!reason.reason) {
-        reason = await getMisconceptionReason(
-          res.main_misconception,
-          quizTopicContext.title
-        );
-      }
-
       const total = questions.length;
       const correctCount = questions.reduce((count, q) => {
         return count + (answers[q._key] === q.correct ? 1 : 0);
       }, 0);
+
+      let res = null;
+      let reason = {
+        reason: "Let's review this concept and try again.",
+        focus_area: "N/A",
+      };
+      let dbSyncWarning = null;
+
+      try {
+        res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId });
+        reason = {
+          reason: res.reason,
+          focus_area: res.focus_area,
+        };
+
+        if (!reason.reason) {
+          reason = await getMisconceptionReason(
+            res.main_misconception,
+            quizTopicContext.title
+          );
+        }
+      } catch (submitErr) {
+        dbSyncWarning = submitErr?.message || "Could not submit this attempt right now.";
+      }
+
+      const questionFeedback = Array.isArray(res?.question_feedback) ? res.question_feedback : [];
 
       const detailedResults = questions.map((q, idx) => {
         const selectedIndex = answers[q._key];
         const correctIndex = q.correct;
         const isCorrect = selectedIndex === correctIndex;
 
-        const matchedFeedback = (Array.isArray(res.question_feedback) ? res.question_feedback : []).find(
+        const matchedFeedback = questionFeedback.find(
           (item) => item?.question_id !== undefined && item?.question_id === q.id
         );
 
@@ -242,12 +255,12 @@ const QuizPage = () => {
         accuracy: Math.round((correctCount / total) * 100),
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
-        questionFeedback: Array.isArray(res.question_feedback) ? res.question_feedback : [],
+        questionFeedback,
         detailedResults,
-        dbSyncWarning: res.db_sync_warning || null,
+        dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
       });
     } catch (err) {
-      setError(err?.message || "Unable to submit answers");
+      setError(err?.message || "Unable to process quiz results");
     }
   };
 
