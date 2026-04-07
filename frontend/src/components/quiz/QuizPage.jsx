@@ -227,6 +227,9 @@ const QuizPage = () => {
 
       const questionFeedback = Array.isArray(res?.question_feedback) ? res.question_feedback : [];
 
+      const mainMisconception = res?.main_misconception || "none";
+      const misconceptionExplanation = res?.misconception_explanation || null;
+
       const detailedResults = questions.map((q, idx) => {
         const selectedIndex = answers[q._key];
         const correctIndex = q.correct;
@@ -255,6 +258,8 @@ const QuizPage = () => {
         accuracy: Math.round((correctCount / total) * 100),
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
+        mainMisconception,
+        misconceptionExplanation,
         questionFeedback,
         detailedResults,
         dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
@@ -294,6 +299,21 @@ const QuizPage = () => {
         </p>
         <p>Correct: {report.correctCount}</p>
         <p>Incorrect: {report.wrongCount}</p>
+
+        {report.misconceptionExplanation && (
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "14px",
+              borderRadius: "10px",
+              background: "#e8fff2",
+              border: "1px solid #bbf7d0",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Misconception Explanation</h3>
+            <p style={{ margin: 0 }}>{report.misconceptionExplanation}</p>
+          </div>
+        )}
 
         <div style={{ marginTop: "18px", padding: "14px", border: "1px solid #dbe4ff", borderRadius: "10px", background: "#f6f9ff" }}>
           <h3 style={{ marginTop: 0 }}>Personalized Feedback</h3>

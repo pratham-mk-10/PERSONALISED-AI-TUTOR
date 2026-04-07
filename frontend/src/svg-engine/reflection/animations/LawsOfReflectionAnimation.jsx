@@ -7,8 +7,7 @@
 // - Minimal highlights (no styling changes)
 // ============================================================
 
-import React from "react";
-import { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import AnimationPlayer from "../../shared/AnimationPlayer";
 import {
   incidentRayStart,
@@ -73,6 +72,18 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
 
     audio.play().catch(() => {});
   };
+
+  // Stop any playing audio when this animation unmounts (e.g., when user
+  // changes stage/section), so the voice does not continue in other screens.
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      lastStepRef.current = -1;
+    };
+  }, []);
 
   return (
     <AnimationPlayer
