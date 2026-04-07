@@ -3,7 +3,7 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from database.models import (
@@ -363,12 +363,17 @@ def generate(data: dict):
     question_count = data.get("question_count")
     tutor_context = data.get("tutor_context")
 
-    questions = generate_questions(
-        topic,
-        difficulty,
-        syllabus_scope=syllabus_scope,
-        question_count=question_count,
-        tutor_context=tutor_context,
-    )
+    try:
+        questions = generate_questions(
+            topic,
+            difficulty,
+            syllabus_scope=syllabus_scope,
+            question_count=question_count,
+            tutor_context=tutor_context,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Question generation failed") from exc
 
     return {"questions": questions}

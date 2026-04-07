@@ -238,7 +238,7 @@ def generate_text(prompt):
     api_key = _get_api_key()
 
     if not api_key:
-        return _fallback_response(prompt)
+        raise RuntimeError("Mistral API key is missing in backend .env")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -251,7 +251,7 @@ def generate_text(prompt):
             {"role": "system", "content": "You are a physics teacher."},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,
+        "temperature": 0.4,
         "max_tokens": 800
     }
 
@@ -260,5 +260,10 @@ def generate_text(prompt):
         response.raise_for_status()
         result = response.json()
         return result["choices"][0]["message"]["content"]
-    except Exception:
-        return _fallback_response(prompt)
+    except requests.Timeout as exc:
+        raise RuntimeError("Mistral request timed out") from exc
+    except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else "unknown"
+        raise RuntimeError(f"Mistral API returned HTTP {status_code}") from exc
+    except Exception as exc:
+        raise RuntimeError("Mistral request failed") from exc
