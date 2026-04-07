@@ -27,11 +27,111 @@ def _extract_topic(prompt: str) -> str:
     return "laws of reflection"
 
 
+def _extract_question_count(prompt: str) -> int | None:
+    match = re.search(r"Return up to\s*(\d+)\s*questions", prompt, flags=re.IGNORECASE)
+    if match:
+        try:
+            return max(2, min(int(match.group(1)), 8))
+        except ValueError:
+            return None
+    return None
+
+
+def _extract_difficulty(prompt: str) -> str:
+    match = re.search(r"Difficulty level:\s*(easy|medium|hard)", prompt, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip().lower()
+    return "easy"
+
+
+def _decide_dynamic_count(topic: str, difficulty: str) -> int:
+    topic = (topic or "").lower()
+    difficulty = (difficulty or "easy").lower()
+
+    if "first law of reflection" in topic or "second law of reflection" in topic:
+        base = 3
+    elif "plane mirror" in topic:
+        base = 4
+    elif "refraction" in topic:
+        base = 6
+    else:
+        base = 5
+
+    if difficulty == "hard":
+        base += 1
+    elif difficulty == "easy":
+        base -= 1
+
+    return max(2, min(base, 8))
+
+
 def _fallback_response(prompt):
     topic = _extract_topic(prompt)
+    requested_count = _extract_question_count(prompt)
+    difficulty = _extract_difficulty(prompt)
+    target_count = requested_count or _decide_dynamic_count(topic, difficulty)
 
-    if "refraction" in topic:
-        questions = [
+    if "first law of reflection" in topic:
+        question_pool = [
+            {
+                "question_text": "According to the first law of reflection, angle of incidence is equal to:",
+                "options": ["Angle of refraction", "Angle of reflection", "Angle of emergence", "Angle of deviation"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "If the angle of incidence is 35 degrees, the angle of reflection is:",
+                "options": ["25 degrees", "35 degrees", "45 degrees", "70 degrees"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "A ray strikes a mirror with incidence angle 50 degrees. Which reflection angle is correct?",
+                "options": ["40 degrees", "50 degrees", "60 degrees", "100 degrees"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "If angle of incidence increases from 20 degrees to 45 degrees, the reflected angle becomes:",
+                "options": ["20 degrees", "25 degrees", "45 degrees", "65 degrees"],
+                "correct": 2,
+                "type": "mcq",
+            },
+        ]
+    elif "second law of reflection" in topic:
+        question_pool = [
+            {
+                "question_text": "In reflection, the incident ray, reflected ray, and normal at the point of incidence lie in:",
+                "options": ["Different planes", "The same plane", "A curved plane only", "No fixed plane"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "Which statement best represents the second law of reflection?",
+                "options": [
+                    "Angle of incidence equals angle of reflection",
+                    "Incident and reflected rays are always parallel",
+                    "Incident ray, normal, and reflected ray are coplanar",
+                    "Reflected ray always passes through focus"
+                ],
+                "correct": 2,
+                "type": "mcq",
+            },
+            {
+                "question_text": "If a drawn normal is not in the same plane as the rays, which law is violated?",
+                "options": ["Snell's law", "Second law of reflection", "Mirror formula", "Power of lens relation"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "The second law mainly describes:",
+                "options": ["Equality of angles", "Coplanarity of rays and normal", "Image size", "Refraction direction"],
+                "correct": 1,
+                "type": "mcq",
+            },
+        ]
+    elif "refraction" in topic:
+        question_pool = [
             {
                 "question_text": "When light goes from air into glass, it usually bends towards which direction?",
                 "options": ["Away from the normal", "Towards the normal", "Parallel to the surface", "No bending occurs"],
@@ -50,9 +150,27 @@ def _fallback_response(prompt):
                 "correct": 1,
                 "type": "mcq",
             },
+            {
+                "question_text": "A medium with higher refractive index is usually:",
+                "options": ["Optically rarer", "Optically denser", "Always transparent", "Always colorless"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "Snell's law relates:",
+                "options": ["Focal length and power", "Sine of angles and refractive indices", "Image distance and object distance", "Speed and wavelength only in vacuum"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "When light enters a rarer medium from denser medium, it bends:",
+                "options": ["Towards the normal", "Away from the normal", "Along the normal always", "Without changing speed"],
+                "correct": 1,
+                "type": "mcq",
+            },
         ]
     elif "plane mirror" in topic:
-        questions = [
+        question_pool = [
             {
                 "question_text": "An image formed by a plane mirror is:",
                 "options": ["Real and inverted", "Virtual and erect", "Real and diminished", "Virtual and inverted"],
@@ -71,9 +189,21 @@ def _fallback_response(prompt):
                 "correct": 0,
                 "type": "mcq",
             },
+            {
+                "question_text": "The size of image in a plane mirror is:",
+                "options": ["Larger than object", "Smaller than object", "Equal to object", "Zero"],
+                "correct": 2,
+                "type": "mcq",
+            },
+            {
+                "question_text": "If an object moves 1 m towards a plane mirror, the image moves:",
+                "options": ["0.5 m towards mirror", "1 m towards mirror", "2 m towards mirror", "No movement"],
+                "correct": 1,
+                "type": "mcq",
+            },
         ]
     else:
-        questions = [
+        question_pool = [
             {
                 "question_text": "According to the first law of reflection, angle of incidence is equal to:",
                 "options": ["Angle of refraction", "Angle of reflection", "Angle of emergence", "Angle of deviation"],
@@ -92,8 +222,15 @@ def _fallback_response(prompt):
                 "correct": 1,
                 "type": "mcq",
             },
+            {
+                "question_text": "Which instrument commonly uses reflection to form clear images?",
+                "options": ["Periscope", "Thermometer", "Barometer", "Voltmeter"],
+                "correct": 0,
+                "type": "mcq",
+            },
         ]
 
+    questions = question_pool[:target_count]
     return json.dumps(questions)
 
 

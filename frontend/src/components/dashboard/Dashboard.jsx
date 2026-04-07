@@ -7,7 +7,8 @@ const CHAPTERS = [
 		id: "light",
 		title: "Light: Reflection & Refraction",
 		topics: [
-			{ id: "laws-reflection", title: "Laws of Reflection" },
+			{ id: "First-law-of-reflection", title: "First Law of Reflection" },
+			{ id: "Second-law-of-reflection", title: "Second Law of Reflection" },
 			{ id: "plane-mirror", title: "Plane Mirror Basics" },
 			{ id: "refraction-intro", title: "Introduction to Refraction" },
 		],
@@ -105,13 +106,9 @@ export default function Dashboard({ onStartTopic }) {
 										<button
 											style={{
 												...styles.primaryBtn,
-												opacity: topic.id === "laws-reflection" ? 1 : 0.6,
-												cursor:
-													topic.id === "laws-reflection"
-														? "pointer"
-														: "not-allowed",
+												opacity: 1,
+												cursor: "pointer",
 											}}
-											disabled={topic.id !== "laws-reflection"}
 											onClick={() => {
 												selectTopic(topic.id);
 												if (onStartTopic) onStartTopic(topic.id);
