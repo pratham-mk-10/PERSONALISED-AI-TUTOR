@@ -11,6 +11,10 @@ __pycache__/
 *.pyd
 *.so
 .python-version
+/backend/__pycache__/
+/backend/database/__pycache__/
+/backend/assesment_agent/__pycache__/
+.backend/orchestrator/__pycache__/
 
 # Python virtual environments
 venv/
@@ -36,6 +40,7 @@ dist/
 .hypothesis/
 .nox/
 .tox/
+*.cpython
 
 # Frontend / Node
 node_modules/

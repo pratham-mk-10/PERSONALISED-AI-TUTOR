@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import re
 
+
 base_dir = Path(__file__).resolve().parent
 llm_spec = spec_from_file_location("assesment_agent.question_gen_llm_service", base_dir / "question_gen_llm_service.py")
 llm_module = module_from_spec(llm_spec)
@@ -28,13 +29,20 @@ Do not go outside this chapter or introduce topics from other physics chapters.
 """.strip()
 
 
-def build_prompt(topic, difficulty="easy", syllabus_scope=None, question_count=5, tutor_context=None):
+def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=None, tutor_context=None):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
-    question_count = int(question_count) if isinstance(question_count, (int, float, str)) and str(question_count).isdigit() else 5
-    question_count = max(2, min(question_count, 8))
+  requested_count = None
+  if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
+    requested_count = max(2, min(int(question_count), 10))
     syllabus_scope = (syllabus_scope or SYLLABUS_SCOPE).strip()
     tutor_context = (tutor_context or "").strip()
+
+  if requested_count is None:
+    count_rule = "Decide the number of questions yourself based on topic breadth and difficulty. Return only high-quality unique questions, usually between 2 and 10."
+  else:
+    count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
+
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
 
@@ -49,8 +57,8 @@ Rules:
 - Include common student misconceptions only when they are directly relevant to this topic.
 - 4 options only.
 - One correct answer.
-- Return up to {question_count} questions.
-- If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones.
+- {count_rule}
+- Do not return paraphrased duplicates.
 
 Return STRICT JSON ONLY:
 
@@ -65,8 +73,68 @@ Return STRICT JSON ONLY:
 """
 
 
-def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_count=5, tutor_context=None):
-    prompt = build_prompt(topic, difficulty, syllabus_scope, question_count, tutor_context)
+def _normalize_text(value):
+  text = re.sub(r"[^a-z0-9\s]", " ", str(value or "").lower())
+  return " ".join(text.split())
+
+
+def _token_signature(value):
+  stop_words = {
+    "the", "a", "an", "of", "to", "in", "on", "at", "for", "with",
+    "is", "are", "was", "were", "be", "by", "from", "and", "or", "if",
+    "which", "what", "when", "where", "why", "how", "does", "do", "did",
+    "can", "could", "will", "would", "should", "into", "through", "about",
+  }
+  tokens = [tok for tok in _normalize_text(value).split() if tok and tok not in stop_words]
+  return set(tokens)
+
+
+def _is_similar_question(text_a, text_b, threshold=0.72):
+  sig_a = _token_signature(text_a)
+  sig_b = _token_signature(text_b)
+  if not sig_a or not sig_b:
+    return False
+  overlap = len(sig_a & sig_b)
+  union = len(sig_a | sig_b)
+  score = overlap / union if union else 0.0
+  return score >= threshold
+
+
+def _dedupe_questions(questions):
+  unique = []
+  seen_normalized = set()
+
+  for q in questions:
+    text = str(q.get("question_text") or "").strip()
+    if not text:
+      continue
+
+    normalized = _normalize_text(text)
+    if normalized in seen_normalized:
+      continue
+
+    is_near_duplicate = any(
+      _is_similar_question(text, existing.get("question_text", ""))
+      for existing in unique
+    )
+    if is_near_duplicate:
+      continue
+
+    q["question_text"] = text
+    unique.append(q)
+    seen_normalized.add(normalized)
+
+  return unique
+
+
+def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_count=None, tutor_context=None):
+  prompt = build_prompt(
+    topic,
+    difficulty,
+    question_count=question_count,
+    syllabus_scope=syllabus_scope,
+    tutor_context=tutor_context,
+  )
 
     raw_output = generate_text(prompt)
 
@@ -79,13 +147,22 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
 
         questions = json.loads(json_str)
 
+        if not isinstance(questions, list):
+          return []
+
         for q in questions:
           text = str(q.get("question_text", "")).strip()
           # Remove common numbering prefixes like "1.", "Q1:", or "(2)".
           text = re.sub(r"^\s*(?:q\s*)?\(?\d+\)?[\.:\-\)]\s*", "", text, flags=re.IGNORECASE)
           q["question_text"] = text
 
-        return questions
+        unique_questions = _dedupe_questions(questions)
+        if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
+          max_count = max(2, min(int(question_count), 10))
+          return unique_questions[:max_count]
+
+        # Safety cap only; count selection is otherwise left to the model.
+        return unique_questions[:10]
 
     except Exception as e:
         print("Parsing error:", e)

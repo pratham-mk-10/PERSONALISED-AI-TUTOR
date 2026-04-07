@@ -360,7 +360,7 @@ def generate(data: dict):
     topic = data.get("topic", "Laws of Reflection")
     difficulty = data.get("difficulty", "easy")
     syllabus_scope = data.get("syllabus_scope") or SYLLABUS_SCOPE
-    question_count = data.get("question_count", 5)
+    question_count = data.get("question_count")
     tutor_context = data.get("tutor_context")
 
     questions = generate_questions(

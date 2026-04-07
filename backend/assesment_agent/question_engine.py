@@ -38,7 +38,7 @@ def _is_valid_mcq(item: Dict[str, Any]) -> bool:
 
 def _topic_keywords(topic: str) -> list[str]:
     t = (topic or "").strip().lower()
-    if "laws of reflection" in t:
+    if "First law of reflection" in t:
         return [
             "angle of incidence",
             "angle of reflection",
@@ -46,7 +46,15 @@ def _topic_keywords(topic: str) -> list[str]:
             "incident ray",
             "reflected ray",
             "normal",
+        ]
+    if "Second law of reflection" in t:
+        return [
+            "plane of incidence",
+            "plane of reflection",
             "same plane",
+            "incident ray",
+            "reflected ray",
+            "normal",
         ]
     if "plane mirror" in t:
         return ["plane mirror", "lateral", "virtual", "erect", "image"]
@@ -66,7 +74,7 @@ def _is_topic_aligned(item: Dict[str, Any], topic: str) -> bool:
         return True
 
     # Keep laws-of-reflection quizzes narrowly focused and block common drift terms.
-    if "laws of reflection" in (topic or "").lower():
+    if "First law of reflection" in (topic or "").lower():
         blocked_terms = [
             "image formation",
             "concave",
@@ -75,7 +83,7 @@ def _is_topic_aligned(item: Dict[str, Any], topic: str) -> bool:
             "mirror formula",
             "focal length",
             "refraction",
-            "lens",
+            "lens","same plane"
         ]
         if any(term in corpus for term in blocked_terms):
             return False

@@ -16,6 +16,16 @@ const TOPIC_CONTEXTS = {
     syllabusScope:
       "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the two laws of reflection: (1) angle of incidence equals angle of reflection (i = r), and (2) incident ray, reflected ray, and normal lie in the same plane. Do NOT include image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
   },
+  "First-law-of-reflection": {
+    title: "First Law of Reflection",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the first law of reflection: angle of incidence equals angle of reflection (i = r). Do NOT include second law details, image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
+  },
+  "Second-law-of-reflection": {
+    title: "Second Law of Reflection",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the second law of reflection: incident ray, reflected ray, and normal lie in the same plane. Do NOT include first law computations, image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
+  },
   "plane-mirror": {
     title: "Plane Mirror Basics",
     syllabusScope:
@@ -27,6 +37,8 @@ const TOPIC_CONTEXTS = {
       "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to refraction, refractive index, optical density, Snell's law, and rectangular glass slab refraction.",
   },
 };
+
+const DEFAULT_TOPIC_CONTEXT = TOPIC_CONTEXTS["laws-reflection"];
 
 
 const loadQuestionHistory = () => {
@@ -70,7 +82,7 @@ const getQuizTopicContext = (topicId) => {
   if (topicId && TOPIC_CONTEXTS[topicId]) {
     return TOPIC_CONTEXTS[topicId];
   }
-  return TOPIC_CONTEXTS["laws-reflection"];
+  return DEFAULT_TOPIC_CONTEXT;
 };
 
 const getPersonalization = (topicId, progress) => {
@@ -78,14 +90,11 @@ const getPersonalization = (topicId, progress) => {
   const mastery = Number(topicProgress?.mastery ?? 0);
 
   let difficulty = "easy";
-  let questionCount = 5;
 
   if (mastery >= 70) {
     difficulty = "hard";
-    questionCount = 6;
   } else if (mastery >= 40) {
     difficulty = "medium";
-    questionCount = 5;
   }
 
   const tutorContext =
@@ -95,7 +104,6 @@ const getPersonalization = (topicId, progress) => {
 
   return {
     difficulty,
-    questionCount,
     tutorContext,
   };
 };
@@ -132,12 +140,13 @@ const QuizPage = () => {
         topic: quizTopicContext.title,
         difficulty: personalization.difficulty,
         syllabusScope: quizTopicContext.syllabusScope,
-        questionCount: personalization.questionCount,
         tutorContext: personalization.tutorContext,
       });
 
-      const nextQuestions = shuffle(data.questions || []).map((q, idx) => ({
+      const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+      const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
         ...q,
+        options: Array.isArray(q?.options) ? q.options : [],
         _key: questionKey(q, idx),
       }));
       setQuestions(nextQuestions);

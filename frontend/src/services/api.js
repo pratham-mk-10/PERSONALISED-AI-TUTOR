@@ -26,21 +26,26 @@ export const getGeneratedQuestions = async ({
   topic = null,
   difficulty = "easy",
   syllabusScope = null,
-  questionCount = 5,
+  questionCount = null,
   tutorContext = null,
 } = {}) => {
+  const payload = {
+    topic,
+    difficulty,
+    syllabus_scope: syllabusScope,
+    tutor_context: tutorContext,
+  };
+
+  if (Number.isFinite(questionCount)) {
+    payload.question_count = questionCount;
+  }
+
   const res = await fetch(`${BASE_URL}/generate-questions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      topic,
-      difficulty,
-      syllabus_scope: syllabusScope,
-      question_count: questionCount,
-      tutor_context: tutorContext,
-    })
+    body: JSON.stringify(payload)
   });
 
   if (!res.ok) {
