@@ -127,6 +127,97 @@ def _dedupe_questions(questions):
   return unique
 
 
+def _extract_complete_json_objects(raw_text):
+  """Extract full top-level JSON objects from a possibly truncated array payload."""
+  if not isinstance(raw_text, str):
+    return []
+
+  start = raw_text.find("[")
+  if start < 0:
+    return []
+
+  objects = []
+  obj_start = None
+  depth = 0
+  in_string = False
+  escaped = False
+
+  for idx in range(start, len(raw_text)):
+    ch = raw_text[idx]
+
+    if in_string:
+      if escaped:
+        escaped = False
+      elif ch == "\\":
+        escaped = True
+      elif ch == '"':
+        in_string = False
+      continue
+
+    if ch == '"':
+      in_string = True
+      continue
+
+    if ch == "{":
+      if depth == 0:
+        obj_start = idx
+      depth += 1
+      continue
+
+    if ch == "}" and depth > 0:
+      depth -= 1
+      if depth == 0 and obj_start is not None:
+        candidate = raw_text[obj_start : idx + 1]
+        try:
+          parsed = json.loads(candidate)
+          if isinstance(parsed, dict):
+            objects.append(parsed)
+        except json.JSONDecodeError:
+          pass
+        obj_start = None
+
+  return objects
+
+
+def _parse_llm_questions(raw_output):
+  """Parse LLM output into a question list, tolerating fenced and truncated JSON."""
+  text = str(raw_output or "").strip()
+  if not text:
+    return []
+
+  # Remove optional markdown code fences before parsing.
+  text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+  text = re.sub(r"\s*```$", "", text)
+
+  start = text.find("[")
+  end = text.rfind("]") + 1
+
+  if start >= 0 and end > start:
+    try:
+      parsed = json.loads(text[start:end])
+      if isinstance(parsed, list):
+        return parsed
+    except json.JSONDecodeError:
+      pass
+
+  recovered = _extract_complete_json_objects(text)
+  return recovered if recovered else []
+
+
+def _fallback_questions(prompt):
+  """Use deterministic local fallback questions when remote output cannot be parsed."""
+  fallback_fn = getattr(llm_module, "_fallback_response", None)
+  if not callable(fallback_fn):
+    return []
+
+  try:
+    fallback_raw = fallback_fn(prompt)
+    parsed = json.loads(fallback_raw)
+    return parsed if isinstance(parsed, list) else []
+  except Exception:
+    return []
+
+
 def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_count=None, tutor_context=None):
   prompt = build_prompt(
     topic,
@@ -139,16 +230,12 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
   raw_output = generate_text(prompt)
 
   try:
-    # Extract JSON safely
-    start = raw_output.find("[")
-    end = raw_output.rfind("]") + 1
-    if start < 0 or end <= start:
-      raise RuntimeError("LLM output did not contain a valid JSON array")
+    questions = _parse_llm_questions(raw_output)
+    if not questions:
+      questions = _fallback_questions(prompt)
 
-    json_str = raw_output[start:end]
-    questions = json.loads(json_str)
-    if not isinstance(questions, list):
-      raise RuntimeError("LLM output JSON is not a question array")
+    if not isinstance(questions, list) or not questions:
+      raise RuntimeError("LLM output could not be parsed into questions")
 
     for q in questions:
       text = str(q.get("question_text", "")).strip()
@@ -172,4 +259,7 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
   except Exception as e:
     print("Parsing error:", e)
     print(raw_output)
+    fallback_questions = _fallback_questions(prompt)
+    if fallback_questions:
+      return _dedupe_questions(fallback_questions)[:10]
     raise RuntimeError("Failed to parse LLM question response") from e
