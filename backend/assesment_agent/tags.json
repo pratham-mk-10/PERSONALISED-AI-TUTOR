@@ -1,0 +1,58 @@
+{
+	"wrong-normal-reference": {
+		"reason": "It looks like the angle was measured from the mirror surface instead of from the normal. Angles of incidence and reflection are always measured from the normal line.",
+		"focus_area": "Show the normal at the point of incidence and mark both angles from that line."
+	},
+	"angle-addition-confusion": {
+		"reason": "The answer suggests you tried to add or subtract angles instead of using the simple rule i = r.",
+		"focus_area": "Highlight the two equal angles on either side of the normal."
+	},
+	"incidence-plus-reflection": {
+		"reason": "It seems you treated the sum of the angles as important, but the law of reflection only says each angle is equal to the other.",
+		"focus_area": "Emphasise that angle of incidence equals angle of reflection, not their sum."
+	},
+	"normal-incidence-misread": {
+		"reason": "When light hits the mirror along the normal, it retraces its path. The ray does not bend away; it goes straight back.",
+		"focus_area": "Show the incident ray along the normal and the reflected ray on top of it."
+	},
+	"reflection-refraction-mixup": {
+		"reason": "This choice mixes up reflection (bouncing off a surface) with refraction (bending in a new medium).",
+		"focus_area": "Contrast a ray bouncing from a mirror with a ray bending at a glass surface."
+	},
+	"mirror-absorption-myth": {
+		"reason": "A plane mirror mostly reflects light; it does not \"use up\" or absorb all the light in this context.",
+		"focus_area": "Show many rays bouncing off the mirror to show reflection."
+	},
+	"frequency-change-myth": {
+		"reason": "The frequency of light does not change when it enters a new medium; only its speed and wavelength change.",
+		"focus_area": "Highlight that f stays the same while speed and wavelength change in the second medium."
+	},
+	"wavelength-direction-mixup": {
+		"reason": "The answer suggests confusion between how wavelength changes and how the ray bends at the boundary.",
+		"focus_area": "Link the change in ray direction with the change in wavelength inside the new medium."
+	},
+	"material-emission-misconception": {
+		"reason": "The glass or lens does not create extra light in this situation; it only bends the light passing through.",
+		"focus_area": "Show rays entering and leaving the material without any new rays being created."
+	},
+	"real-vs-virtual-confusion": {
+		"reason": "This choice mixes up when images are real (can be caught on a screen) and when they are virtual.",
+		"focus_area": "Show a ray diagram with real image on a screen versus a virtual image behind a mirror or lens."
+	},
+	"optical-center-myth": {
+		"reason": "The optical centre is not the only place where an object can form a real image. The object position relative to the focal length matters.",
+		"focus_area": "Highlight the focal points and different object positions around the lens."
+	},
+	"infinity-only-myth": {
+		"reason": "A convex lens can form a real image for many object positions beyond the focal length, not just at infinity.",
+		"focus_area": "Show several object positions beyond the focal length and their image locations."
+	},
+	"general_concept_gap": {
+		"reason": "Your pattern of answers suggests a general gap in this concept rather than one specific mistake.",
+		"focus_area": "Redo the main animation or diagram slowly, pausing at each step."
+	},
+	"no_concept": {
+		"reason": "It looks like the core idea for this question is unclear. Start from the definition and key law, then apply it to the example.",
+		"focus_area": "Show the single diagram or formula that the question is based on."
+	}
+}

@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from urllib import error, request
 
 FALLBACK_MODELS = [
@@ -9,6 +10,22 @@ FALLBACK_MODELS = [
 ]
 
 MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+USE_LLM = os.getenv("USE_LLM", "false").lower() in {"1", "true", "yes"}
+
+
+_TAG_FILE = Path(__file__).resolve().parents[1] / "assesment_agent" / "tags.json"
+
+
+def _load_tag_library():
+	try:
+		with open(_TAG_FILE, "r", encoding="utf-8") as f:
+			data = json.load(f)
+			return data if isinstance(data, dict) else {}
+	except (FileNotFoundError, json.JSONDecodeError, OSError):
+		return {}
+
+
+TAG_LIBRARY = _load_tag_library()
 
 
 def _get_api_key():
@@ -73,15 +90,69 @@ def _extract_json(raw):
 		return None
 
 
+def _tag_based_feedback(misconception_tag, topic):
+	"""Return canned reasoning for a specific misconception tag, if available.
+
+	This acts as a lightweight "misconception agent" that works even without
+	any LLM or external API keys.
+	"""
+	key = str(misconception_tag or "").strip().lower()
+	if not key:
+		return None
+
+	entry = TAG_LIBRARY.get(key)
+	if not isinstance(entry, dict):
+		return None
+
+	reason = str(entry.get("reason", "")).strip()
+	focus_area = str(entry.get("focus_area", entry.get("focus", "N/A"))).strip() or "N/A"
+	if not reason:
+		return None
+
+	return {"reason": reason, "focus_area": focus_area}
+
+
 def generate_reasoning(misconception_tag, topic, question_text=None, student_answer=None, correct_answer=None):
+	"""Generate feedback for a misconception.
+
+	Order of preference:
+	1. Tag-specific canned feedback from assesment_agent/tags.json
+	2. Simple rule-based feedback using topic when LLM is disabled or no API key
+	3. Mistral LLM call when USE_LLM=true and API key is set
+	"""
+	# 1) Tag-based, deterministic feedback (no network required)
+	tag_payload = _tag_based_feedback(misconception_tag, topic)
+	if tag_payload:
+		return tag_payload
+
+	# 2) Lightweight rule-based feedback when LLM is disabled or not configured
 	api_key = _get_api_key()
+	topic_lower = str(topic or "").lower()
+	if not USE_LLM or not api_key:
+		if "refract" in topic_lower or "lens" in topic_lower:
+			reason = (
+				"The answers suggest confusion about how light bends when it changes "
+				"medium (refraction). Focus on how speed changes at the boundary and "
+				"how we measure the angle from the normal."
+			)
+			focus_area = "Highlight incident and refracted rays with the normal at the interface."
+		elif "reflect" in topic_lower or "mirror" in topic_lower:
+			reason = (
+				"The answers indicate a misunderstanding of the laws of reflection, "
+				"especially that the angle of incidence equals the angle of reflection "
+				"and both are measured from the normal, not the mirror surface."
+			)
+			focus_area = "Highlight the normal line and mark equal angles i and r."
+		else:
+			reason = (
+				"The responses show a gap in the core idea for this topic. "
+				"Revisit the main definition and walk through one worked example step by step."
+			)
+			focus_area = "Highlight the key diagram or formula that summarises the concept."
 
-	if not api_key:
-		return {
-			"reason": "LLM is not configured. Set MISTRAL_API_KEY to enable explanations.",
-			"focus_area": "N/A",
-		}
+		return {"reason": reason, "focus_area": focus_area}
 
+	# 3) LLM-based feedback path when explicitly enabled
 	# Build context with available information
 	context = f"Topic: {topic}\nMisconception: {misconception_tag}"
 	

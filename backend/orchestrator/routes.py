@@ -313,8 +313,12 @@ def submit_answers(data: SubmitAnswersRequest):
         "main_misconception": main_misconception,
         "level": student.get("level"),
         "attempt": student.get("attempts"),
+        # Overall explanation for the dominant misconception. Frontend uses this
+        # both for the green "Misconception Explanation" panel and the blue
+        # personalised feedback block.
         "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
         "focus_area": reason_payload.get("focus_area", "N/A"),
+        "misconception_explanation": reason_payload.get("reason", "Let's review this concept from a different angle."),
         "question_feedback": per_question_feedback,
         "questions": follow_up,
         "db_sync_warning": _trim_feedback(db_sync_error, 180) if db_sync_error else None,
