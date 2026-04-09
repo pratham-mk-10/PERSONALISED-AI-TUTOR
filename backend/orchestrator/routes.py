@@ -34,6 +34,7 @@ def _load_adaptation_feedback_module():
 
 _adaptation_feedback = _load_adaptation_feedback_module()
 generate_reasoning = _adaptation_feedback.generate_reasoning
+_classify_misconception_tag = getattr(_adaptation_feedback, "classify_misconception_tag", None)
 
 
 # Load misconception metadata (titles, explanations, etc.) from the shared
@@ -66,11 +67,16 @@ def _get_misconception_explanation(tag: str | None) -> str | None:
     else:
         text = meta
 
-    if not isinstance(text, str):
-        return None
+    if isinstance(text, str) and text.strip():
+        cleaned = " ".join(text.split())
+        if cleaned:
+            return cleaned
 
-    cleaned = " ".join(text.split())
-    return cleaned or None
+    # Fallback: synthesize a readable explanation from the tag so that
+    # the frontend always has something to display when a misconception
+    # has been detected.
+    readable = str(tag).strip().replace("_", " ")
+    return f"This attempt suggests a misconception related to: {readable}. Review this idea once more and connect it to the formal law of reflection."
 
 router = APIRouter()
 evaluator = Evaluator()
@@ -235,6 +241,21 @@ def submit_answers(data: SubmitAnswersRequest):
             )
             if not guessed:
                 guessed = "general_concept_gap"
+
+            # If the misconception is still generic and the LLM classifier
+            # is available, try to infer a more specific reflection tag.
+            if callable(_classify_misconception_tag) and (
+                guessed is None
+                or str(guessed).strip() in {"", "no_concept", "general_concept_gap"}
+            ):
+                auto_tag = _classify_misconception_tag(
+                    topic or "Laws of Reflection",
+                    question_text,
+                    selected,
+                    correct,
+                )
+                if isinstance(auto_tag, str) and auto_tag.strip():
+                    guessed = auto_tag.strip()
 
         if ans.get("question_id") is not None:
             try:
