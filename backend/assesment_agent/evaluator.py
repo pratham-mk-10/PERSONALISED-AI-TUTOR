@@ -20,6 +20,7 @@ def _load_adaptation_feedback_module():
 USE_LLM = os.getenv("USE_LLM", "false").lower() in {"1", "true", "yes"}
 _adaptation_feedback = _load_adaptation_feedback_module()
 generate_reasoning = _adaptation_feedback.generate_reasoning
+classify_misconception_tag = getattr(_adaptation_feedback, "classify_misconception_tag", None)
 
 
 def classify_level(student):
@@ -53,6 +54,20 @@ class Evaluator:
 			misconception_tag = misconception_map.get(selected_option) or misconception_map.get(
 				str(selected_option), "no_concept"
 			)
+			# If no specific tag is provided, optionally let the LLM
+			# infer a finer-grained misconception label.
+			if USE_LLM and callable(classify_misconception_tag) and (
+				misconception_tag is None
+				or str(misconception_tag).strip() in {"", "no_concept", "general_concept_gap"}
+			):
+				auto_tag = classify_misconception_tag(
+					topic or "Laws of Reflection",
+					question_text or "",
+					selected_option,
+					correct_option,
+				)
+				if isinstance(auto_tag, str) and auto_tag.strip():
+					misconception_tag = auto_tag.strip()
 
 		student = update_student(student_id, misconception_tag)
 		level = classify_level(student)
