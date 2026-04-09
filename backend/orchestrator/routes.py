@@ -1,5 +1,6 @@
 from collections import Counter
 import importlib.util
+import json
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,43 @@ def _load_adaptation_feedback_module():
 
 _adaptation_feedback = _load_adaptation_feedback_module()
 generate_reasoning = _adaptation_feedback.generate_reasoning
+
+
+# Load misconception metadata (titles, explanations, etc.) from the shared
+# JSON file so we can return a clear "Misconception Explanation" alongside
+# personalized LLM feedback.
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = _BACKEND_ROOT.parent
+_MISCONCEPTION_TAGS_PATH = _PROJECT_ROOT / "shared" / "misconception_tags.json"
+
+
+def _load_misconception_metadata() -> dict[str, Any]:
+    try:
+        with _MISCONCEPTION_TAGS_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+_MISCONCEPTION_METADATA = _load_misconception_metadata()
+
+
+def _get_misconception_explanation(tag: str | None) -> str | None:
+    if not tag:
+        return None
+
+    meta = _MISCONCEPTION_METADATA.get(tag) or _MISCONCEPTION_METADATA.get("general_concept_gap")
+    if isinstance(meta, dict):
+        text = meta.get("explanation")
+    else:
+        text = meta
+
+    if not isinstance(text, str):
+        return None
+
+    cleaned = " ".join(text.split())
+    return cleaned or None
 
 router = APIRouter()
 evaluator = Evaluator()
@@ -309,12 +347,15 @@ def submit_answers(data: SubmitAnswersRequest):
     next_difficulty = _difficulty_from_level(student.get("level"))
     follow_up = generate_questions(topic or "reflection_refraction", next_difficulty)[:5]
 
+    misconception_explanation = _get_misconception_explanation(main_misconception)
+
     return {
         "main_misconception": main_misconception,
         "level": student.get("level"),
         "attempt": student.get("attempts"),
         "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
         "focus_area": reason_payload.get("focus_area", "N/A"),
+        "misconception_explanation": misconception_explanation,
         "question_feedback": per_question_feedback,
         "questions": follow_up,
         "db_sync_warning": _trim_feedback(db_sync_error, 180) if db_sync_error else None,

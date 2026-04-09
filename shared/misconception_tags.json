@@ -1,0 +1,28 @@
+{
+  "general_concept_gap": {
+    "title": "General Concept Gap",
+    "explanation": "Some of your answers suggest gaps in the core ideas for this topic. Revisit the key definitions, diagrams, and example questions before trying a new quiz.",
+    "focus_area": "Review the main definitions and standard diagrams in your textbook for this topic."
+  },
+  "first_law_reflection_angle": {
+    "title": "Angle of Incidence and Reflection",
+    "explanation": "Angle of incidence equals angle of reflection (i = r). Both angles are always measured from the NORMAL to the surface, not from the mirror surface itself.",
+    "focus_area": "Highlight the normal line at the point of incidence and mark equal angles i and r on either side of the normal."
+  },
+  "second_law_reflection_plane": {
+    "title": "Rays in the Same Plane",
+    "explanation": "According to the second law of reflection, the incident ray, reflected ray and the normal at the point of incidence all lie in the same plane.",
+    "focus_area": "Show the incident ray, reflected ray and the normal drawn on a single flat surface to emphasize they are coplanar.",
+    "topic": "Second law of reflection"
+  },
+  "plane_mirror_image_properties": {
+    "title": "Plane Mirror Image Properties",
+    "explanation": "A plane mirror forms a virtual, erect image of the same size as the object, placed as far behind the mirror as the object is in front. The image is laterally inverted.",
+    "focus_area": "Highlight object and image distances from the mirror and show lateral inversion (left-right reversal)."
+  },
+  "refraction_bending_normal": {
+    "title": "Bending Towards or Away from Normal",
+    "explanation": "When light travels from a rarer medium (like air) to a denser medium (like glass), it bends towards the normal. When it travels from a denser to a rarer medium, it bends away from the normal.",
+    "focus_area": "Show incident and refracted rays on both sides of the boundary and emphasize how their direction changes relative to the normal."
+  }
+}

@@ -29,6 +29,27 @@ Do not go outside this chapter or introduce topics from other physics chapters.
 """.strip()
 
 
+def _default_misconception_tag(topic: str) -> str:
+  """Choose a coarse misconception tag based on the quiz topic.
+
+  This keeps tagging simple and robust: all wrong options in a question
+  map to the same topic-level misconception tag so downstream
+  reasoning and reporting stay stable even if the LLM format changes.
+  """
+  t = (topic or "").strip().lower()
+
+  if "first law of reflection" in t:
+    return "first_law_reflection_angle"
+  if "second law of reflection" in t:
+    return "second_law_reflection_plane"
+  if "plane mirror" in t:
+    return "plane_mirror_image_properties"
+  if "refraction" in t:
+    return "refraction_bending_normal"
+
+  return "general_concept_gap"
+
+
 def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=None, tutor_context=None):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
@@ -67,7 +88,10 @@ Return STRICT JSON ONLY:
     "question_text": "...",
     "options": ["A","B","C","D"],
     "correct": 0,
-    "type": "mcq"
+    "type": "mcq",
+    "misconception_map": {{
+      "1": "first_law_reflection_angle"
+    }}
   }}
 ]
 """
@@ -247,6 +271,31 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     if not unique_questions:
       raise RuntimeError("LLM returned no valid unique questions")
 
+    # Attach a simple, robust misconception map if missing so that
+    # evaluation can always infer a misconception tag from any wrong
+    # option.
+    default_tag = _default_misconception_tag(topic)
+    for q in unique_questions:
+      options = q.get("options") or []
+      correct_idx = q.get("correct")
+      if not isinstance(options, list) or not options:
+        continue
+      if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+        continue
+
+      if not isinstance(q.get("misconception_map"), dict):
+        mis_map = {}
+        for idx in range(len(options)):
+          if idx == correct_idx:
+            continue
+          mis_map[str(idx)] = default_tag
+        q["misconception_map"] = mis_map
+
+      # Ensure topic is present so downstream consumers don't need to
+      # guess.
+      if not q.get("topic"):
+        q["topic"] = topic
+
     if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
       max_count = max(2, min(int(question_count), 10))
       return unique_questions[:max_count]
@@ -261,5 +310,28 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     print(raw_output)
     fallback_questions = _fallback_questions(prompt)
     if fallback_questions:
-      return _dedupe_questions(fallback_questions)[:10]
+      deduped = _dedupe_questions(fallback_questions)[:10]
+
+      default_tag = _default_misconception_tag(topic)
+      for q in deduped:
+        options = q.get("options") or []
+        correct_idx = q.get("correct")
+        if not isinstance(options, list) or not options:
+          continue
+        if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+          continue
+
+        if not isinstance(q.get("misconception_map"), dict):
+          mis_map = {}
+          for idx in range(len(options)):
+            if idx == correct_idx:
+              continue
+            mis_map[str(idx)] = default_tag
+          q["misconception_map"] = mis_map
+
+        if not q.get("topic"):
+          q["topic"] = topic
+
+      return deduped
+
     raise RuntimeError("Failed to parse LLM question response") from e
