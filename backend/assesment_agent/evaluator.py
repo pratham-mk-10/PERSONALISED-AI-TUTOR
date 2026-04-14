@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from database.models import log_student_behavior, update_student, update_student_level
+from database.misconception_catalog import coerce_misconception_tag, get_allowed_misconception_tags
 
 
 def _load_adaptation_feedback_module():
@@ -47,6 +48,7 @@ class Evaluator:
 		question_text=None,
 	):
 		is_correct = str(selected_option) == str(correct_option)
+		allowed_tags = get_allowed_misconception_tags(topic)
 
 		if is_correct:
 			misconception_tag = None
@@ -54,6 +56,7 @@ class Evaluator:
 			misconception_tag = misconception_map.get(selected_option) or misconception_map.get(
 				str(selected_option), "no_concept"
 			)
+			misconception_tag = coerce_misconception_tag(misconception_tag, topic)
 			# If no specific tag is provided, optionally let the LLM
 			# infer a finer-grained misconception label.
 			if USE_LLM and callable(classify_misconception_tag) and (
@@ -65,9 +68,10 @@ class Evaluator:
 					question_text or "",
 					selected_option,
 					correct_option,
+					allowed_tags=allowed_tags,
 				)
 				if isinstance(auto_tag, str) and auto_tag.strip():
-					misconception_tag = auto_tag.strip()
+					misconception_tag = coerce_misconception_tag(auto_tag.strip(), topic)
 
 		student = update_student(student_id, misconception_tag)
 		level = classify_level(student)
