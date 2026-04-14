@@ -3,6 +3,13 @@ import json
 from pathlib import Path
 import re
 
+from database.misconception_catalog import (
+  coerce_misconception_tag,
+  format_misconceptions_for_prompt,
+  get_allowed_misconception_tags,
+  topic_key_for,
+)
+
 
 base_dir = Path(__file__).resolve().parent
 llm_spec = spec_from_file_location("assesment_agent.question_gen_llm_service", base_dir / "question_gen_llm_service.py")
@@ -29,6 +36,27 @@ Do not go outside this chapter or introduce topics from other physics chapters.
 """.strip()
 
 
+def _default_misconception_tag(topic: str) -> str:
+  """Choose a coarse misconception tag based on the quiz topic.
+
+  This keeps tagging simple and robust: all wrong options in a question
+  map to the same topic-level misconception tag so downstream
+  reasoning and reporting stay stable even if the LLM format changes.
+  """
+  topic_key = topic_key_for(topic)
+
+  if topic_key == "laws_of_reflection":
+    return "angle_from_surface"
+  if topic_key == "plane_mirror":
+    return "image_real_confusion"
+  if topic_key == "spherical_mirrors":
+    return "image_position_confusion"
+  if topic_key == "refraction":
+    return "refraction_bending_normal"
+
+  return "general_concept_gap"
+
+
 def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=None, tutor_context=None):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
@@ -43,6 +71,8 @@ def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=N
     else:
         count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
 
+    misconception_block = format_misconceptions_for_prompt(topic)
+
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
 
@@ -52,6 +82,8 @@ Rules:
 - Questions must stay on the video topic and stay strictly within the syllabus scope.
 - Difficulty level: {difficulty}.
 - Tutor context (for personalization): {tutor_context or "No prior learner profile available."}
+- Allowed misconception tags for this topic:
+{misconception_block}
 - No conceptual errors.
 - Use only Class 10 NCERT physics level language.
 - Include common student misconceptions only when they are directly relevant to this topic.
@@ -67,7 +99,10 @@ Return STRICT JSON ONLY:
     "question_text": "...",
     "options": ["A","B","C","D"],
     "correct": 0,
-    "type": "mcq"
+    "type": "mcq",
+    "misconception_map": {{
+      "1": "angle_from_surface"
+    }}
   }}
 ]
 """
@@ -127,6 +162,97 @@ def _dedupe_questions(questions):
   return unique
 
 
+def _extract_complete_json_objects(raw_text):
+  """Extract full top-level JSON objects from a possibly truncated array payload."""
+  if not isinstance(raw_text, str):
+    return []
+
+  start = raw_text.find("[")
+  if start < 0:
+    return []
+
+  objects = []
+  obj_start = None
+  depth = 0
+  in_string = False
+  escaped = False
+
+  for idx in range(start, len(raw_text)):
+    ch = raw_text[idx]
+
+    if in_string:
+      if escaped:
+        escaped = False
+      elif ch == "\\":
+        escaped = True
+      elif ch == '"':
+        in_string = False
+      continue
+
+    if ch == '"':
+      in_string = True
+      continue
+
+    if ch == "{":
+      if depth == 0:
+        obj_start = idx
+      depth += 1
+      continue
+
+    if ch == "}" and depth > 0:
+      depth -= 1
+      if depth == 0 and obj_start is not None:
+        candidate = raw_text[obj_start : idx + 1]
+        try:
+          parsed = json.loads(candidate)
+          if isinstance(parsed, dict):
+            objects.append(parsed)
+        except json.JSONDecodeError:
+          pass
+        obj_start = None
+
+  return objects
+
+
+def _parse_llm_questions(raw_output):
+  """Parse LLM output into a question list, tolerating fenced and truncated JSON."""
+  text = str(raw_output or "").strip()
+  if not text:
+    return []
+
+  # Remove optional markdown code fences before parsing.
+  text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+  text = re.sub(r"\s*```$", "", text)
+
+  start = text.find("[")
+  end = text.rfind("]") + 1
+
+  if start >= 0 and end > start:
+    try:
+      parsed = json.loads(text[start:end])
+      if isinstance(parsed, list):
+        return parsed
+    except json.JSONDecodeError:
+      pass
+
+  recovered = _extract_complete_json_objects(text)
+  return recovered if recovered else []
+
+
+def _fallback_questions(prompt):
+  """Use deterministic local fallback questions when remote output cannot be parsed."""
+  fallback_fn = getattr(llm_module, "_fallback_response", None)
+  if not callable(fallback_fn):
+    return []
+
+  try:
+    fallback_raw = fallback_fn(prompt)
+    parsed = json.loads(fallback_raw)
+    return parsed if isinstance(parsed, list) else []
+  except Exception:
+    return []
+
+
 def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_count=None, tutor_context=None):
   prompt = build_prompt(
     topic,
@@ -142,16 +268,12 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     raw_output = ""
 
   try:
-    # Extract JSON safely
-    start = raw_output.find("[")
-    end = raw_output.rfind("]") + 1
-    if start < 0 or end <= start:
-      raise RuntimeError("LLM output did not contain a valid JSON array")
+    questions = _parse_llm_questions(raw_output)
+    if not questions:
+      questions = _fallback_questions(prompt)
 
-    json_str = raw_output[start:end]
-    questions = json.loads(json_str)
-    if not isinstance(questions, list):
-      raise RuntimeError("LLM output JSON is not a question array")
+    if not isinstance(questions, list) or not questions:
+      raise RuntimeError("LLM output could not be parsed into questions")
 
     for q in questions:
       text = str(q.get("question_text", "")).strip()
@@ -162,6 +284,48 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     unique_questions = _dedupe_questions(questions)
     if not unique_questions:
       raise RuntimeError("LLM returned no valid unique questions")
+
+    allowed_tags = set(get_allowed_misconception_tags(topic))
+
+    # Attach a simple, robust misconception map if missing so that
+    # evaluation can always infer a misconception tag from any wrong
+    # option.
+    default_tag = _default_misconception_tag(topic)
+    for q in unique_questions:
+      options = q.get("options") or []
+      correct_idx = q.get("correct")
+      if not isinstance(options, list) or not options:
+        continue
+      if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+        continue
+
+      if not isinstance(q.get("misconception_map"), dict):
+        mis_map = {}
+        for idx in range(len(options)):
+          if idx == correct_idx:
+            continue
+          mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
+        q["misconception_map"] = mis_map
+      else:
+        sanitized_map = {}
+        for key, value in q["misconception_map"].items():
+          coerced = coerce_misconception_tag(value, topic)
+          if coerced in allowed_tags or coerced == "general_concept_gap":
+            sanitized_map[str(key)] = coerced
+        if sanitized_map:
+          q["misconception_map"] = sanitized_map
+        else:
+          mis_map = {}
+          for idx in range(len(options)):
+            if idx == correct_idx:
+              continue
+            mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
+          q["misconception_map"] = mis_map
+
+      # Ensure topic is present so downstream consumers don't need to
+      # guess.
+      if not q.get("topic"):
+        q["topic"] = topic
 
     if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
       max_count = max(2, min(int(question_count), 10))
@@ -175,9 +339,6 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
   except Exception as e:
     print("Parsing error:", e)
     print(raw_output)
-<<<<<<< Updated upstream
-    raise RuntimeError("Failed to parse LLM question response") from e
-=======
     fallback_questions = _fallback_questions(prompt)
     if fallback_questions:
       deduped = _dedupe_questions(fallback_questions)[:10]
@@ -196,8 +357,23 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
           for idx in range(len(options)):
             if idx == correct_idx:
               continue
-            mis_map[str(idx)] = default_tag
+            mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
           q["misconception_map"] = mis_map
+        else:
+          sanitized_map = {}
+          for key, value in q["misconception_map"].items():
+            coerced = coerce_misconception_tag(value, topic)
+            if coerced in allowed_tags or coerced == "general_concept_gap":
+              sanitized_map[str(key)] = coerced
+          if sanitized_map:
+            q["misconception_map"] = sanitized_map
+          else:
+            mis_map = {}
+            for idx in range(len(options)):
+              if idx == correct_idx:
+                continue
+              mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
+            q["misconception_map"] = mis_map
 
         if not q.get("topic"):
           q["topic"] = topic
@@ -205,4 +381,3 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
       return deduped
 
     raise RuntimeError("Failed to parse LLM question response") from e
->>>>>>> Stashed changes

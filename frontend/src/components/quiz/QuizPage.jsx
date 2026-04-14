@@ -116,6 +116,7 @@ const QuizPage = () => {
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [report, setReport] = useState(null);
 
@@ -182,6 +183,7 @@ const QuizPage = () => {
       return;
     }
 
+    setSubmitting(true);
     try {
       const quizTopicContext = getQuizTopicContext(currentTopicId);
       const studentId = user?.id || user?.name || "guest-student";
@@ -266,6 +268,8 @@ const QuizPage = () => {
       });
     } catch (err) {
       setError(err?.message || "Unable to process quiz results");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -474,7 +478,14 @@ const QuizPage = () => {
         <button
           onClick={handlePrevious}
           disabled={currentIndex === 0}
-          style={{ padding: "10px 16px", cursor: "pointer" }}
+          style={{
+            padding: "10px 16px",
+            cursor: currentIndex === 0 ? "not-allowed" : "pointer",
+            borderRadius: "999px",
+            border: "1px solid #e5e7eb",
+            background: currentIndex === 0 ? "#f3f4f6" : "#ffffff",
+            fontWeight: 600,
+          }}
         >
           Previous
         </button>
@@ -483,16 +494,46 @@ const QuizPage = () => {
           <button
             onClick={handleNext}
             disabled={selectedForCurrent === undefined}
-            style={{ padding: "10px 16px", cursor: "pointer" }}
+            style={{
+              padding: "10px 16px",
+              cursor: selectedForCurrent === undefined ? "not-allowed" : "pointer",
+              borderRadius: "999px",
+              border: "1px solid #e5e7eb",
+              background: selectedForCurrent === undefined ? "#f3f4f6" : "#eef2ff",
+              fontWeight: 600,
+            }}
           >
             Next
           </button>
         ) : (
           <button
             onClick={handleSubmit}
-            style={{ padding: "10px 16px", cursor: "pointer" }}
+            disabled={selectedForCurrent === undefined || submitting}
+            style={{
+              padding: "10px 20px",
+              cursor:
+                selectedForCurrent === undefined || submitting
+                  ? "not-allowed"
+                  : "pointer",
+              borderRadius: "999px",
+              border: "none",
+              fontWeight: 700,
+              color: "#ffffff",
+              background:
+                selectedForCurrent === undefined
+                  ? "#9ca3af"
+                  : submitting
+                  ? "linear-gradient(90deg, #4b5563, #6b7280)"
+                  : "linear-gradient(90deg, #4f46e5, #6366f1)",
+              boxShadow:
+                selectedForCurrent === undefined || submitting
+                  ? "0 4px 10px rgba(156, 163, 175, 0.5)"
+                  : "0 10px 20px rgba(79, 70, 229, 0.4)",
+              transform: submitting ? "scale(0.97)" : "scale(1)",
+              transition: "all 0.18s ease-out",
+            }}
           >
-            Finish Quiz
+            {submitting ? "Checking answers..." : "Finish Quiz"}
           </button>
         )}
       </div>

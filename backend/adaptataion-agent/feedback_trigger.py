@@ -1,6 +1,10 @@
 import json
 import os
+from pathlib import Path
 from urllib import error, request
+from dotenv import load_dotenv
+
+from database.misconception_catalog import format_misconceptions_for_prompt
 
 FALLBACK_MODELS = [
 	"mistral-small-latest",
@@ -9,9 +13,25 @@ FALLBACK_MODELS = [
 ]
 
 MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_ENV_CANDIDATES = [
+	BACKEND_ROOT / ".env",
+	BACKEND_ROOT / "env",
+	BACKEND_ROOT.parent / ".env",
+]
+
+
+def _load_env_files():
+	for env_path in _ENV_CANDIDATES:
+		if env_path.exists():
+			load_dotenv(dotenv_path=env_path, override=False)
+
+
+_load_env_files()
 
 
 def _get_api_key():
+	_load_env_files()
 	return os.getenv("MISTRAL_API_KEY", "").strip()
 
 
@@ -148,4 +168,89 @@ Output JSON only with keys: reason, focus_area.
 	reason = str(parsed.get("reason", "")).strip() or "Reason unavailable"
 	focus_area = str(parsed.get("focus_area", "N/A")).strip() or "N/A"
 	return {"reason": reason, "focus_area": focus_area}
+
+
+def classify_misconception_tag(topic, question_text, student_answer, correct_answer, allowed_tags=None):
+	"""Use the LLM to choose the best misconception tag.
+
+	This is a lightweight "misconception model" implemented via prompt
+	engineering. It returns one of a small, fixed set of tags so that
+	Python code can make decisions (e.g., which video to show) without a
+	separate ML classifier.
+	"""
+	api_key = _get_api_key()
+	if not api_key:
+		return None
+
+	allowed_tags = [str(tag).strip() for tag in (allowed_tags or []) if str(tag).strip()]
+	allowed_block = format_misconceptions_for_prompt(topic)
+	if allowed_tags:
+		allowed_block_lines = []
+		for line in allowed_block.splitlines():
+			cleaned = line.lstrip("- ").strip()
+			tag = cleaned.split(":", 1)[0].strip()
+			if tag in allowed_tags:
+				allowed_block_lines.append(line)
+		if allowed_block_lines:
+			allowed_block = "\n".join(allowed_block_lines)
+		else:
+			allowed_block = "\n".join(f"- {tag}" for tag in allowed_tags)
+
+	context = f"Topic: {topic}\nQuestion: {question_text}\nStudent's answer: {student_answer}\nCorrect answer: {correct_answer}"
+
+	prompt = f"""
+You are an expert NCERT Class 10 physics teacher.
+
+Your task is to classify the student's main misconception for a question on reflection.
+
+Use ONLY the allowed tags for this topic:
+{allowed_block}
+
+If no specific tag fits, use general_concept_gap.
+
+{context}
+
+Pick the SINGLE best tag from the list above.
+
+Return STRICT JSON ONLY:
+{{"tag": "<chosen_tag>"}}
+""".strip()
+
+	response_payload = None
+	last_exc = None
+	for model_name in _candidate_models():
+		try:
+			response_payload = _post_chat_completion(
+				api_key,
+				{
+					"model": model_name,
+					"temperature": 0.1,
+					"messages": [
+						{
+							"role": "system",
+							"content": "You are a teaching assistant. Return JSON only with key 'tag'.",
+						},
+						{"role": "user", "content": prompt},
+					],
+				},
+			)
+			break
+		except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
+			last_exc = exc
+
+	if response_payload is None:
+		return None
+
+	choices = response_payload.get("choices") or []
+	raw = ""
+	if choices:
+		raw = ((choices[0].get("message") or {}).get("content") or "").strip()
+	if not raw:
+		raw = json.dumps(response_payload)
+
+	parsed = _extract_json(raw) or {}
+	tag = str(parsed.get("tag", "")).strip()
+	if tag not in allowed_tags:
+		return None
+	return tag
 

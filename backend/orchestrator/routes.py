@@ -16,6 +16,11 @@ try:
         update_student_topic_resolution,
     )
     from database.connection import get_connection
+    from database.misconception_catalog import (
+        coerce_misconception_tag,
+        get_allowed_misconception_tags,
+        get_misconception_metadata,
+    )
     from assesment_agent.evaluator import Evaluator
     from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
 except ImportError:
@@ -28,6 +33,11 @@ except ImportError:
         update_student_topic_resolution,
     )
     from backend.database.connection import get_connection
+    from backend.database.misconception_catalog import (
+        coerce_misconception_tag,
+        get_allowed_misconception_tags,
+        get_misconception_metadata,
+    )
     from backend.assesment_agent.evaluator import Evaluator
     from backend.assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
 
@@ -61,38 +71,29 @@ def _load_content_agent_class():
 
 _adaptation_feedback = _load_adaptation_feedback_module()
 generate_reasoning = _adaptation_feedback.generate_reasoning
-
-<<<<<<< Updated upstream
-=======
-_BACKEND_ROOT = Path(__file__).resolve().parents[1]
-_PROJECT_ROOT = _BACKEND_ROOT.parent
-_MISCONCEPTION_TAGS_PATH = _PROJECT_ROOT / "shared" / "misconception_tags.json"
-
-
-def _load_misconception_metadata() -> dict[str, Any]:
-    try:
-        with _MISCONCEPTION_TAGS_PATH.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-_MISCONCEPTION_METADATA = _load_misconception_metadata()
+_classify_misconception_tag = getattr(_adaptation_feedback, "classify_misconception_tag", None)
 
 
 def _get_misconception_explanation(tag: str | None) -> str | None:
     if not tag:
         return None
 
-    meta = _MISCONCEPTION_METADATA.get(tag) or _MISCONCEPTION_METADATA.get("general_concept_gap")
-    text = meta.get("explanation") if isinstance(meta, dict) else meta
-    if not isinstance(text, str):
-        return None
-    return " ".join(text.split())
+    meta = get_misconception_metadata(tag) or get_misconception_metadata("general_concept_gap")
+    text = meta.get("explanation") if isinstance(meta, dict) else None
+
+    if isinstance(text, str) and text.strip():
+        cleaned = " ".join(text.split())
+        if cleaned:
+            return cleaned
+
+    readable = str(tag).strip().replace("_", " ")
+    return f"This attempt suggests a misconception related to: {readable}. Review this idea once more and connect it to the formal law of reflection."
 
 
->>>>>>> Stashed changes
+def _allowed_misconceptions_for_topic(topic: str | None) -> list[str]:
+    return get_allowed_misconception_tags(topic)
+
+
 router = APIRouter()
 evaluator = Evaluator()
 ContentAgent = _load_content_agent_class()
@@ -194,18 +195,45 @@ def submit_answers(data: SubmitAnswersRequest):
     db_sync_warning = None
 
     for ans in data.answers:
-        selected = str(ans.get("selected"))
-        correct_ans = str(ans.get("correct"))
+        selected_raw = ans.get("selected")
+        correct_raw = ans.get("correct")
+        if selected_raw is None or correct_raw is None:
+            continue
+
+        selected = str(selected_raw)
+        correct_ans = str(correct_raw)
         is_correct = selected == correct_ans
 
         total += 1
         if is_correct:
             correct += 1
-            continue
+        else:
+            misconception_map = ans.get("misconception_map") or ans.get("misconception_tags") or {}
+            tag = (
+                misconception_map.get(selected)
+                or misconception_map.get(str(selected_raw))
+                or ans.get("misconception_tag")
+                or "general_concept_gap"
+            )
 
-        mapping = ans.get("misconception_map", {}) or {}
-        tag = mapping.get(selected) or mapping.get(str(selected)) or "general_concept_gap"
-        tags.append(tag)
+            question_text = str(ans.get("question_text") or "").strip()
+            if callable(_classify_misconception_tag) and str(tag).strip() in {
+                "",
+                "no_concept",
+                "general_concept_gap",
+            }:
+                auto_tag = _classify_misconception_tag(
+                    topic or "Laws of Reflection",
+                    question_text,
+                    selected,
+                    correct_ans,
+                    allowed_tags=_allowed_misconceptions_for_topic(topic),
+                )
+                if isinstance(auto_tag, str) and auto_tag.strip():
+                    tag = auto_tag.strip()
+
+            tag = coerce_misconception_tag(tag, topic)
+            tags.append(tag)
 
         try:
             log_student_behavior(
@@ -213,8 +241,8 @@ def submit_answers(data: SubmitAnswersRequest):
                 topic=topic,
                 selected_option=selected,
                 correct_option=correct_ans,
-                is_correct=False,
-                misconception_tag=tag,
+                is_correct=is_correct,
+                misconception_tag=None if is_correct else tag,
             )
         except Exception as exc:
             db_sync_warning = str(exc)
@@ -256,8 +284,14 @@ def submit_answers(data: SubmitAnswersRequest):
         if str(selected) == str(correct_ans):
             continue
 
-        mapping = ans.get("misconception_map", {}) or {}
-        tag = mapping.get(selected) or mapping.get(str(selected)) or "general_concept_gap"
+        mapping = ans.get("misconception_map") or ans.get("misconception_tags") or {}
+        tag = (
+            mapping.get(selected)
+            or mapping.get(str(selected))
+            or ans.get("misconception_tag")
+            or "general_concept_gap"
+        )
+        tag = coerce_misconception_tag(tag, topic)
         reason_text = _get_misconception_explanation(tag) or "Review this concept carefully."
         question_feedback.append(
             {
@@ -268,32 +302,14 @@ def submit_answers(data: SubmitAnswersRequest):
             }
         )
 
-<<<<<<< Updated upstream
-    reason_payload = {
-        "reason": _trim_feedback(reason_payload.get("reason", "Let's review this concept from a different angle."), 220),
-        "focus_area": _trim_feedback(reason_payload.get("focus_area", "N/A"), 120),
-    }
-
-    next_difficulty = _difficulty_from_level(student.get("level"))
-    follow_up = generate_questions(topic or "reflection_refraction", next_difficulty)[:5]
-
-    return {
-        "main_misconception": main_misconception,
-        "level": student.get("level"),
-        "attempt": student.get("attempts"),
-        "reason": reason_payload.get("reason", "Let's review this concept from a different angle."),
-        "focus_area": reason_payload.get("focus_area", "N/A"),
-        "question_feedback": per_question_feedback,
-=======
     return {
         "main_misconception": main_misconception,
         "level": level,
-        "reason": explanation or "Review the concept carefully.",
-        "focus_area": main_misconception,
+        "reason": _trim_feedback(explanation or "Review the concept carefully."),
+        "focus_area": "N/A" if main_misconception == "none" else main_misconception,
         "misconception_explanation": _get_misconception_explanation(main_misconception),
         "question_feedback": question_feedback,
         "db_sync_warning": db_sync_warning,
->>>>>>> Stashed changes
         "questions": follow_up,
     }
 
