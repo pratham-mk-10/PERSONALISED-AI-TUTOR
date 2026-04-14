@@ -136,7 +136,10 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     tutor_context=tutor_context,
   )
 
-  raw_output = generate_text(prompt)
+  try:
+    raw_output = generate_text(prompt)
+  except Exception:
+    raw_output = ""
 
   try:
     # Extract JSON safely
@@ -172,4 +175,34 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
   except Exception as e:
     print("Parsing error:", e)
     print(raw_output)
+<<<<<<< Updated upstream
     raise RuntimeError("Failed to parse LLM question response") from e
+=======
+    fallback_questions = _fallback_questions(prompt)
+    if fallback_questions:
+      deduped = _dedupe_questions(fallback_questions)[:10]
+
+      default_tag = _default_misconception_tag(topic)
+      for q in deduped:
+        options = q.get("options") or []
+        correct_idx = q.get("correct")
+        if not isinstance(options, list) or not options:
+          continue
+        if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+          continue
+
+        if not isinstance(q.get("misconception_map"), dict):
+          mis_map = {}
+          for idx in range(len(options)):
+            if idx == correct_idx:
+              continue
+            mis_map[str(idx)] = default_tag
+          q["misconception_map"] = mis_map
+
+        if not q.get("topic"):
+          q["topic"] = topic
+
+      return deduped
+
+    raise RuntimeError("Failed to parse LLM question response") from e
+>>>>>>> Stashed changes

@@ -2,7 +2,10 @@ import importlib.util
 import os
 from pathlib import Path
 
-from database.models import log_student_behavior, update_student, update_student_level
+try:
+	from database.models import log_student_behavior, update_student, update_student_level
+except ImportError:
+	from backend.database.models import log_student_behavior, update_student, update_student_level
 
 
 def _load_adaptation_feedback_module():

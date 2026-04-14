@@ -1,10 +1,6 @@
 // ============================================================
-// LawsOfReflectionAnimation.jsx (UPDATED - PANEL FRIENDLY)
-// Changes:
-// - Slower animation (42000ms)
-// - Step-by-step teaching captions
-// - Pause-based flow (LKG style)
-// - Minimal highlights (no styling changes)
+// FirstLawOfReflectionAnimation.jsx
+// Animation for the 1st Law: Angle of Incidence = Angle of Reflection
 // ============================================================
 
 import React, { useRef, useEffect } from "react";
@@ -32,7 +28,7 @@ const RAY_LEN  = 160;
 const ANGLE    = 35;
 const ARC_R    = 45;
 
-const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
+const FirstLawOfReflectionAnimation = ({ onTryItClicked }) => {
   const audioRef = useRef(null);
   const lastStepRef = useRef(-1);
   const incStart  = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
@@ -73,8 +69,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
     audio.play().catch(() => {});
   };
 
-  // Stop any playing audio when this animation unmounts (e.g., when user
-  // changes stage/section), so the voice does not continue in other screens.
+  // Stop any playing audio when this animation unmounts
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -88,7 +83,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
   return (
     <AnimationPlayer
       duration={42000}
-      title="Watch: Law of Reflection"
+      title="Watch: 1st Law of Reflection"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
@@ -106,7 +101,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
         // Play audio for current step
         playAudio(step);
 
-        // ── PHASES (SLOW + TEACHING STYLE) ──
+        // ── PHASES ──
         const mirrorOpacity = clamp(progress / 0.10, 0, 1);
 
         const incPhase = clamp((progress - 0.22) / 0.18, 0, 1);
@@ -239,7 +234,7 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
               </>
             )}
 
-            {/* ── TEACHER CAPTIONS (KEY CHANGE) ── */}
+            {/* ── TEACHER CAPTIONS ── */}
             {step === 0 && (
               <Label
                 x={210}
@@ -348,4 +343,4 @@ const LawsOfReflectionAnimation = ({ onTryItClicked }) => {
   );
 };
 
-export default LawsOfReflectionAnimation;
+export default FirstLawOfReflectionAnimation;
