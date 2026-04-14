@@ -1,6 +1,10 @@
 import json
 import os
+from pathlib import Path
 from urllib import error, request
+from dotenv import load_dotenv
+
+from database.misconception_catalog import format_misconceptions_for_prompt
 
 FALLBACK_MODELS = [
 	"mistral-small-latest",
@@ -9,9 +13,25 @@ FALLBACK_MODELS = [
 ]
 
 MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_ENV_CANDIDATES = [
+	BACKEND_ROOT / ".env",
+	BACKEND_ROOT / "env",
+	BACKEND_ROOT.parent / ".env",
+]
+
+
+def _load_env_files():
+	for env_path in _ENV_CANDIDATES:
+		if env_path.exists():
+			load_dotenv(dotenv_path=env_path, override=False)
+
+
+_load_env_files()
 
 
 def _get_api_key():
+	_load_env_files()
 	return os.getenv("MISTRAL_API_KEY", "").strip()
 
 
@@ -150,7 +170,7 @@ Output JSON only with keys: reason, focus_area.
 	return {"reason": reason, "focus_area": focus_area}
 
 
-def classify_misconception_tag(topic, question_text, student_answer, correct_answer):
+def classify_misconception_tag(topic, question_text, student_answer, correct_answer, allowed_tags=None):
 	"""Use the LLM to choose the best misconception tag.
 
 	This is a lightweight "misconception model" implemented via prompt
@@ -162,13 +182,19 @@ def classify_misconception_tag(topic, question_text, student_answer, correct_ans
 	if not api_key:
 		return None
 
-	allowed_tags = [
-		"angle_from_surface",
-		"reflection_not_equal",
-		"normal_orientation_wrong",
-		"plane_not_same",
-		"general_concept_gap",
-	]
+	allowed_tags = [str(tag).strip() for tag in (allowed_tags or []) if str(tag).strip()]
+	allowed_block = format_misconceptions_for_prompt(topic)
+	if allowed_tags:
+		allowed_block_lines = []
+		for line in allowed_block.splitlines():
+			cleaned = line.lstrip("- ").strip()
+			tag = cleaned.split(":", 1)[0].strip()
+			if tag in allowed_tags:
+				allowed_block_lines.append(line)
+		if allowed_block_lines:
+			allowed_block = "\n".join(allowed_block_lines)
+		else:
+			allowed_block = "\n".join(f"- {tag}" for tag in allowed_tags)
 
 	context = f"Topic: {topic}\nQuestion: {question_text}\nStudent's answer: {student_answer}\nCorrect answer: {correct_answer}"
 
@@ -177,12 +203,10 @@ You are an expert NCERT Class 10 physics teacher.
 
 Your task is to classify the student's main misconception for a question on reflection.
 
-Use ONLY one of these tags:
-- angle_from_surface: Student measures angle from the mirror surface instead of from the normal.
-- reflection_not_equal: Student thinks angle of incidence and angle of reflection are not equal (i ≠ r).
-- normal_orientation_wrong: Student draws or imagines the normal incorrectly (for example, parallel to the mirror instead of perpendicular).
-- plane_not_same: Student thinks the incident ray, reflected ray and normal do not lie in the same plane.
-- general_concept_gap: Student answer is off-topic, a random guess, or mixes several misconceptions so that no single tag clearly fits.
+Use ONLY the allowed tags for this topic:
+{allowed_block}
+
+If no specific tag fits, use general_concept_gap.
 
 {context}
 

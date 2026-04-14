@@ -6,13 +6,26 @@ import re
 from dotenv import load_dotenv
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(dotenv_path=BACKEND_ROOT / ".env")
+_ENV_CANDIDATES = [
+    BACKEND_ROOT / ".env",
+    BACKEND_ROOT / "env",
+    BACKEND_ROOT.parent / ".env",
+]
+
+
+def _load_env_files():
+    for env_path in _ENV_CANDIDATES:
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path, override=False)
+
+
+_load_env_files()
 
 API_URL = "https://api.mistral.ai/v1/chat/completions"
 
 def _get_api_key():
     # Reload env each request to pick up updates without relying on import-time values.
-    load_dotenv(dotenv_path=BACKEND_ROOT / ".env", override=False)
+    _load_env_files()
     return (
         os.getenv("MISTRAL_API_KEY")
         or os.getenv("MISTRAL_API_TOKEN")
@@ -238,7 +251,7 @@ def generate_text(prompt):
     api_key = _get_api_key()
 
     if not api_key:
-        raise RuntimeError("Mistral API key is missing in backend .env")
+        raise RuntimeError("Mistral API key is missing. Add it to backend/.env or backend/env")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -256,7 +269,7 @@ def generate_text(prompt):
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, json=data, timeout=30)
+        response = requests.post(API_URL, headers=headers, json=data, timeout=60)
         response.raise_for_status()
         result = response.json()
         return result["choices"][0]["message"]["content"]

@@ -3,6 +3,13 @@ import json
 from pathlib import Path
 import re
 
+from database.misconception_catalog import (
+  coerce_misconception_tag,
+  format_misconceptions_for_prompt,
+  get_allowed_misconception_tags,
+  topic_key_for,
+)
+
 
 base_dir = Path(__file__).resolve().parent
 llm_spec = spec_from_file_location("assesment_agent.question_gen_llm_service", base_dir / "question_gen_llm_service.py")
@@ -36,15 +43,15 @@ def _default_misconception_tag(topic: str) -> str:
   map to the same topic-level misconception tag so downstream
   reasoning and reporting stay stable even if the LLM format changes.
   """
-  t = (topic or "").strip().lower()
+  topic_key = topic_key_for(topic)
 
-  if "first law of reflection" in t:
-    return "first_law_reflection_angle"
-  if "second law of reflection" in t:
-    return "second_law_reflection_plane"
-  if "plane mirror" in t:
-    return "plane_mirror_image_properties"
-  if "refraction" in t:
+  if topic_key == "laws_of_reflection":
+    return "angle_from_surface"
+  if topic_key == "plane_mirror":
+    return "image_real_confusion"
+  if topic_key == "spherical_mirrors":
+    return "image_position_confusion"
+  if topic_key == "refraction":
     return "refraction_bending_normal"
 
   return "general_concept_gap"
@@ -64,6 +71,8 @@ def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=N
     else:
         count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
 
+    misconception_block = format_misconceptions_for_prompt(topic)
+
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
 
@@ -73,6 +82,8 @@ Rules:
 - Questions must stay on the video topic and stay strictly within the syllabus scope.
 - Difficulty level: {difficulty}.
 - Tutor context (for personalization): {tutor_context or "No prior learner profile available."}
+- Allowed misconception tags for this topic:
+{misconception_block}
 - No conceptual errors.
 - Use only Class 10 NCERT physics level language.
 - Include common student misconceptions only when they are directly relevant to this topic.
@@ -90,7 +101,7 @@ Return STRICT JSON ONLY:
     "correct": 0,
     "type": "mcq",
     "misconception_map": {{
-      "1": "first_law_reflection_angle"
+      "1": "angle_from_surface"
     }}
   }}
 ]
@@ -271,6 +282,8 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     if not unique_questions:
       raise RuntimeError("LLM returned no valid unique questions")
 
+    allowed_tags = set(get_allowed_misconception_tags(topic))
+
     # Attach a simple, robust misconception map if missing so that
     # evaluation can always infer a misconception tag from any wrong
     # option.
@@ -288,8 +301,23 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         for idx in range(len(options)):
           if idx == correct_idx:
             continue
-          mis_map[str(idx)] = default_tag
+          mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
         q["misconception_map"] = mis_map
+      else:
+        sanitized_map = {}
+        for key, value in q["misconception_map"].items():
+          coerced = coerce_misconception_tag(value, topic)
+          if coerced in allowed_tags or coerced == "general_concept_gap":
+            sanitized_map[str(key)] = coerced
+        if sanitized_map:
+          q["misconception_map"] = sanitized_map
+        else:
+          mis_map = {}
+          for idx in range(len(options)):
+            if idx == correct_idx:
+              continue
+            mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
+          q["misconception_map"] = mis_map
 
       # Ensure topic is present so downstream consumers don't need to
       # guess.
@@ -326,8 +354,23 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
           for idx in range(len(options)):
             if idx == correct_idx:
               continue
-            mis_map[str(idx)] = default_tag
+            mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
           q["misconception_map"] = mis_map
+        else:
+          sanitized_map = {}
+          for key, value in q["misconception_map"].items():
+            coerced = coerce_misconception_tag(value, topic)
+            if coerced in allowed_tags or coerced == "general_concept_gap":
+              sanitized_map[str(key)] = coerced
+          if sanitized_map:
+            q["misconception_map"] = sanitized_map
+          else:
+            mis_map = {}
+            for idx in range(len(options)):
+              if idx == correct_idx:
+                continue
+              mis_map[str(idx)] = coerce_misconception_tag(default_tag, topic)
+            q["misconception_map"] = mis_map
 
         if not q.get("topic"):
           q["topic"] = topic

@@ -1,6 +1,5 @@
 from collections import Counter
 import importlib.util
-import json
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,7 @@ from database.models import (
     update_student_level,
     update_student_topic_resolution,
 )
+from database.misconception_catalog import coerce_misconception_tag, get_allowed_misconception_tags, get_misconception_metadata
 from assesment_agent.evaluator import Evaluator
 from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
 
@@ -37,35 +37,12 @@ generate_reasoning = _adaptation_feedback.generate_reasoning
 _classify_misconception_tag = getattr(_adaptation_feedback, "classify_misconception_tag", None)
 
 
-# Load misconception metadata (titles, explanations, etc.) from the shared
-# JSON file so we can return a clear "Misconception Explanation" alongside
-# personalized LLM feedback.
-_BACKEND_ROOT = Path(__file__).resolve().parents[1]
-_PROJECT_ROOT = _BACKEND_ROOT.parent
-_MISCONCEPTION_TAGS_PATH = _PROJECT_ROOT / "shared" / "misconception_tags.json"
-
-
-def _load_misconception_metadata() -> dict[str, Any]:
-    try:
-        with _MISCONCEPTION_TAGS_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-_MISCONCEPTION_METADATA = _load_misconception_metadata()
-
-
 def _get_misconception_explanation(tag: str | None) -> str | None:
     if not tag:
         return None
 
-    meta = _MISCONCEPTION_METADATA.get(tag) or _MISCONCEPTION_METADATA.get("general_concept_gap")
-    if isinstance(meta, dict):
-        text = meta.get("explanation")
-    else:
-        text = meta
+    meta = get_misconception_metadata(tag) or get_misconception_metadata("general_concept_gap")
+    text = meta.get("explanation") if isinstance(meta, dict) else None
 
     if isinstance(text, str) and text.strip():
         cleaned = " ".join(text.split())
@@ -77,6 +54,10 @@ def _get_misconception_explanation(tag: str | None) -> str | None:
     # has been detected.
     readable = str(tag).strip().replace("_", " ")
     return f"This attempt suggests a misconception related to: {readable}. Review this idea once more and connect it to the formal law of reflection."
+
+
+def _allowed_misconceptions_for_topic(topic: str | None) -> list[str]:
+    return get_allowed_misconception_tags(topic)
 
 router = APIRouter()
 evaluator = Evaluator()
@@ -253,9 +234,10 @@ def submit_answers(data: SubmitAnswersRequest):
                     question_text,
                     selected,
                     correct,
+                    allowed_tags=_allowed_misconceptions_for_topic(topic),
                 )
                 if isinstance(auto_tag, str) and auto_tag.strip():
-                    guessed = auto_tag.strip()
+                    guessed = coerce_misconception_tag(auto_tag.strip(), topic)
 
         if ans.get("question_id") is not None:
             try:

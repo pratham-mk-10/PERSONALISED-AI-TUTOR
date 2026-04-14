@@ -41,7 +41,8 @@ export const getGeneratedQuestions = async ({
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  // LLM question generation can occasionally exceed 30s under load.
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   let res;
   try {
