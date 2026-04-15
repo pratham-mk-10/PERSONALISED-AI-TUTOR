@@ -8,6 +8,7 @@ const CHAPTERS = [
 		title: "Light: Reflection & Refraction",
 		topics: [
 			{ id: "plane-mirror", title: "Plane Mirror Basics" },
+			{ id: "spherical-mirror-basics", title: "Spherical Mirror Basics" },
 			{ id: "laws-reflection", title: "Laws of Reflection (1st + 2nd)" },
 			{ id: "refraction-intro", title: "Introduction to Refraction" },
 		],
