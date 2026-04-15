@@ -26,6 +26,7 @@ const AnimationPlayer = ({
   onComplete,        // called when animation reaches end
   onTryItClicked,    // called when student clicks "Try it yourself"
   showTryIt = true,  // whether to show the Try It button after completion
+  tryButtonLabel = "Try it yourself ->",
   title = "",        // optional title shown above SVG
 }) => {
 
@@ -165,7 +166,7 @@ const AnimationPlayer = ({
         {/* Try it yourself — appears after animation completes */}
         {showTry && showTryIt && (
           <button onClick={handleTryIt} style={styles.btnPrimary}>
-            Try it yourself →
+            {tryButtonLabel}
           </button>
         )}
 

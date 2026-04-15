@@ -1,4 +1,7 @@
-from database.connection import get_connection
+try:
+	from database.connection import get_connection
+except ImportError:
+	from backend.database.connection import get_connection
 
 
 def ensure_schema(cur):

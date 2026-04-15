@@ -2,8 +2,12 @@ import importlib.util
 import os
 from pathlib import Path
 
-from database.models import log_student_behavior, update_student, update_student_level
-from database.misconception_catalog import coerce_misconception_tag, get_allowed_misconception_tags
+try:
+	from database.models import log_student_behavior, update_student, update_student_level
+	from database.misconception_catalog import coerce_misconception_tag, get_allowed_misconception_tags
+except ImportError:
+	from backend.database.models import log_student_behavior, update_student, update_student_level
+	from backend.database.misconception_catalog import coerce_misconception_tag, get_allowed_misconception_tags
 
 
 def _load_adaptation_feedback_module():

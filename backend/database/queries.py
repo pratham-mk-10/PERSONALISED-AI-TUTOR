@@ -1,6 +1,9 @@
 import random
 
-from database.connection import get_connection
+try:
+    from database.connection import get_connection
+except ImportError:
+    from backend.database.connection import get_connection
 
 def _has_column(table_name, column_name):
     conn = get_connection()

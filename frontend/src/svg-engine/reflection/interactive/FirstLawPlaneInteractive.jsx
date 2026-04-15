@@ -1,15 +1,12 @@
 // ============================================================
-// AngleSlider.jsx
+// FirstLawPlaneInteractive.jsx
 // TRY stage — student controls angle of incidence via slider.
 // Reflected ray updates in real-time.
-// Appears after LawsOfReflectionAnimation completes.
 //
 // PROPS:
 //   attempt          {number}  1, 2, or 3 (controls labels/hints)
 //   misconceptionTag {string}  detected tag (controls which hint shows)
 //   onInteracted     {func}    called when student first moves slider
-//
-// LOCATION: svg-engine/reflection/interactive/AngleSlider.jsx
 // ============================================================
 
 import React, { useState, useCallback } from "react";
@@ -46,7 +43,7 @@ const HINTS = {
     "💡 Drag the slider and watch how the reflected ray changes.",
 };
 
-const AngleSlider = ({
+const FirstLawPlaneInteractive = ({
   attempt = 1,
   misconceptionTag = "",
   onInteracted,
@@ -254,4 +251,4 @@ const styles = {
   },
 };
 
-export default AngleSlider;
+export default FirstLawPlaneInteractive;
