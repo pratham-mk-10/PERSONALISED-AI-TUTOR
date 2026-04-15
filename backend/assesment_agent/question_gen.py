@@ -1,5 +1,6 @@
 from importlib.util import module_from_spec, spec_from_file_location
 import json
+import random
 from pathlib import Path
 import re
 
@@ -89,6 +90,9 @@ Rules:
 - Include common student misconceptions only when they are directly relevant to this topic.
 - 4 options only.
 - One correct answer.
+- Wrong options must be conceptually distinct from the correct answer.
+- Never include a distractor that restates the correct answer in different words.
+- For reflection questions, do not treat "angle of reflection" and "angle between the reflected ray and the normal" as separate answers.
 - {count_rule}
 - Do not return paraphrased duplicates.
 
@@ -160,6 +164,75 @@ def _dedupe_questions(questions):
     seen_normalized.add(normalized)
 
   return unique
+
+
+def _shuffle_question_options(question):
+  options = question.get("options") or []
+  correct_idx = question.get("correct")
+  if not isinstance(options, list) or len(options) < 2:
+    return question
+  if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+    return question
+
+  indexed_options = list(enumerate(options))
+  random.shuffle(indexed_options)
+
+  shuffled_options = [option_text for _, option_text in indexed_options]
+  new_correct_idx = next(
+    idx for idx, (original_idx, _) in enumerate(indexed_options)
+    if original_idx == correct_idx
+  )
+
+  question["options"] = shuffled_options
+  question["correct"] = new_correct_idx
+
+  misconception_map = question.get("misconception_map")
+  if isinstance(misconception_map, dict):
+    remapped = {}
+    for new_idx, (original_idx, _) in enumerate(indexed_options):
+      if new_idx == new_correct_idx:
+        continue
+
+      tag = misconception_map.get(str(original_idx))
+      if tag is None:
+        tag = misconception_map.get(original_idx)
+      if tag is not None:
+        remapped[str(new_idx)] = tag
+
+    if remapped:
+      question["misconception_map"] = remapped
+
+  return question
+
+
+def _option_equivalence_key(option_text, topic):
+  text = _normalize_text(option_text)
+  topic_key = topic_key_for(topic)
+
+  if topic_key == "laws_of_reflection":
+    if "angle of reflection" in text or ("reflected ray" in text and "normal" in text):
+      return "angle_of_reflection"
+    if "angle of incidence" in text or ("incident ray" in text and "normal" in text):
+      return "angle_of_incidence"
+    if "same plane" in text or "coplanar" in text:
+      return "coplanar_law"
+
+  return text
+
+
+def _has_equivalent_answer_choices(question, topic):
+  options = question.get("options") or []
+  if not isinstance(options, list) or len(options) < 2:
+    return False
+
+  seen = {}
+  for option in options:
+    key = _option_equivalence_key(option, topic)
+    if key in seen and seen[key] != option:
+      return True
+    seen[key] = option
+
+  return False
 
 
 def _extract_complete_json_objects(raw_text):
@@ -291,12 +364,15 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     # evaluation can always infer a misconception tag from any wrong
     # option.
     default_tag = _default_misconception_tag(topic)
+    validated_questions = []
     for q in unique_questions:
       options = q.get("options") or []
       correct_idx = q.get("correct")
       if not isinstance(options, list) or not options:
         continue
       if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+        continue
+      if _has_equivalent_answer_choices(q, topic):
         continue
 
       if not isinstance(q.get("misconception_map"), dict):
@@ -327,12 +403,15 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
       if not q.get("topic"):
         q["topic"] = topic
 
+      _shuffle_question_options(q)
+      validated_questions.append(q)
+
     if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
       max_count = max(2, min(int(question_count), 10))
-      return unique_questions[:max_count]
+      return validated_questions[:max_count]
 
     # Safety cap only; count selection is otherwise left to the model.
-    return unique_questions[:10]
+    return validated_questions[:10]
 
   except RuntimeError:
     raise
@@ -344,12 +423,15 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
       deduped = _dedupe_questions(fallback_questions)[:10]
 
       default_tag = _default_misconception_tag(topic)
+      validated_fallback_questions = []
       for q in deduped:
         options = q.get("options") or []
         correct_idx = q.get("correct")
         if not isinstance(options, list) or not options:
           continue
         if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
+          continue
+        if _has_equivalent_answer_choices(q, topic):
           continue
 
         if not isinstance(q.get("misconception_map"), dict):
@@ -378,6 +460,9 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         if not q.get("topic"):
           q["topic"] = topic
 
-      return deduped
+        _shuffle_question_options(q)
+        validated_fallback_questions.append(q)
+
+      return validated_fallback_questions
 
     raise RuntimeError("Failed to parse LLM question response") from e
