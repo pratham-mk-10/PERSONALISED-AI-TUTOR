@@ -193,6 +193,7 @@ def submit_answers(data: SubmitAnswersRequest):
     for ans in data.answers:
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
+        question_text = str(ans.get("question_text") or "").strip()
 
         if selected_raw is None or correct_raw is None:
             continue
@@ -247,8 +248,6 @@ def submit_answers(data: SubmitAnswersRequest):
 
         if not topic and ans.get("topic"):
             topic = str(ans.get("topic"))
-
-        question_text = str(ans.get("question_text") or "").strip()
 
         if not is_correct:
             item_feedback = generate_reasoning(
