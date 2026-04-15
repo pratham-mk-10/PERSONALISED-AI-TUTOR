@@ -262,7 +262,10 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
     tutor_context=tutor_context,
   )
 
-  raw_output = generate_text(prompt)
+  try:
+    raw_output = generate_text(prompt)
+  except Exception:
+    raw_output = ""
 
   try:
     questions = _parse_llm_questions(raw_output)

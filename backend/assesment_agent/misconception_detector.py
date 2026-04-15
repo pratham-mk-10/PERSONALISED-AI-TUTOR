@@ -1,5 +1,9 @@
 from collections import Counter
-from database.connection import get_connection
+
+try:
+    from database.connection import get_connection
+except ImportError:
+    from backend.database.connection import get_connection
 
 def detect_misconception(answers):
     conn = get_connection()

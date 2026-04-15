@@ -1,7 +1,11 @@
 import random
 
-from database.models import get_student
-from database.queries import fetch_by_misconception, fetch_questions
+try:
+    from database.models import get_student
+    from database.queries import fetch_by_misconception, fetch_questions
+except ImportError:
+    from backend.database.models import get_student
+    from backend.database.queries import fetch_by_misconception, fetch_questions
 
 
 def _pick_difficulty(level):
