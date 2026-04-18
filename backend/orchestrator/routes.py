@@ -20,6 +20,7 @@ try:
         coerce_misconception_tag,
         get_allowed_misconception_tags,
         get_misconception_metadata,
+        topic_key_for,
     )
     from assesment_agent.evaluator import Evaluator
     from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
@@ -37,6 +38,7 @@ except ImportError:
         coerce_misconception_tag,
         get_allowed_misconception_tags,
         get_misconception_metadata,
+        topic_key_for,
     )
     from backend.assesment_agent.evaluator import Evaluator
     from backend.assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
@@ -143,7 +145,7 @@ def _difficulty_from_level(level: str | None) -> str:
     return "easy"
 
 
-def _trim_feedback(text: str, max_len: int = 220) -> str:
+def _trim_feedback(text: str, max_len: int = 520) -> str:
     cleaned = " ".join(str(text or "").split())
     if len(cleaned) <= max_len:
         return cleaned
@@ -188,8 +190,11 @@ def generate_questions_route(data: GenerateQuestionsRequest | None = None):
 def submit_answers(data: SubmitAnswersRequest):
     student_id = data.student_id or "guest"
     topic = data.topic or "reflection_refraction"
+    topic_key = topic_key_for(topic)
+    use_laws_reflection_llm = topic_key == "laws_of_reflection"
 
     tags: list[str] = []
+    wrong_entries: list[dict[str, Any]] = []
     total = 0
     correct = 0
     db_sync_warning = None
@@ -234,6 +239,13 @@ def submit_answers(data: SubmitAnswersRequest):
 
             tag = coerce_misconception_tag(tag, topic)
             tags.append(tag)
+            wrong_entries.append(
+                {
+                    "question_id": ans.get("question_id"),
+                    "question_text": question_text,
+                    "tag": tag,
+                }
+            )
 
         try:
             log_student_behavior(
@@ -249,15 +261,44 @@ def submit_answers(data: SubmitAnswersRequest):
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
+    explanations_by_tag: dict[str, str] = {}
+    if use_laws_reflection_llm:
+        for entry in wrong_entries:
+            tag = entry["tag"]
+            if tag in explanations_by_tag:
+                continue
+            try:
+                explanation_data = content_agent.generate(
+                    subtopic=topic,
+                    misconception_tag=tag,
+                    attempt=2,
+                    question_text=entry.get("question_text") or None,
+                    student_answer=None,
+                    correct_answer=None,
+                )
+                explanations_by_tag[tag] = explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
+            except Exception:
+                explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
+
     explanation = None
     if main_misconception != "none":
         try:
-            explanation_data = content_agent.generate(
-                subtopic=topic,
-                misconception_tag=main_misconception,
-                attempt=2,
-            )
-            explanation = explanation_data.get("explanation")
+            if use_laws_reflection_llm:
+                explanation = explanations_by_tag.get(main_misconception)
+                if not explanation:
+                    explanation_data = content_agent.generate(
+                        subtopic=topic,
+                        misconception_tag=main_misconception,
+                        attempt=2,
+                    )
+                    explanation = explanation_data.get("explanation")
+            else:
+                explanation_data = content_agent.generate(
+                    subtopic=topic,
+                    misconception_tag=main_misconception,
+                    attempt=2,
+                )
+                explanation = explanation_data.get("explanation")
         except Exception:
             explanation = _get_misconception_explanation(main_misconception)
 
@@ -275,7 +316,8 @@ def submit_answers(data: SubmitAnswersRequest):
     except Exception as exc:
         db_sync_warning = str(exc)
 
-    follow_up = generate_questions(topic, _difficulty_from_level(level))[:5]
+    # Keep submit fast; front-end already has dedicated question-generation calls.
+    follow_up = []
 
     question_feedback = []
     for ans in data.answers:
@@ -292,12 +334,16 @@ def submit_answers(data: SubmitAnswersRequest):
             or "general_concept_gap"
         )
         tag = coerce_misconception_tag(tag, topic)
-        reason_text = _get_misconception_explanation(tag) or "Review this concept carefully."
+        reason_text = explanations_by_tag.get(tag) if use_laws_reflection_llm else _get_misconception_explanation(tag)
+        if not reason_text:
+            reason_text = _get_misconception_explanation(tag)
+
+        reason_text = reason_text or "Review this concept carefully."
         question_feedback.append(
             {
                 "question_id": ans.get("question_id"),
                 "question_text": ans.get("question_text"),
-                "reason": _trim_feedback(reason_text),
+                "reason": " ".join(str(reason_text or "").split()),
                 "focus_area": tag,
             }
         )

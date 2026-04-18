@@ -1,13 +1,12 @@
+import json
+import importlib.util
 import os
 from datetime import datetime
-from typing import Optional
-import importlib.util
 from pathlib import Path
+from typing import Optional
+from urllib import error, request
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+from dotenv import load_dotenv
 
 
 def _load_prompt_builder():
@@ -24,50 +23,130 @@ def _load_prompt_builder():
 
 build_explanation_prompt = _load_prompt_builder().build_explanation_prompt
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) if OpenAI is not None else None
+FALLBACK_MODELS = [
+    "mistral-small-latest",
+    "open-mistral-nemo",
+    "open-mistral-7b",
+]
+
+MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_ENV_CANDIDATES = [
+    BACKEND_ROOT / ".env",
+    BACKEND_ROOT / "env",
+    BACKEND_ROOT.parent / ".env",
+]
+
+
+def _load_env_files():
+    for env_path in _ENV_CANDIDATES:
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path, override=False)
+
+
+_load_env_files()
+
+
+def _get_api_key():
+    _load_env_files()
+    return os.getenv("MISTRAL_API_KEY", "").strip()
+
+
+def _candidate_models():
+    configured = os.getenv("MISTRAL_MODEL", "").strip()
+    if configured:
+        return [configured]
+    return [FALLBACK_MODELS[0]]
+
+
+def _post_chat_completion(api_key, payload):
+    body = json.dumps(payload).encode("utf-8")
+    req = request.Request(
+        MISTRAL_API_URL,
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+
+    with request.urlopen(req, timeout=12) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 class ContentAgentLLMService:
 
     def __init__(self, db_connection_factory=None):
         self.db_connection_factory = db_connection_factory
-        self.model = "gpt-4o-mini"
+        self.model = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
 
-    def get_explanation(self, subtopic: str, misconception_tag: str, attempt: int) -> str:
+    def get_explanation(self, subtopic: str, misconception_tag: str, attempt: int, question_text: str | None = None, student_answer: str | None = None, correct_answer: str | None = None) -> str:
 
         if attempt == 1:
             return "Try again and observe the diagram carefully."
 
-        cached = self._get_from_cache(subtopic, misconception_tag, attempt)
-        if cached:
-            return cached
+        use_cache = not any([question_text, student_answer, correct_answer])
+        if use_cache:
+            cached = self._get_from_cache(subtopic, misconception_tag, attempt)
+            if cached:
+                return cached
 
-        prompt = build_explanation_prompt(subtopic, misconception_tag, attempt)
+        prompt = build_explanation_prompt(
+            subtopic,
+            misconception_tag,
+            attempt,
+            question_text=question_text,
+            student_answer=student_answer,
+            correct_answer=correct_answer,
+        )
 
         explanation = self._call_llm(prompt)
 
         if not self._validate(explanation):
             explanation = self._fallback(misconception_tag)
 
-        self._save_to_cache(subtopic, misconception_tag, attempt, explanation)
+        if use_cache:
+            self._save_to_cache(subtopic, misconception_tag, attempt, explanation)
 
         return explanation
 
     def _call_llm(self, prompt: str) -> str:
-        if client is None:
+        api_key = _get_api_key()
+        if not api_key:
             return ""
         try:
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a clear physics teacher for a Class 10 student."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.5,
-                max_tokens=200
-            )
+            response_payload = None
+            for model_name in _candidate_models():
+                try:
+                    response_payload = _post_chat_completion(
+                        api_key,
+                        {
+                            "model": model_name,
+                            "temperature": 0.4,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "You are a clear NCERT physics teacher for a Class 10 student. Return a direct teaching explanation only.",
+                                },
+                                {"role": "user", "content": prompt},
+                            ],
+                        },
+                    )
+                    break
+                except (error.HTTPError, error.URLError, TimeoutError, ValueError):
+                    continue
 
-            return response.choices[0].message.content.strip()
+            if response_payload is None:
+                return ""
+
+            choices = response_payload.get("choices") or []
+            if not choices:
+                return ""
+
+            content = ((choices[0].get("message") or {}).get("content") or "").strip()
+            return content
 
         except Exception:
             return ""

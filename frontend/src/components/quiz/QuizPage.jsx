@@ -189,7 +189,7 @@ const QuizPage = () => {
       const studentId = user?.id || user?.name || "guest-student";
 
       const formatted = questions.map(q => ({
-        question_id: q.id,
+        question_id: q.id ?? q._key,
         question_text: q.question_text,
         selected: answers[q._key],
         correct: q.correct,
@@ -238,8 +238,11 @@ const QuizPage = () => {
         const isCorrect = selectedIndex === correctIndex;
 
         const matchedFeedback = questionFeedback.find(
-          (item) => item?.question_id !== undefined && item?.question_id === q.id
+          (item) => item?.question_id !== undefined && String(item.question_id) === String(q.id ?? q._key)
         );
+
+        const fallbackFeedback = !matchedFeedback ? questionFeedback[idx] : null;
+        const selectedFeedback = matchedFeedback || fallbackFeedback;
 
         return {
           index: idx + 1,
@@ -248,8 +251,8 @@ const QuizPage = () => {
           selectedIndex,
           correctIndex,
           isCorrect,
-          reason: matchedFeedback?.reason || (isCorrect ? "Correct answer." : "Review this concept once more."),
-          focusArea: matchedFeedback?.focus_area || null,
+          reason: selectedFeedback?.reason || (isCorrect ? "Correct answer." : "Review this concept once more."),
+          focusArea: selectedFeedback?.focus_area || null,
         };
       });
 

@@ -26,11 +26,14 @@ class ContentAgent:
     def __init__(self, db_connection_factory=None):
         self.llm = ContentAgentLLMService(db_connection_factory)
 
-    def generate(self, subtopic, misconception_tag, attempt):
+    def generate(self, subtopic, misconception_tag, attempt, question_text=None, student_answer=None, correct_answer=None):
         explanation = self.llm.get_explanation(
             subtopic=subtopic,
             misconception_tag=misconception_tag,
-            attempt=attempt
+            attempt=attempt,
+            question_text=question_text,
+            student_answer=student_answer,
+            correct_answer=correct_answer,
         )
 
         return {
