@@ -5,7 +5,6 @@ import FirstLawPlaneInteractive from "./svg-engine/reflection/interactive/FirstL
 import SecondLawOfReflectionAnimation from "./svg-engine/reflection/animations/SecondLawOfReflectionAnimation";
 import SecondLawPlaneInteractive from "./svg-engine/reflection/interactive/SecondLawPlaneInteractive";
 import PlaneMirrorBasicsAnimation from "./svg-engine/reflection/animations/PlaneMirrorBasicsAnimation";
-import SphericalMirrorBasicsWatch from "./svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorBasicsWatch";
 import SphericalMirrorDetailedAnimation from "./svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorDetailedAnimation";
 import Dashboard from "./components/dashboard/Dashboard";
 import { useSessionStore } from "./state/sessionStore";

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import AnimationPlayer from "../../../shared/AnimationPlayer";
 import { clamp, lerp } from "../../../shared/PhysicsEngine";
 import { Label } from "../../../shared/SVGUtils";
 
@@ -31,6 +32,38 @@ const convexHits = [
   { x: 165, y: 300 },
   { x: 196, y: 380 },
 ];
+
+const STEP_AUDIO_FILES = {
+  1: "/audio/spherical mirror 1.wav",
+  2: "/audio/spherical mirror 2.wav",
+  3: "/audio/spherical mirror 3.mp3",
+  4: "/audio/spherical mirror 4.mp3",
+  5: "/audio/spherical mirror 5.mp3",
+  6: "/audio/spherical mirror 6.mp3",
+  7: "/audio/spherical mirror 7.mp3",
+  8: "/audio/spherical mirror 8.mp3",
+};
+
+const STEP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const DEFAULT_STEP_DURATIONS_MS = {
+  1: 11000,
+  2: 9200,
+  3: 9200,
+  4: 9200,
+  5: 9200,
+  6: 11000,
+  7: 11000,
+  8: 11000,
+};
+
+const SUMMARY_DURATION_MS = 11000;
+const AUDIO_END_PADDING_MS = 450;
+
+const normalizeBetween = (value, start, end) => {
+  if (end <= start) return 0;
+  return clamp((value - start) / (end - start), 0, 1);
+};
 
 const rightHemisphere = (cx, cy, r) => `M ${cx} ${cy - r} A ${r} ${r} 0 0 1 ${cx} ${cy + r}`;
 const leftHemisphere = (cx, cy, r) => `M ${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r}`;
@@ -158,9 +191,10 @@ export const SPHERICAL_MIRROR_TTS_SCRIPT = [
   },
   {
     step: 5,
-    title: "Definition: Principal Focus (F), f and R = 2f",
+    title: "Definition: Principal Focus (F), Principal Axis, f and R = 2f",
     text: [
       "Principal focus is the point where reflected parallel rays actually meet.",
+      "The principal axis of a spherical mirror is the straight line passing through pole P and centre of curvature C.",
       "Focal length is f = PF and radius of curvature is R = PC.",
       "For spherical mirrors, focus lies midway between P and C, so R = 2f.",
     ],
@@ -207,130 +241,129 @@ export const SPHERICAL_MIRROR_TTS_SCRIPT = [
   },
 ];
 
-const AUDIO_FILES_BY_STEP = {
-  1: ["/audio/spherical mirror 1.wav"],
-  2: ["/audio/spherical mirror 2.wav"],
-  3: ["/audio/spherical mirror 3.mp3"],
-  4: ["/audio/spherical mirror 4.mp3", "/audio/spherical mirror 4.wav"],
-  5: ["/audio/spherical mirror 5.mp3"],
-  6: ["/audio/spherical mirror 6.mp3"],
-  7: ["/audio/spherical mirror 7.mp3"],
-  8: ["/audio/spherical mirror 8.mp3"],
-};
-
-const STEP_SEQUENCE = [1, 2, 3, 4, 5, 6, 7, 8, 11];
-
 const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
-  const [stepIndex, setStepIndex] = useState(0);
-  const [stepProgress, setStepProgress] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
   const audioRef = useRef(null);
-
-  const step = STEP_SEQUENCE[stepIndex];
-  const isLastStep = stepIndex === STEP_SEQUENCE.length - 1;
+  const lastStepRef = useRef(null);
+  const [stepDurationsMs, setStepDurationsMs] = useState(DEFAULT_STEP_DURATIONS_MS);
 
   useEffect(() => {
-    if (!isPlaying) return;
+    let cancelled = false;
 
-    const sources = AUDIO_FILES_BY_STEP[step] || [];
+    const loadDuration = (step, src) =>
+      new Promise((resolve) => {
+        const audio = new Audio(src);
+        audio.preload = "metadata";
 
-    const advanceStep = () => {
-      setStepProgress(1);
-      if (isLastStep) {
-        setIsPlaying(false);
-      } else {
-        setStepIndex((prev) => prev + 1);
-      }
-    };
+        const done = (ms) => resolve([step, ms]);
 
-    const clearAudio = () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
-        audioRef.current = null;
-      }
-    };
+        audio.onloadedmetadata = () => {
+          const ms = Number.isFinite(audio.duration) ? Math.max(1000, Math.round(audio.duration * 1000)) : DEFAULT_STEP_DURATIONS_MS[step];
+          done(ms + AUDIO_END_PADDING_MS);
+        };
 
-    if (sources.length === 0) {
-      const timeoutId = setTimeout(advanceStep, 120);
-      return () => clearTimeout(timeoutId);
-    }
-
-    const playSourceAt = (index) => {
-      if (index >= sources.length) {
-        advanceStep();
-        return;
-      }
-
-      clearAudio();
-      setStepProgress(0);
-
-      const audio = new Audio(sources[index]);
-      audioRef.current = audio;
-
-      audio.ontimeupdate = () => {
-        if (audio.duration && Number.isFinite(audio.duration)) {
-          setStepProgress(clamp(audio.currentTime / audio.duration, 0, 1));
-        }
-      };
-
-      audio.onended = () => {
-        advanceStep();
-      };
-
-      audio.onerror = () => {
-        playSourceAt(index + 1);
-      };
-
-      audio.play().catch(() => {
-        playSourceAt(index + 1);
+        audio.onerror = () => done(DEFAULT_STEP_DURATIONS_MS[step] + AUDIO_END_PADDING_MS);
       });
-    };
 
-    playSourceAt(0);
+    Promise.all(STEP_ORDER.map((step) => loadDuration(step, STEP_AUDIO_FILES[step]))).then((results) => {
+      if (cancelled) return;
+      const nextDurations = { ...DEFAULT_STEP_DURATIONS_MS };
+      results.forEach(([step, ms]) => {
+        nextDurations[step] = ms;
+      });
+      setStepDurationsMs(nextDurations);
+    });
 
     return () => {
-      clearAudio();
-    };
-  }, [step, isPlaying, isLastStep]);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      cancelled = true;
     };
   }, []);
 
-  const handleReplay = () => {
+  const totalDurationMs = useMemo(() => {
+    const audioTotal = STEP_ORDER.reduce((acc, step) => acc + (stepDurationsMs[step] || 0), 0);
+    return audioTotal + SUMMARY_DURATION_MS;
+  }, [stepDurationsMs]);
+
+  const stepRanges = useMemo(() => {
+    const orderedSteps = [...STEP_ORDER, 11];
+    const durationByStep = { ...stepDurationsMs, 11: SUMMARY_DURATION_MS };
+    let elapsed = 0;
+    const ranges = {};
+
+    orderedSteps.forEach((step) => {
+      const stepDuration = durationByStep[step];
+      const start = elapsed / totalDurationMs;
+      elapsed += stepDuration;
+      const end = elapsed / totalDurationMs;
+      ranges[step] = { start, end };
+    });
+
+    return ranges;
+  }, [stepDurationsMs, totalDurationMs]);
+
+  const playStepAudio = (step) => {
+    if (step === lastStepRef.current) return;
+    lastStepRef.current = step;
+
     if (audioRef.current) {
       audioRef.current.pause();
+      audioRef.current.currentTime = 0;
     }
-    setStepIndex(0);
-    setStepProgress(0);
-    setIsPlaying(true);
+
+    const audioFile = STEP_AUDIO_FILES[step];
+    if (!audioFile) {
+      audioRef.current = null;
+      return;
+    }
+
+    const audio = new Audio(audioFile);
+    audioRef.current = audio;
+    audio.play().catch(() => {});
   };
 
-  const concaveReflectingArc = rightHemisphere(concave.center.x, concave.center.y, concave.radius);
-  const convexReflectingArc = leftHemisphere(convex.center.x, convex.center.y, convex.radius);
-
-  const concaveAppear = step >= 2 ? 1 : step === 1 ? 0.95 : 0;
-  const concavePointsAppear = step >= 4 ? 1 : 0;
-  const concaveIncPhase = step === 6 ? clamp(stepProgress * 2, 0, 1) : step > 6 ? 1 : 0;
-  const concaveRefPhase = step === 6 ? clamp((stepProgress - 0.5) * 2, 0, 1) : step > 6 ? 1 : 0;
-
-  const convexAppear = step >= 7 ? 1 : 0;
-  const convexPointsAppear = step >= 8 ? 1 : 0;
-  const convexRayPhase = step === 8 ? stepProgress : step > 8 ? 1 : 0;
-  const convexIncPhase = step === 8 ? clamp(stepProgress * 2, 0, 1) : step > 8 ? 1 : 0;
-  const convexRefPhase = step === 8 ? clamp((stepProgress - 0.5) * 2, 0, 1) : step > 8 ? 1 : 0;
-  const summaryAppear = step === 11 ? clamp(stepProgress, 0, 1) : 0;
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      lastStepRef.current = null;
+    };
+  }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "16px", fontFamily: "Arial, sans-serif" }}>
-      <p style={{ fontSize: "15px", color: "#374151", margin: 0, fontWeight: "600" }}>Watch: Spherical Mirror Basics (Detailed Dynamic)</p>
-      <div style={{ border: "1px solid #E5E7EB", borderRadius: "8px", overflow: "hidden", background: "#FAFAFA" }}>
+    <AnimationPlayer
+      duration={totalDurationMs}
+      title="Watch: Spherical Mirror Basics (Detailed Dynamic)"
+      onTryItClicked={onTryItClicked}
+      showTryIt={true}
+    >
+      {({ progress }) => {
+        let step = 11;
+        for (const candidateStep of STEP_ORDER) {
+          if (progress < stepRanges[candidateStep].end) {
+            step = candidateStep;
+            break;
+          }
+        }
 
+        playStepAudio(step);
+
+        const concaveReflectingArc = rightHemisphere(concave.center.x, concave.center.y, concave.radius);
+        const convexReflectingArc = leftHemisphere(convex.center.x, convex.center.y, convex.radius);
+
+        const concaveAppear = normalizeBetween(progress, stepRanges[2].start, stepRanges[3].start);
+        const concavePointsAppear = normalizeBetween(progress, stepRanges[4].start, stepRanges[6].start);
+        const concaveRayPhase = normalizeBetween(progress, stepRanges[6].start, stepRanges[7].start);
+        const concaveIncPhase = clamp(concaveRayPhase * 2, 0, 1);
+        const concaveRefPhase = clamp((concaveRayPhase - 0.5) * 2, 0, 1);
+
+        const convexAppear = normalizeBetween(progress, stepRanges[7].start, stepRanges[8].start);
+        const convexPointsAppear = normalizeBetween(progress, stepRanges[8].start, stepRanges[11].start);
+        const convexRayPhase = normalizeBetween(progress, stepRanges[8].start, stepRanges[11].start);
+        const convexIncPhase = clamp(convexRayPhase * 2, 0, 1);
+        const convexRefPhase = clamp((convexRayPhase - 0.5) * 2, 0, 1);
+        const summaryAppear = normalizeBetween(progress, stepRanges[11].start, stepRanges[11].end);
+
+        return (
           <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ display: "block", background: "#F8FAFF" }}>
             <rect width={SVG_W} height={SVG_H} fill="#F8FAFF" />
 
@@ -604,9 +637,10 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
 
             {step === 5 && (
               <DefinitionCard
-                title="Definition: Principal Focus (F), f and R = 2f"
+                title="Definition: Principal Focus (F), Principal Axis, f and R = 2f"
                 lines={[
                   "Principal focus is the point where reflected parallel rays actually meet.",
+                  "Principal axis is the straight line passing through pole P and centre of curvature C.",
                   "Focal length is f = PF and radius of curvature is R = PC.",
                   "For spherical mirrors, focus lies midway between P and C, so R = 2f.",
                 ]}
@@ -662,18 +696,9 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
               </g>
             )}
           </svg>
-      </div>
-      <div style={{ width: "100%", maxWidth: "800px", height: "4px", background: "#E5E7EB", borderRadius: "2px", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${stepProgress * 100}%`, background: "#2563EB", transition: "width 0.08s linear" }} />
-      </div>
-      <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-        <button onClick={handleReplay} style={{ padding: "8px 16px", fontSize: "14px", border: "1px solid #D1D5DB", borderRadius: "6px", background: "#F9FAFB", color: "#374151", cursor: "pointer", fontFamily: "Arial, sans-serif" }}>Replay</button>
-        <span style={{ fontSize: "13px", color: "#6B7280" }}>Step {step}</span>
-        {!isPlaying && step === 11 && onTryItClicked && (
-          <button onClick={onTryItClicked} style={{ padding: "8px 20px", fontSize: "14px", border: "none", borderRadius: "6px", background: "#2563EB", color: "#FFFFFF", cursor: "pointer", fontWeight: "bold", fontFamily: "Arial, sans-serif", boxShadow: "0 2px 6px rgba(37,99,235,0.3)" }}>Try it yourself -&gt;</button>
-        )}
-      </div>
-    </div>
+        );
+      }}
+    </AnimationPlayer>
   );
 };
 
