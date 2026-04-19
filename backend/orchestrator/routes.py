@@ -281,6 +281,7 @@ def submit_answers(data: SubmitAnswersRequest):
                 explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
 
     explanation = None
+    visual_payload = None
     if main_misconception != "none":
         try:
             if use_laws_reflection_llm:
@@ -292,6 +293,7 @@ def submit_answers(data: SubmitAnswersRequest):
                         attempt=2,
                     )
                     explanation = explanation_data.get("explanation")
+                    visual_payload = explanation_data
             else:
                 explanation_data = content_agent.generate(
                     subtopic=topic,
@@ -299,8 +301,19 @@ def submit_answers(data: SubmitAnswersRequest):
                     attempt=2,
                 )
                 explanation = explanation_data.get("explanation")
+                visual_payload = explanation_data
         except Exception:
             explanation = _get_misconception_explanation(main_misconception)
+
+    if visual_payload is None and main_misconception != "none":
+        try:
+            visual_payload = content_agent.generate(
+                subtopic=topic,
+                misconception_tag=main_misconception,
+                attempt=2,
+            )
+        except Exception:
+            visual_payload = {}
 
     level = "beginner"
     acc = correct / total if total else 0
@@ -354,6 +367,8 @@ def submit_answers(data: SubmitAnswersRequest):
         "reason": _trim_feedback(explanation or "Review the concept carefully."),
         "focus_area": "N/A" if main_misconception == "none" else main_misconception,
         "misconception_explanation": _get_misconception_explanation(main_misconception),
+        "svg_component": (visual_payload or {}).get("svg_component"),
+        "svg_variant": (visual_payload or {}).get("svg_variant"),
         "question_feedback": question_feedback,
         "db_sync_warning": db_sync_warning,
         "questions": follow_up,
