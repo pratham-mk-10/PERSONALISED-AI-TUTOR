@@ -6,6 +6,7 @@ import {
   submitAnswers,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
+import QuizVisualCorrection from "./QuizVisualCorrection";
 
 
 const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
@@ -265,6 +266,8 @@ const QuizPage = () => {
         focusArea: reason.focus_area || "N/A",
         mainMisconception,
         misconceptionExplanation,
+        svgComponent: res?.svg_component || null,
+        svgVariant: res?.svg_variant || null,
         questionFeedback,
         detailedResults,
         dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
@@ -320,6 +323,15 @@ const QuizPage = () => {
             <h3 style={{ marginTop: 0 }}>Misconception Explanation</h3>
             <p style={{ margin: 0 }}>{report.misconceptionExplanation}</p>
           </div>
+        )}
+
+        {report.mainMisconception && report.mainMisconception !== "none" && (
+          <QuizVisualCorrection
+            svgComponent={report.svgComponent}
+            svgVariant={report.svgVariant}
+            misconceptionTag={report.mainMisconception}
+            explanation={report.misconceptionExplanation || report.reason}
+          />
         )}
 
         <div style={{ marginTop: "18px", padding: "14px", border: "1px solid #dbe4ff", borderRadius: "10px", background: "#f6f9ff" }}>

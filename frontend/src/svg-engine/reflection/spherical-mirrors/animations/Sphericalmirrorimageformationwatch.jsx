@@ -11,8 +11,8 @@
 // ============================================================
 
 import React, { useRef, useEffect } from "react";
-import AnimationPlayer from "../../shared/AnimationPlayer";
-import { lerp, clamp } from "../../shared/PhysicsEngine";
+import AnimationPlayer from "../../../shared/AnimationPlayer";
+import { lerp, clamp } from "../../../shared/PhysicsEngine";
 import {
   ConcaveMirrorArc,
   PrincipalAxis,
@@ -24,7 +24,7 @@ import {
   Label,
   DataBox,
   MirrorFormula,
-} from "../../shared/SVGUtils";
+} from "../../../shared/SVGUtils";
 
 // ── CONSTANTS ────────────────────────────────────────────────
 const SVG_W = 720;

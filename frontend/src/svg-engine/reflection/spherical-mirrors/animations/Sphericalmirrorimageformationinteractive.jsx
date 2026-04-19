@@ -20,7 +20,7 @@ import {
   RayLine,
   Label,
   DataBox,
-} from "../../shared/SVGUtils";
+} from "../../../shared/SVGUtils";
 
 // ── CONSTANTS ────────────────────────────────────────────────
 const SVG_W = 720;

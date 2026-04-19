@@ -19,6 +19,7 @@ _svg_template_picker = _load_local_module("content_agent_svg_template_picker", "
 
 ContentAgentLLMService = _llm_service.ContentAgentLLMService
 pick_svg_template = _svg_template_picker.pick_svg_template
+pick_svg_variant = _svg_template_picker.pick_svg_variant
 
 
 class ContentAgent:
@@ -37,6 +38,7 @@ class ContentAgent:
         )
 
         return {
-            "svg_component": pick_svg_template(subtopic),
-            "explanation": explanation
+            "svg_component": pick_svg_template(subtopic, misconception_tag),
+            "svg_variant": pick_svg_variant(misconception_tag),
+            "explanation": explanation,
         }
