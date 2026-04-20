@@ -124,6 +124,15 @@ class GenerateQuestionsRequest(BaseModel):
     untaught_concepts: list[str] | None = None
 
 
+class GenerateMisconceptionQuizRequest(BaseModel):
+    student_id: str | None = None
+    topic: str | None = None
+    misconception_tags: list[str] | None = None
+    wrong_question_texts: list[str] | None = None
+    question_count: int | None = 5
+    difficulty: str | None = "easy"
+
+
 class SubmitAnswersRequest(BaseModel):
     student_id: str | None = None
     topic: str | None = None
@@ -202,6 +211,100 @@ def generate_questions_route(data: GenerateQuestionsRequest | None = None):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {"questions": questions}
+
+
+def _retag_questions_for_misconceptions(questions: list[dict[str, Any]], misconception_tags: list[str], topic: str | None) -> list[dict[str, Any]]:
+    if not misconception_tags:
+        return questions
+
+    normalized_tags = [coerce_misconception_tag(tag, topic) for tag in misconception_tags if str(tag or "").strip()]
+    if not normalized_tags:
+        return questions
+
+    for q in questions:
+        options = q.get("options") or []
+        correct_idx = q.get("correct")
+        if not isinstance(options, list) or not isinstance(correct_idx, int):
+            continue
+
+        updated_map: dict[str, str] = {}
+        tag_idx = 0
+        for idx in range(len(options)):
+            if idx == correct_idx:
+                continue
+            updated_map[str(idx)] = normalized_tags[tag_idx % len(normalized_tags)]
+            tag_idx += 1
+
+        if updated_map:
+            q["misconception_map"] = updated_map
+
+    return questions
+
+
+@router.post("/generate-misconception-quiz")
+def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | None = None):
+    payload = data or GenerateMisconceptionQuizRequest()
+    topic = payload.topic or "Laws of Reflection"
+    requested_count = payload.question_count if isinstance(payload.question_count, int) else 5
+    requested_count = max(2, min(requested_count, 10))
+
+    misconception_tags = [
+        coerce_misconception_tag(tag, topic)
+        for tag in (payload.misconception_tags or [])
+        if str(tag or "").strip()
+    ]
+
+    if not misconception_tags:
+        raise HTTPException(status_code=400, detail="No misconception tags provided for remedial quiz generation")
+
+    unique_tags = []
+    seen = set()
+    for tag in misconception_tags:
+        if tag in seen:
+            continue
+        seen.add(tag)
+        unique_tags.append(tag)
+
+    wrong_texts = [str(item).strip() for item in (payload.wrong_question_texts or []) if str(item).strip()]
+    focus_lines = []
+    for tag in unique_tags:
+        meta = get_misconception_metadata(tag) or {}
+        title = str(meta.get("title") or tag).strip()
+        explanation = str(meta.get("explanation") or "").strip()
+        focus_area = str(meta.get("focus_area") or "").strip()
+        line = f"- {tag}: {title}"
+        if explanation:
+            line += f" | {explanation}"
+        if focus_area:
+            line += f" | Focus: {focus_area}"
+        focus_lines.append(line)
+
+    tutor_context = "Generate ONLY remedial questions that target these misconceptions:\n"
+    tutor_context += "\n".join(focus_lines)
+    if wrong_texts:
+        tutor_context += "\nUse these previously incorrect question themes for context:\n"
+        tutor_context += "\n".join(f"- {text}" for text in wrong_texts[:8])
+    tutor_context += "\nDo not ask unrelated concepts outside these misconception targets."
+
+    try:
+        questions = generate_questions(
+            topic=topic,
+            difficulty=payload.difficulty or "easy",
+            syllabus_scope=SYLLABUS_SCOPE,
+            question_count=requested_count,
+            tutor_context=tutor_context,
+            taught_concepts=None,
+            untaught_concepts=None,
+        )
+        questions = _retag_questions_for_misconceptions(questions, unique_tags, topic)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "questions": questions,
+        "target_misconceptions": unique_tags,
+        "mode": "remedial-misconception-quiz",
+    }
 
 
 @router.post("/submit-answers")

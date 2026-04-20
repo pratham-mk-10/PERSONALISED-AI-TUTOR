@@ -95,6 +95,43 @@ export const submitAnswers = async ({ answers, topic = null, studentId = null })
 };
 
 
+export const getMisconceptionQuiz = async ({
+  topic = null,
+  studentId = null,
+  misconceptionTags = [],
+  wrongQuestionTexts = [],
+  questionCount = 5,
+  difficulty = "easy",
+} = {}) => {
+  const payload = {
+    topic,
+    student_id: studentId,
+    misconception_tags: Array.isArray(misconceptionTags) ? misconceptionTags : [],
+    wrong_question_texts: Array.isArray(wrongQuestionTexts) ? wrongQuestionTexts : [],
+    difficulty,
+  };
+
+  if (Number.isFinite(questionCount)) {
+    payload.question_count = questionCount;
+  }
+
+  const res = await fetch(`${BASE_URL}/generate-misconception-quiz`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to load misconception quiz (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
+
 export const getMisconceptionReason = async (misconceptionTag, topic = "reflection_refraction") => {
   if (!misconceptionTag || misconceptionTag === "none") {
     return {
