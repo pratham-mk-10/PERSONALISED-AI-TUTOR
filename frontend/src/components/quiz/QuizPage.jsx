@@ -14,32 +14,131 @@ const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
 const TOPIC_CONTEXTS = {
   "laws-reflection": {
     title: "Laws of Reflection",
+    videoTemplate: "ReflectionMisconceptionFeedback",
     syllabusScope:
-      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the two laws of reflection: (1) angle of incidence equals angle of reflection (i = r), and (2) incident ray, reflected ray, and normal lie in the same plane. Do NOT include image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
-  },
-  "First-law-of-reflection": {
-    title: "First Law of Reflection",
-    syllabusScope:
-      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the first law of reflection: angle of incidence equals angle of reflection (i = r). Do NOT include second law details, image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
-  },
-  "Second-law-of-reflection": {
-    title: "Second Law of Reflection",
-    syllabusScope:
-      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Strictly limit to ONLY the second law of reflection: incident ray, reflected ray, and normal lie in the same plane. Do NOT include first law computations, image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Focus on the full reflection lesson as one topic: the angle of incidence equals the angle of reflection, and the incident ray, reflected ray, and normal lie in the same plane. Use ray-diagram ideas and the lesson video examples, but do NOT include image formation by mirrors, spherical mirrors, mirror formula, magnification, refraction, lenses, or numerical problems.",
+    lessonFocus:
+      "Lesson video focus: one unified reflection topic covering both laws together, using plane-mirror ray diagrams, the normal, angle measurements from the normal, and the coplanarity rule.",
+    taughtConcepts: [
+      "angle of incidence is measured from the normal",
+      "angle of reflection is measured from the normal",
+      "angle of incidence equals angle of reflection",
+      "incident ray, reflected ray and normal lie in the same plane",
+      "basic ray-diagram reasoning for laws of reflection",
+    ],
+    untaughtConcepts: [
+      "spherical mirror image formation",
+      "mirror formula",
+      "magnification formula",
+      "refraction",
+      "lenses",
+    ],
   },
   "plane-mirror": {
     title: "Plane Mirror Basics",
+    videoTemplate: "PlaneMirrorBasicsAnimation",
     syllabusScope:
       "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to plane mirror image characteristics, laws of reflection, and related Class 10 NCERT ideas.",
+    taughtConcepts: [
+      "image in a plane mirror is virtual and erect",
+      "image size equals object size in a plane mirror",
+      "image distance equals object distance from the mirror",
+      "lateral inversion in plane mirror",
+      "laws of reflection in plane mirror context",
+    ],
+    untaughtConcepts: [
+      "spherical mirrors",
+      "mirror formula",
+      "magnification by spherical mirrors",
+      "refraction",
+      "lenses",
+    ],
+  },
+  "spherical-mirror-basics": {
+    title: "Spherical Mirror Basics",
+    videoTemplate: "SphericalMirrorBasicsWatch",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to introductory spherical mirror ideas only: what spherical mirrors are, concave vs convex mirror identification, and basic terms such as pole, principal axis, centre of curvature, principal focus, and focal length. Do NOT include mirror formula, magnification calculations, detailed image-formation cases, sign convention, or advanced numericals.",
+    lessonFocus:
+      "Lesson video focus: spherical mirrors as a combined topic, including concave and convex mirrors, principal focus, centre of curvature, pole, focal length, and the common image-forming behavior of each mirror.",
+    taughtConcepts: [
+      "definition of spherical mirror",
+      "difference between concave and convex mirrors",
+      "pole, principal axis, centre of curvature",
+      "principal focus and focal length basic meaning",
+      "basic everyday uses of concave and convex mirrors",
+    ],
+    untaughtConcepts: [
+      "mirror formula",
+      "magnification formula",
+      "sign convention",
+      "complex image formation cases for different object positions",
+      "numerical problems on spherical mirrors",
+    ],
   },
   "refraction-intro": {
     title: "Introduction to Refraction",
+    videoTemplate: "RefractionAnimation",
     syllabusScope:
       "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to refraction, refractive index, optical density, Snell's law, and rectangular glass slab refraction.",
+    taughtConcepts: [
+      "light bends at boundary of two media",
+      "bending towards or away from normal based on optical density",
+      "basic meaning of refractive index",
+      "Snell law qualitative understanding",
+      "lateral displacement in rectangular glass slab",
+    ],
+    untaughtConcepts: [
+      "lens formula",
+      "power of lens",
+      "advanced lens numericals",
+      "spherical mirror formula",
+    ],
   },
 };
 
 const DEFAULT_TOPIC_CONTEXT = TOPIC_CONTEXTS["laws-reflection"];
+
+const TAG_TO_VISUAL_TEMPLATE = {
+  angle_from_surface: "ReflectionMisconceptionFeedback",
+  reflection_not_equal: "ReflectionMisconceptionFeedback",
+  normal_orientation_wrong: "ReflectionMisconceptionFeedback",
+  plane_not_same: "ReflectionMisconceptionFeedback",
+  first_law_reflection_angle: "ReflectionMisconceptionFeedback",
+  second_law_reflection_plane: "ReflectionMisconceptionFeedback",
+  image_real_confusion: "PlaneMirrorBasicsAnimation",
+  size_mismatch: "PlaneMirrorBasicsAnimation",
+  distance_confusion: "PlaneMirrorBasicsAnimation",
+  lateral_inversion_confusion: "PlaneMirrorBasicsAnimation",
+  plane_mirror_image_properties: "PlaneMirrorBasicsAnimation",
+  concave_convex_confusion: "SphericalMirrorMisconceptionFeedback",
+  pole_confusion: "SphericalMirrorMisconceptionFeedback",
+  center_of_curvature_confusion: "SphericalMirrorMisconceptionFeedback",
+  principal_axis_confusion: "SphericalMirrorMisconceptionFeedback",
+  focus_definition_wrong: "SphericalMirrorMisconceptionFeedback",
+  focus_convex_confusion: "SphericalMirrorMisconceptionFeedback",
+  radius_focal_relation_wrong: "SphericalMirrorMisconceptionFeedback",
+  sign_convention_confusion: "SphericalMirrorMisconceptionFeedback",
+  left_right_sign_error: "SphericalMirrorMisconceptionFeedback",
+  parallel_ray_rule_wrong: "SphericalMirrorMisconceptionFeedback",
+  focus_ray_rule_wrong: "SphericalMirrorMisconceptionFeedback",
+  center_ray_rule_wrong: "SphericalMirrorMisconceptionFeedback",
+  random_reflection: "SphericalMirrorMisconceptionFeedback",
+  image_position_confusion: "SphericalMirrorMisconceptionFeedback",
+  real_virtual_confusion: "SphericalMirrorMisconceptionFeedback",
+  image_size_confusion: "SphericalMirrorMisconceptionFeedback",
+  inverted_erect_confusion: "SphericalMirrorMisconceptionFeedback",
+  focus_infinity_confusion: "SphericalMirrorMisconceptionFeedback",
+  beyond_c_confusion: "SphericalMirrorMisconceptionFeedback",
+  convex_real_image_myth: "SphericalMirrorMisconceptionFeedback",
+  convex_size_confusion: "SphericalMirrorMisconceptionFeedback",
+  rearview_reason_wrong: "SphericalMirrorMisconceptionFeedback",
+};
+
+const resolveVisualTemplateByTag = (tag) => {
+  const key = String(tag || "").trim();
+  return TAG_TO_VISUAL_TEMPLATE[key] || null;
+};
 
 
 const loadQuestionHistory = () => {
@@ -120,6 +219,7 @@ const QuizPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [report, setReport] = useState(null);
+  const [activeVisualByQuestion, setActiveVisualByQuestion] = useState({});
 
   // 🔹 Load questions
   useEffect(() => {
@@ -131,18 +231,25 @@ const QuizPage = () => {
     setError("");
     setReport(null);
     setCurrentIndex(0);
+    setActiveVisualByQuestion({});
 
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
     const personalization = getPersonalization(currentTopicId, progress);
     const studentId = user?.id || user?.name || "guest-student";
+    const tutorContext = [quizTopicContext.lessonFocus, personalization.tutorContext]
+      .filter(Boolean)
+      .join(" ");
 
     try {
       const data = await getGeneratedQuestions({
         topic: quizTopicContext.title,
         difficulty: personalization.difficulty,
         syllabusScope: quizTopicContext.syllabusScope,
-        tutorContext: personalization.tutorContext,
+        tutorContext,
+        videoTemplate: quizTopicContext.videoTemplate,
+        taughtConcepts: quizTopicContext.taughtConcepts,
+        untaughtConcepts: quizTopicContext.untaughtConcepts,
       });
 
       const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
@@ -229,6 +336,11 @@ const QuizPage = () => {
       }
 
       const questionFeedback = Array.isArray(res?.question_feedback) ? res.question_feedback : [];
+      const questionFeedbackById = new Map(
+        questionFeedback
+          .filter((item) => item?.question_id !== undefined && item?.question_id !== null)
+          .map((item) => [String(item.question_id), item])
+      );
 
       const mainMisconception = res?.main_misconception || "none";
       const misconceptionExplanation = res?.misconception_explanation || null;
@@ -237,13 +349,17 @@ const QuizPage = () => {
         const selectedIndex = answers[q._key];
         const correctIndex = q.correct;
         const isCorrect = selectedIndex === correctIndex;
+        const questionId = String(q.id ?? q._key);
 
-        const matchedFeedback = questionFeedback.find(
-          (item) => item?.question_id !== undefined && String(item.question_id) === String(q.id ?? q._key)
-        );
+        const matchedFeedback = questionFeedbackById.get(questionId);
+        const localMisconceptionTag = !isCorrect
+          ? ((q.misconception_map || {})[String(selectedIndex)]
+            || (q.misconception_map || {})[selectedIndex]
+            || null)
+          : null;
+        const focusArea = matchedFeedback?.focus_area || localMisconceptionTag || null;
 
-        const fallbackFeedback = !matchedFeedback ? questionFeedback[idx] : null;
-        const selectedFeedback = matchedFeedback || fallbackFeedback;
+        const selectedFeedback = matchedFeedback;
 
         return {
           index: idx + 1,
@@ -253,7 +369,9 @@ const QuizPage = () => {
           correctIndex,
           isCorrect,
           reason: selectedFeedback?.reason || (isCorrect ? "Correct answer." : "Review this concept once more."),
-          focusArea: selectedFeedback?.focus_area || null,
+          focusArea,
+          svgComponent: selectedFeedback?.svg_component || null,
+          svgVariant: selectedFeedback?.svg_variant || focusArea || null,
         };
       });
 
@@ -296,6 +414,7 @@ const QuizPage = () => {
     setCurrentIndex(0);
     setReport(null);
     setError("");
+    setActiveVisualByQuestion({});
   };
 
   if (loading) return <h2>Loading questions...</h2>;
@@ -411,10 +530,45 @@ const QuizPage = () => {
                 </div>
 
                 {!item.isCorrect && (
-                  <p style={{ margin: "8px 0 0", color: "#374151" }}>
-                    <strong>Why wrong:</strong> {item.reason}
-                    {item.focusArea ? ` | Focus: ${item.focusArea}` : ""}
-                  </p>
+                  <div style={{ marginTop: "8px" }}>
+                    <p style={{ margin: "0 0 8px", color: "#374151" }}>
+                      <strong>Why wrong:</strong> {item.reason}
+                      {item.focusArea ? ` | Focus: ${item.focusArea}` : ""}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setActiveVisualByQuestion((prev) => ({
+                          ...prev,
+                          [item.index]: !prev[item.index],
+                        }));
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "999px",
+                        border: "1px solid #c7d2fe",
+                        background: "#eef2ff",
+                        color: "#3730a3",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {activeVisualByQuestion[item.index] ? "Hide Visual Fix" : "See Visual Fix"}
+                    </button>
+
+                    {activeVisualByQuestion[item.index] && (
+                      <QuizVisualCorrection
+                        svgComponent={
+                          item.svgComponent
+                          || resolveVisualTemplateByTag(item.focusArea)
+                          || report.svgComponent
+                          || "ReflectionMisconceptionFeedback"
+                        }
+                        svgVariant={item.svgVariant || item.focusArea || report.mainMisconception}
+                        misconceptionTag={item.focusArea || report.mainMisconception}
+                        explanation={item.reason || report.misconceptionExplanation || report.reason}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             ))}

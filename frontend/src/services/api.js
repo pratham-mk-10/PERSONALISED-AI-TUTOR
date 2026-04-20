@@ -28,12 +28,18 @@ export const getGeneratedQuestions = async ({
   syllabusScope = null,
   questionCount = null,
   tutorContext = null,
+  videoTemplate = null,
+  taughtConcepts = null,
+  untaughtConcepts = null,
 } = {}) => {
   const payload = {
     topic,
     difficulty,
     syllabus_scope: syllabusScope,
     tutor_context: tutorContext,
+    video_template: videoTemplate,
+    taught_concepts: taughtConcepts,
+    untaught_concepts: untaughtConcepts,
   };
 
   if (Number.isFinite(questionCount)) {

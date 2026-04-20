@@ -1,17 +1,17 @@
 import React, { useRef, useEffect } from "react";
-import AnimationPlayer from "../../shared/AnimationPlayer";
+import AnimationPlayer from "../../../shared/AnimationPlayer";
 import {
   incidentRayStart,
   describeArc,
   lerp,
   clamp,
-} from "../../shared/PhysicsEngine";
+} from "../../../shared/PhysicsEngine";
 import {
   Normal,
   PlaneMirror,
   AngleArc,
   Label,
-} from "../../shared/SVGUtils";
+} from "../../../shared/SVGUtils";
 
 const SVG_W = 420;
 const SVG_H = 300;

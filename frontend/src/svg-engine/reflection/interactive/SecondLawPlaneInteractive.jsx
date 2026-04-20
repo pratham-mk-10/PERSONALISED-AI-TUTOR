@@ -535,7 +535,7 @@ const SecondLawPlaneInteractive= () => {
           Think of the plane like a <strong>sheet of paper lying on a table</strong>. 
           Everything (incident ray, reflected ray, mirror, normal) must be 
           <strong> drawn on that same sheet</strong>. If any part pokes up or 
-          down off the paper, it violates the 2nd Law of Reflection!
+          down off the paper, it violates the reflection rule!
         </p>
       </div>
     </div>

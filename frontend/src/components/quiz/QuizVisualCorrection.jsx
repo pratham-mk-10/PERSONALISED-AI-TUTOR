@@ -2,8 +2,8 @@ import React from "react";
 import FirstLawOfReflectionAnimation from "../../svg-engine/reflection/animations/FirstLawOfReflectionAnimation";
 import SecondLawOfReflectionAnimation from "../../svg-engine/reflection/animations/SecondLawOfReflectionAnimation";
 import PlaneMirrorBasicsAnimation from "../../svg-engine/reflection/animations/PlaneMirrorBasicsAnimation";
-import SphericalMirrorBasicsWatch from "../../svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorBasicsWatch";
 import SphericalMirrorDetailedAnimation from "../../svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorDetailedAnimation";
+import SphericalMirrorMisconceptionFeedback from "../../svg-engine/reflection/spherical-mirrors/animations/feedback/SphericalMirrorMisconceptionFeedback";
 import ReflectionMisconceptionFeedback from "../../svg-engine/reflection/animations/feedback/ReflectionMisconceptionFeedback";
 
 const styles = {
@@ -46,7 +46,14 @@ const QuizVisualCorrection = ({
       case "PlaneMirrorBasicsAnimation":
         return <PlaneMirrorBasicsAnimation onContinue={noOp} />;
       case "SphericalMirrorBasicsWatch":
-        return <SphericalMirrorBasicsWatch onTryItClicked={noOp} />;
+        return <SphericalMirrorDetailedAnimation />;
+      case "SphericalMirrorMisconceptionFeedback":
+        return (
+          <SphericalMirrorMisconceptionFeedback
+            misconceptionTag={tag}
+            explanation={explanation}
+          />
+        );
       case "SphericalMirrorDetailedAnimation":
         return <SphericalMirrorDetailedAnimation />;
       case "SecondLawOfReflectionAnimation":

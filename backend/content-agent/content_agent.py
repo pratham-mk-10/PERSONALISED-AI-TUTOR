@@ -16,10 +16,12 @@ def _load_local_module(module_name: str, file_name: str):
 
 _llm_service = _load_local_module("content_agent_llm_service", "llm_service.py")
 _svg_template_picker = _load_local_module("content_agent_svg_template_picker", "svg_template_picker.py")
+_template_quiz_scope = _load_local_module("content_agent_template_quiz_scope", "template_quiz_scope.py")
 
 ContentAgentLLMService = _llm_service.ContentAgentLLMService
 pick_svg_template = _svg_template_picker.pick_svg_template
 pick_svg_variant = _svg_template_picker.pick_svg_variant
+get_template_quiz_scope = _template_quiz_scope.get_template_quiz_scope
 
 
 class ContentAgent:

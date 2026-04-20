@@ -61,8 +61,10 @@ def _decide_dynamic_count(topic: str, difficulty: str) -> int:
     topic = (topic or "").lower()
     difficulty = (difficulty or "easy").lower()
 
-    if "first law of reflection" in topic or "second law of reflection" in topic:
-        base = 3
+    if "laws of reflection" in topic:
+        base = 5
+    elif "spherical mirror" in topic or "concave" in topic or "convex" in topic:
+        base = 6
     elif "plane mirror" in topic:
         base = 4
     elif "refraction" in topic:
@@ -84,11 +86,17 @@ def _fallback_response(prompt):
     difficulty = _extract_difficulty(prompt)
     target_count = requested_count or _decide_dynamic_count(topic, difficulty)
 
-    if "first law of reflection" in topic:
+    if "laws of reflection" in topic or "first law of reflection" in topic or "second law of reflection" in topic:
         question_pool = [
             {
-                "question_text": "According to the first law of reflection, angle of incidence is equal to:",
+                "question_text": "According to the laws of reflection, the angle of incidence is equal to:",
                 "options": ["Angle of refraction", "Angle of reflection", "Angle of emergence", "Angle of deviation"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "The incident ray, reflected ray, and the normal at the point of incidence lie in:",
+                "options": ["Different planes", "The same plane", "A curved plane only", "No fixed plane"],
                 "correct": 1,
                 "type": "mcq",
             },
@@ -99,46 +107,63 @@ def _fallback_response(prompt):
                 "type": "mcq",
             },
             {
-                "question_text": "A ray strikes a mirror with incidence angle 50 degrees. Which reflection angle is correct?",
-                "options": ["40 degrees", "50 degrees", "60 degrees", "100 degrees"],
+                "question_text": "Which statement best describes reflection of light from a plane mirror?",
+                "options": [
+                    "The reflected ray bends towards the surface",
+                    "Angle of incidence equals angle of reflection",
+                    "Light always turns into the mirror",
+                    "The normal and reflected ray are never related",
+                ],
                 "correct": 1,
                 "type": "mcq",
             },
             {
-                "question_text": "If angle of incidence increases from 20 degrees to 45 degrees, the reflected angle becomes:",
-                "options": ["20 degrees", "25 degrees", "45 degrees", "65 degrees"],
-                "correct": 2,
+                "question_text": "A correct ray diagram for reflection should show the incident ray, reflected ray, and normal:",
+                "options": [
+                    "In the same plane",
+                    "On separate sheets",
+                    "Without a normal line",
+                    "With the reflected ray always parallel to the mirror",
+                ],
+                "correct": 0,
                 "type": "mcq",
             },
         ]
-    elif "second law of reflection" in topic:
+    elif "spherical mirror" in topic or "concave" in topic or "convex" in topic:
         question_pool = [
             {
-                "question_text": "In reflection, the incident ray, reflected ray, and normal at the point of incidence lie in:",
-                "options": ["Different planes", "The same plane", "A curved plane only", "No fixed plane"],
+                "question_text": "A spherical mirror that bulges outward is called:",
+                "options": ["Concave mirror", "Convex mirror", "Plane mirror", "Parabolic mirror"],
                 "correct": 1,
                 "type": "mcq",
             },
             {
-                "question_text": "Which statement best represents the second law of reflection?",
-                "options": [
-                    "Angle of incidence equals angle of reflection",
-                    "Incident and reflected rays are always parallel",
-                    "Incident ray, normal, and reflected ray are coplanar",
-                    "Reflected ray always passes through focus"
-                ],
-                "correct": 2,
-                "type": "mcq",
-            },
-            {
-                "question_text": "If a drawn normal is not in the same plane as the rays, which law is violated?",
-                "options": ["Snell's law", "Second law of reflection", "Mirror formula", "Power of lens relation"],
+                "question_text": "The point at the middle of a spherical mirror is called the:",
+                "options": ["Focus", "Pole", "Centre of curvature", "Aperture"],
                 "correct": 1,
                 "type": "mcq",
             },
             {
-                "question_text": "The second law mainly describes:",
-                "options": ["Equality of angles", "Coplanarity of rays and normal", "Image size", "Refraction direction"],
+                "question_text": "The centre of curvature of a spherical mirror lies on the:",
+                "options": ["Mirror surface", "Principal axis", "Normal only", "Reflected ray"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "For a spherical mirror, the relation between radius of curvature and focal length is:",
+                "options": ["R = f", "R = 2f", "R = 3f", "R = f/2"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "A concave mirror can form a real image when the object is:",
+                "options": ["Always behind the mirror", "Beyond the focus", "Only at the pole", "Always at the centre of curvature"],
+                "correct": 1,
+                "type": "mcq",
+            },
+            {
+                "question_text": "Convex mirrors are commonly used as rear-view mirrors because they:",
+                "options": ["Form a magnified real image", "Give a wide field of view", "Always make objects inverted", "Focus light to a single point"],
                 "correct": 1,
                 "type": "mcq",
             },
@@ -218,13 +243,13 @@ def _fallback_response(prompt):
     else:
         question_pool = [
             {
-                "question_text": "According to the first law of reflection, angle of incidence is equal to:",
+                "question_text": "According to the laws of reflection, the angle of incidence is equal to:",
                 "options": ["Angle of refraction", "Angle of reflection", "Angle of emergence", "Angle of deviation"],
                 "correct": 1,
                 "type": "mcq",
             },
             {
-                "question_text": "In reflection, the incident ray, reflected ray, and the normal at the point of incidence lie in:",
+                "question_text": "The incident ray, reflected ray, and the normal at the point of incidence lie in:",
                 "options": ["Different planes", "The same plane", "A curved path", "Opposite media"],
                 "correct": 1,
                 "type": "mcq",
@@ -236,8 +261,14 @@ def _fallback_response(prompt):
                 "type": "mcq",
             },
             {
-                "question_text": "Which instrument commonly uses reflection to form clear images?",
-                "options": ["Periscope", "Thermometer", "Barometer", "Voltmeter"],
+                "question_text": "Which statement is true for reflection from a plane mirror?",
+                "options": ["Only the first law applies", "Only the second law applies", "Both reflection laws apply together", "No normal is needed"],
+                "correct": 2,
+                "type": "mcq",
+            },
+            {
+                "question_text": "A correct ray diagram for reflection should show the incident ray, reflected ray, and normal:",
+                "options": ["In the same plane", "On separate sheets", "Without a normal line", "With the reflected ray always parallel to the mirror"],
                 "correct": 0,
                 "type": "mcq",
             },

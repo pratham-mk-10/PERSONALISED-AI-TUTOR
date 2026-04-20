@@ -58,7 +58,15 @@ def _default_misconception_tag(topic: str) -> str:
   return "general_concept_gap"
 
 
-def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=None, tutor_context=None):
+def build_prompt(
+  topic,
+  difficulty="easy",
+  question_count=None,
+  syllabus_scope=None,
+  tutor_context=None,
+  taught_concepts=None,
+  untaught_concepts=None,
+):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
     requested_count = None
@@ -66,6 +74,8 @@ def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=N
         requested_count = max(2, min(int(question_count), 10))
     syllabus_scope = (syllabus_scope or SYLLABUS_SCOPE).strip()
     tutor_context = (tutor_context or "").strip()
+    taught_concepts = [str(item).strip() for item in (taught_concepts or []) if str(item).strip()]
+    untaught_concepts = [str(item).strip() for item in (untaught_concepts or []) if str(item).strip()]
 
     if requested_count is None:
         count_rule = "Decide the number of questions yourself based on topic breadth and difficulty. Return only high-quality unique questions, usually between 2 and 10."
@@ -73,6 +83,17 @@ def build_prompt(topic, difficulty="easy", question_count=None, syllabus_scope=N
         count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
 
     misconception_block = format_misconceptions_for_prompt(topic)
+    taught_block = "\n".join(f"- {item}" for item in taught_concepts)
+    untaught_block = "\n".join(f"- {item}" for item in untaught_concepts)
+    coverage_rules = ""
+    if taught_concepts:
+      coverage_rules += f"\n- Taught concepts in this specific video (strict scope):\n{taught_block}\n"
+      coverage_rules += "- Every question MUST test only one or more concepts from the taught list above.\n"
+      coverage_rules += "- If multiple taught concepts are listed, distribute questions across them and cover each concept at least once when feasible.\n"
+    if untaught_concepts:
+      coverage_rules += f"\n- Concepts NOT taught in this video (forbidden):\n{untaught_block}\n"
+      coverage_rules += "- Never ask anything that depends on the forbidden list above.\n"
+    coverage_text = coverage_rules or "\n- No explicit taught/untaught concept list was supplied."
 
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
@@ -83,6 +104,7 @@ Rules:
 - Questions must stay on the video topic and stay strictly within the syllabus scope.
 - Difficulty level: {difficulty}.
 - Tutor context (for personalization): {tutor_context or "No prior learner profile available."}
+- Video coverage constraints:{coverage_text}
 - Allowed misconception tags for this topic:
 {misconception_block}
 - No conceptual errors.
@@ -235,6 +257,150 @@ def _has_equivalent_answer_choices(question, topic):
   return False
 
 
+def _is_taught_scope_aligned(question, taught_concepts):
+  concepts = [str(item).strip() for item in (taught_concepts or []) if str(item).strip()]
+  if not concepts:
+    return True
+
+  question_text = str(question.get("question_text") or "")
+  options = question.get("options") or []
+  corpus = f"{question_text} {' '.join(str(opt) for opt in options)}"
+  normalized_corpus = _normalize_text(corpus)
+  corpus_tokens = _token_signature(corpus)
+
+  for concept in concepts:
+    normalized_concept = _normalize_text(concept)
+    if normalized_concept and normalized_concept in normalized_corpus:
+      return True
+
+    concept_tokens = _token_signature(concept)
+    if not concept_tokens:
+      continue
+
+    overlap = len(corpus_tokens & concept_tokens)
+    coverage_ratio = overlap / len(concept_tokens)
+    if overlap >= 2 or coverage_ratio >= 0.5:
+      return True
+
+  return False
+
+
+def _contains_untaught_concept(question, untaught_concepts):
+  concepts = [str(item).strip() for item in (untaught_concepts or []) if str(item).strip()]
+  if not concepts:
+    return False
+
+  question_text = str(question.get("question_text") or "")
+  options = question.get("options") or []
+  corpus = f"{question_text} {' '.join(str(opt) for opt in options)}"
+  normalized_corpus = _normalize_text(corpus)
+
+  for concept in concepts:
+    normalized_concept = _normalize_text(concept)
+    if not normalized_concept:
+      continue
+    if normalized_concept in normalized_corpus:
+      return True
+
+  return False
+
+
+def _question_matches_concept(question, concept):
+  concept_text = str(concept or "").strip()
+  if not concept_text:
+    return False
+
+  question_text = str(question.get("question_text") or "")
+  options = question.get("options") or []
+  corpus = f"{question_text} {' '.join(str(opt) for opt in options)}"
+  normalized_corpus = _normalize_text(corpus)
+  normalized_concept = _normalize_text(concept_text)
+  if normalized_concept and normalized_concept in normalized_corpus:
+    return True
+
+  concept_tokens = _token_signature(concept_text)
+  corpus_tokens = _token_signature(corpus)
+  if not concept_tokens or not corpus_tokens:
+    return False
+
+  overlap = len(concept_tokens & corpus_tokens)
+  coverage_ratio = overlap / len(concept_tokens)
+  return overlap >= 2 or coverage_ratio >= 0.5
+
+
+def _select_questions_covering_taught_concepts(questions, taught_concepts, max_count):
+  if not isinstance(questions, list) or not questions:
+    return []
+
+  limit = max(1, int(max_count)) if isinstance(max_count, int) else len(questions)
+  concepts = [str(item).strip() for item in (taught_concepts or []) if str(item).strip()]
+  if not concepts:
+    return questions[:limit]
+
+  indexed = list(enumerate(questions))
+  concept_matches = {
+    concept: [idx for idx, q in indexed if _question_matches_concept(q, concept)]
+    for concept in concepts
+  }
+
+  selected_indices = []
+  used = set()
+
+  # Pass 1: guarantee breadth by taking one question per concept when available.
+  for concept in concepts:
+    if len(selected_indices) >= limit:
+      break
+    for idx in concept_matches.get(concept, []):
+      if idx in used:
+        continue
+      selected_indices.append(idx)
+      used.add(idx)
+      break
+
+  # Pass 2: maximize uncovered concept gain with remaining slots.
+  covered_concepts = set()
+  for idx in selected_indices:
+    q = questions[idx]
+    for concept in concepts:
+      if _question_matches_concept(q, concept):
+        covered_concepts.add(concept)
+
+  remaining = [idx for idx, _ in indexed if idx not in used]
+  while len(selected_indices) < limit and remaining:
+    best_idx = None
+    best_gain = -1
+    best_total = -1
+
+    for idx in remaining:
+      q = questions[idx]
+      matched = {concept for concept in concepts if _question_matches_concept(q, concept)}
+      gain = len(matched - covered_concepts)
+      total = len(matched)
+      if gain > best_gain or (gain == best_gain and total > best_total):
+        best_gain = gain
+        best_total = total
+        best_idx = idx
+
+    if best_idx is None:
+      break
+
+    selected_indices.append(best_idx)
+    used.add(best_idx)
+    q = questions[best_idx]
+    for concept in concepts:
+      if _question_matches_concept(q, concept):
+        covered_concepts.add(concept)
+    remaining = [idx for idx in remaining if idx != best_idx]
+
+  return [questions[idx] for idx in selected_indices]
+
+
+def _resolve_max_count(question_count):
+  if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
+    return max(2, min(int(question_count), 10))
+  return 10
+
+
 def _extract_complete_json_objects(raw_text):
   """Extract full top-level JSON objects from a possibly truncated array payload."""
   if not isinstance(raw_text, str):
@@ -326,13 +492,23 @@ def _fallback_questions(prompt):
     return []
 
 
-def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_count=None, tutor_context=None):
+def generate_questions(
+  topic,
+  difficulty="easy",
+  syllabus_scope=None,
+  question_count=None,
+  tutor_context=None,
+  taught_concepts=None,
+  untaught_concepts=None,
+):
   prompt = build_prompt(
     topic,
     difficulty,
     question_count=question_count,
     syllabus_scope=syllabus_scope,
     tutor_context=tutor_context,
+    taught_concepts=taught_concepts,
+    untaught_concepts=untaught_concepts,
   )
 
   try:
@@ -374,6 +550,10 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         continue
       if _has_equivalent_answer_choices(q, topic):
         continue
+      if not _is_taught_scope_aligned(q, taught_concepts):
+        continue
+      if _contains_untaught_concept(q, untaught_concepts):
+        continue
 
       if not isinstance(q.get("misconception_map"), dict):
         mis_map = {}
@@ -406,12 +586,12 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
       _shuffle_question_options(q)
       validated_questions.append(q)
 
-    if isinstance(question_count, (int, float, str)) and str(question_count).isdigit():
-      max_count = max(2, min(int(question_count), 10))
-      return validated_questions[:max_count]
-
-    # Safety cap only; count selection is otherwise left to the model.
-    return validated_questions[:10]
+    max_count = _resolve_max_count(question_count)
+    return _select_questions_covering_taught_concepts(
+      validated_questions,
+      taught_concepts=taught_concepts,
+      max_count=max_count,
+    )
 
   except RuntimeError:
     raise
@@ -432,6 +612,10 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         if not isinstance(correct_idx, int) or correct_idx < 0 or correct_idx >= len(options):
           continue
         if _has_equivalent_answer_choices(q, topic):
+          continue
+        if not _is_taught_scope_aligned(q, taught_concepts):
+          continue
+        if _contains_untaught_concept(q, untaught_concepts):
           continue
 
         if not isinstance(q.get("misconception_map"), dict):
@@ -463,6 +647,11 @@ def generate_questions(topic, difficulty="easy", syllabus_scope=None, question_c
         _shuffle_question_options(q)
         validated_fallback_questions.append(q)
 
-      return validated_fallback_questions
+      max_count = _resolve_max_count(question_count)
+      return _select_questions_covering_taught_concepts(
+        validated_fallback_questions,
+        taught_concepts=taught_concepts,
+        max_count=max_count,
+      )
 
     raise RuntimeError("Failed to parse LLM question response") from e

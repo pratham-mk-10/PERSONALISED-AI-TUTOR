@@ -1,6 +1,6 @@
 // ============================================================
 // FirstLawOfReflectionAnimation.jsx
-// Animation for the 1st Law: Angle of Incidence = Angle of Reflection
+// Animation for the reflection rule: Angle of Incidence = Angle of Reflection
 // ============================================================
 
 import React, { useRef, useEffect } from "react";
@@ -83,7 +83,7 @@ const FirstLawOfReflectionAnimation = ({ onTryItClicked }) => {
   return (
     <AnimationPlayer
       duration={42000}
-      title="Watch: 1st Law of Reflection"
+      title="Watch: Reflection Rule"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >

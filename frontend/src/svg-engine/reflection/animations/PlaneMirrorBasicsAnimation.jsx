@@ -263,7 +263,7 @@ const PlaneMirrorBasicsAnimation = ({ onContinue }) => {
                 <Label
                   x={215}
                   y={70}
-                  text="Next: Learn the 1st and 2nd Laws of Reflection"
+                  text="Next: Learn the reflection rules"
                   color="#166534"
                   size={12}
                 />
