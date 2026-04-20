@@ -51,7 +51,9 @@ def _default_misconception_tag(topic: str) -> str:
   if topic_key == "plane_mirror":
     return "image_real_confusion"
   if topic_key == "spherical_mirrors":
-    return "image_position_confusion"
+    return "concave_convex_confusion"
+  if topic_key == "reflection_of_light":
+    return "angle_from_surface"
   if topic_key == "refraction":
     return "refraction_bending_normal"
 

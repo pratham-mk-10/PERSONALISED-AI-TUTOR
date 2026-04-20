@@ -518,6 +518,20 @@ def get_student_route(student_id: str):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/debug/allowed-misconceptions")
+def debug_allowed_misconceptions(topic: str | None = "Laws of Reflection"):
+    """Sanity endpoint: inspect allowed misconception tags for a topic input."""
+    resolved_topic = topic or "Laws of Reflection"
+    tags = get_allowed_misconception_tags(resolved_topic)
+    return {
+        "input_topic": topic,
+        "resolved_topic": resolved_topic,
+        "topic_key": topic_key_for(resolved_topic),
+        "allowed_misconception_tags": tags,
+        "count": len(tags),
+    }
+
+
 @router.post("/misconception-reason")
 def misconception_reason(req: MisconceptionReasonRequest):
     if req.misconception_tag == "none":

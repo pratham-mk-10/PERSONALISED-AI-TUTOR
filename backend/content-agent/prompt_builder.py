@@ -118,7 +118,7 @@ Rules:
 
 def build_explanation_prompt(subtopic, misconception_tag, attempt, question_text=None, student_answer=None, correct_answer=None):
 
-    if topic_key_for(subtopic) == "laws_of_reflection":
+    if topic_key_for(subtopic) in {"laws_of_reflection", "reflection_of_light"}:
         return _build_laws_reflection_prompt(
             subtopic,
             misconception_tag,

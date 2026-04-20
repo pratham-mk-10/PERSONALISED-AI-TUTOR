@@ -1,51 +1,149 @@
 {
   "general_concept_gap": {
+    "topic_key": "general",
     "title": "General Concept Gap",
     "explanation": "Some of your answers suggest gaps in the core ideas for this topic. Revisit the key definitions, diagrams, and example questions before trying a new quiz.",
-    "focus_area": "Review the main definitions and standard diagrams in your textbook for this topic."
-  },
-  "first_law_reflection_angle": {
-    "title": "Angle of Incidence and Reflection",
-    "explanation": "Angle of incidence equals angle of reflection (i = r). Both angles are always measured from the NORMAL to the surface, not from the mirror surface itself.",
-    "focus_area": "Highlight the normal line at the point of incidence and mark equal angles i and r on either side of the normal."
-  },
-  "second_law_reflection_plane": {
-    "title": "Rays in the Same Plane",
-    "explanation": "According to the second law of reflection, the incident ray, reflected ray and the normal at the point of incidence all lie in the same plane.",
-    "focus_area": "Show the incident ray, reflected ray and the normal drawn on a single flat surface to emphasize they are coplanar.",
-    "topic": "Second law of reflection"
-  },
-  "plane_mirror_image_properties": {
-    "title": "Plane Mirror Image Properties",
-    "explanation": "A plane mirror forms a virtual, erect image of the same size as the object, placed as far behind the mirror as the object is in front. The image is laterally inverted.",
-    "focus_area": "Highlight object and image distances from the mirror and show lateral inversion (left-right reversal)."
-  },
-  "refraction_bending_normal": {
-    "title": "Bending Towards or Away from Normal",
-    "explanation": "When light travels from a rarer medium (like air) to a denser medium (like glass), it bends towards the normal. When it travels from a denser to a rarer medium, it bends away from the normal.",
-    "focus_area": "Show incident and refracted rays on both sides of the boundary and emphasize how their direction changes relative to the normal."
+    "focus_area": "Review the main definitions and standard diagrams in your textbook for this topic.",
+    "sort_order": 0
   },
   "angle_from_surface": {
+    "topic_key": "laws_of_reflection",
     "title": "Angles Measured from Surface",
     "explanation": "Angle of incidence and angle of reflection are never measured from the mirror surface itself. Both angles are always measured from the NORMAL drawn perpendicular to the mirror.",
-    "focus_area": "Draw the normal as a perpendicular line to the mirror and shade the angles between the rays and this normal, not the mirror surface."
+    "focus_area": "Draw the normal as a perpendicular line to the mirror and shade the angles between the rays and this normal, not the mirror surface.",
+    "sort_order": 1
   },
   "reflection_not_equal": {
+    "topic_key": "laws_of_reflection",
     "title": "i and r Must Be Equal",
     "explanation": "According to the first law of reflection, the angle of incidence is exactly equal to the angle of reflection (i = r) when light reflects from a smooth surface.",
     "focus_area": "Show incident and reflected rays making equal angles with the normal, and explicitly label i and r as equal.",
-    "topic": "Laws of reflection"
+    "sort_order": 2
   },
   "normal_orientation_wrong": {
+    "topic_key": "laws_of_reflection",
     "title": "Normal Drawn Incorrectly",
     "explanation": "The normal is an imaginary line drawn perpendicular to the mirror surface at the point where the ray hits, not parallel or at any random angle.",
     "focus_area": "Highlight the mirror surface and then draw the normal at 90° to it exactly at the point of incidence.",
-    "topic": "Laws of reflection"
+    "sort_order": 3
   },
   "plane_not_same": {
+    "topic_key": "laws_of_reflection",
     "title": "Rays Not in Same Plane",
     "explanation": "The incident ray, reflected ray and the normal at the point of incidence must all lie in the same plane. If you draw them in different planes, the second law of reflection is violated.",
     "focus_area": "Show the mirror, normal and both rays drawn together on a single flat surface to emphasize they are coplanar.",
-    "topic": "Laws of reflection"
+    "sort_order": 4
+  },
+  "image_real_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Plane Mirror Image Type",
+    "explanation": "A plane mirror forms a virtual image, not a real image. The image cannot be obtained on a screen.",
+    "focus_area": "Contrast real vs virtual images and show why plane mirror images appear behind the mirror.",
+    "sort_order": 5
+  },
+  "size_mismatch": {
+    "topic_key": "plane_mirror",
+    "title": "Plane Mirror Image Size",
+    "explanation": "In a plane mirror, image size is always equal to object size.",
+    "focus_area": "Use object-image comparison in the mirror to show equal size.",
+    "sort_order": 6
+  },
+  "distance_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Object-Image Distance Relation",
+    "explanation": "In a plane mirror, the image forms as far behind the mirror as the object is in front.",
+    "focus_area": "Mark equal perpendicular distances from mirror to object and image.",
+    "sort_order": 7
+  },
+  "lateral_inversion_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Lateral Inversion",
+    "explanation": "Lateral inversion in a plane mirror means left-right reversal, not upside-down inversion.",
+    "focus_area": "Use left-right labeled objects to demonstrate lateral inversion.",
+    "sort_order": 8
+  },
+  "concave_convex_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Concave vs Convex Identification",
+    "explanation": "Concave mirror curves inward; convex mirror bulges outward.",
+    "focus_area": "Use mirror shape and reflecting surface orientation to differentiate types.",
+    "sort_order": 9
+  },
+  "pole_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Pole Definition",
+    "explanation": "The pole is the center point of the mirror surface, not the center of the sphere.",
+    "focus_area": "Mark pole on mirror surface and center of curvature separately.",
+    "sort_order": 10
+  },
+  "center_of_curvature_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Center of Curvature Location",
+    "explanation": "The center of curvature lies away from the mirror surface on the principal axis, not on the reflecting surface.",
+    "focus_area": "Draw C and the mirror arc to show spatial separation clearly.",
+    "sort_order": 11
+  },
+  "principal_axis_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Principal Axis Definition",
+    "explanation": "Principal axis is the straight line passing through pole (P) and center of curvature (C).",
+    "focus_area": "Construct axis using P and C and use it as reference for ray rules.",
+    "sort_order": 12
+  },
+  "focus_definition_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Principal Focus Definition",
+    "explanation": "Principal focus is the point where rays parallel to the principal axis converge (concave) or appear to diverge from (convex).",
+    "focus_area": "Trace parallel rays and show reflected-ray behavior at focus.",
+    "sort_order": 13
+  },
+  "focus_convex_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Convex Focus Nature",
+    "explanation": "For a convex mirror, principal focus is virtual and lies behind the mirror.",
+    "focus_area": "Extend reflected rays backward to locate virtual focus behind mirror.",
+    "sort_order": 14
+  },
+  "radius_focal_relation_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Relation Between Radius and Focal Length",
+    "explanation": "For spherical mirrors, radius of curvature and focal length are related by R = 2f.",
+    "focus_area": "Use labeled ray diagram to show F midway between P and C.",
+    "sort_order": 15
+  },
+  "parallel_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Parallel Ray Rule",
+    "explanation": "A ray parallel to the principal axis reflects through focus in a concave mirror (or appears to come from focus in a convex mirror).",
+    "focus_area": "Apply this as a strict construction rule in ray diagrams.",
+    "sort_order": 16
+  },
+  "focus_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Focus Ray Rule",
+    "explanation": "A ray passing through focus reflects parallel to the principal axis (concave mirror rule).",
+    "focus_area": "Show incident ray through F and reflected ray parallel to axis.",
+    "sort_order": 17
+  },
+  "center_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Center of Curvature Ray Rule",
+    "explanation": "A ray passing through center of curvature strikes the mirror normally and retraces its path after reflection.",
+    "focus_area": "Draw normal incidence at mirror and retraced reflected path.",
+    "sort_order": 18
+  },
+  "random_reflection": {
+    "topic_key": "spherical_mirrors",
+    "title": "Random Ray Diagram Construction",
+    "explanation": "Reflected rays cannot be drawn randomly; each ray must obey reflection laws and standard mirror ray rules.",
+    "focus_area": "Build ray diagrams with legal rays only and verify each step.",
+    "sort_order": 19
+  },
+  "refraction_bending_normal": {
+    "topic_key": "refraction",
+    "title": "Bending Towards or Away from Normal",
+    "explanation": "When light travels from a rarer medium (like air) to a denser medium (like glass), it bends towards the normal. When it travels from a denser to a rarer medium, it bends away from the normal.",
+    "focus_area": "Show incident and refracted rays on both sides of the boundary and emphasize how their direction changes relative to the normal.",
+    "sort_order": 30
   }
 }
