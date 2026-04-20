@@ -3,6 +3,7 @@ import QuizCard from "./QuizCard";
 import {
   getMisconceptionReason,
   getGeneratedQuestions,
+  getMisconceptionQuiz,
   submitAnswers,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
@@ -217,9 +218,11 @@ const QuizPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingRemedial, setLoadingRemedial] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [report, setReport] = useState(null);
   const [activeVisualByQuestion, setActiveVisualByQuestion] = useState({});
+  const [quizMode, setQuizMode] = useState("regular");
 
   // 🔹 Load questions
   useEffect(() => {
@@ -232,6 +235,7 @@ const QuizPage = () => {
     setReport(null);
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
+    setQuizMode("regular");
 
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
@@ -417,6 +421,67 @@ const QuizPage = () => {
     setActiveVisualByQuestion({});
   };
 
+  const startMisconceptionQuiz = async () => {
+    if (!report?.detailedResults?.length) {
+      return;
+    }
+
+    const quizTopicContext = getQuizTopicContext(currentTopicId);
+    const studentId = user?.id || user?.name || "guest-student";
+    const wrongItems = report.detailedResults.filter((item) => !item.isCorrect);
+    const misconceptionTags = [
+      ...new Set(
+        wrongItems
+          .map((item) => String(item.focusArea || "").trim())
+          .filter(Boolean)
+      ),
+    ];
+    const wrongQuestionTexts = wrongItems
+      .map((item) => String(item.questionText || "").trim())
+      .filter(Boolean);
+
+    if (!misconceptionTags.length) {
+      setError("No misconception tags were found for remedial quiz generation.");
+      return;
+    }
+
+    setLoadingRemedial(true);
+    setError("");
+
+    try {
+      const data = await getMisconceptionQuiz({
+        topic: quizTopicContext.title,
+        studentId,
+        misconceptionTags,
+        wrongQuestionTexts,
+        questionCount: Math.max(2, Math.min(wrongItems.length + 1, 6)),
+      });
+
+      const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+      const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
+        ...q,
+        options: Array.isArray(q?.options) ? q.options : [],
+        _key: questionKey(q, idx),
+      }));
+
+      if (!nextQuestions.length) {
+        setError("Could not generate misconception-focused quiz right now.");
+        return;
+      }
+
+      setQuestions(nextQuestions);
+      setAnswers({});
+      setCurrentIndex(0);
+      setReport(null);
+      setActiveVisualByQuestion({});
+      setQuizMode("misconception");
+    } catch (err) {
+      setError(err?.message || "Unable to start misconception quiz");
+    } finally {
+      setLoadingRemedial(false);
+    }
+  };
+
   if (loading) return <h2>Loading questions...</h2>;
 
   if (report) {
@@ -593,6 +658,23 @@ const QuizPage = () => {
           <button onClick={restartSameQuiz} style={{ padding: "10px 16px", cursor: "pointer" }}>
             Retry Same Quiz
           </button>
+          {report.wrongCount > 0 && (
+            <button
+              onClick={startMisconceptionQuiz}
+              disabled={loadingRemedial}
+              style={{
+                padding: "10px 16px",
+                cursor: loadingRemedial ? "not-allowed" : "pointer",
+                border: "1px solid #c7d2fe",
+                borderRadius: "8px",
+                background: loadingRemedial ? "#e5e7eb" : "#eef2ff",
+                color: "#3730a3",
+                fontWeight: 700,
+              }}
+            >
+              {loadingRemedial ? "Preparing Misconception Quiz..." : "Take Misconception Quiz"}
+            </button>
+          )}
           <button onClick={loadQuestions} style={{ padding: "10px 16px", cursor: "pointer" }}>
             Start New Quiz
           </button>
@@ -623,7 +705,12 @@ const QuizPage = () => {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h1>🧠 AI Tutor Quiz</h1>
+      <h1>{quizMode === "misconception" ? "🎯 Misconception Quiz" : "🧠 AI Tutor Quiz"}</h1>
+      {quizMode === "misconception" && (
+        <p style={{ marginTop: "4px", color: "#374151", fontWeight: 600 }}>
+          This round targets only the misconceptions from your previous attempt.
+        </p>
+      )}
       <p style={{ color: "#4b587c", fontWeight: 600 }}>
         Question {currentIndex + 1} of {questions.length}
       </p>
