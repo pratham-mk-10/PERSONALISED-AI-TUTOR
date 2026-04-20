@@ -1,6 +1,6 @@
 // ============================================================
 // SecondLawReflectionFeedback.jsx
-// RED/GREEN feedback overlay for 2nd Law misconceptions
+// RED/GREEN feedback overlay for reflection-rule misconceptions
 // 
 // Common misconceptions:
 // 1. rays_not_coplanar - thinks rays can go out of plane
@@ -44,7 +44,7 @@ const SecondLawReflectionFeedback = ({
           color: "#166534",
           fontWeight: "600"
         }}>
-          You understand the 2nd Law! The incident ray, reflected ray, and normal
+          You understand the reflection rule! The incident ray, reflected ray, and normal
           are always in the same plane.
         </div>
       </div>
@@ -92,7 +92,7 @@ const SecondLawReflectionFeedback = ({
             <Label
               x={210}
               y={280}
-              text="One ray is going out of the page - this violates the 2nd law"
+              text="One ray is going out of the page - this violates the reflection rule"
               color="#991B1B"
               size={11}
               anchor="middle"

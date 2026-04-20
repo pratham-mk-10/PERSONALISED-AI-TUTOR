@@ -1,9 +1,9 @@
 // ============================================================
-// SecondLawOfReflectionAnimation.jsx (2ND LAW)
+// SecondLawOfReflectionAnimation.jsx (Reflection Rule)
 // The incident ray, reflected ray, and normal ALL lie in 
 // the SAME PLANE (perpendicular to the mirror surface)
 //
-// Changes from 1st Law:
+// Changes from the previous reflection step:
 // - Shows 3D representation (2D view of 3D space)
 // - Demonstrates ray + normal + mirror in same plane
 // - Shows what happens if ray goes out of plane (WRONG)
@@ -76,7 +76,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
   return (
     <AnimationPlayer
       duration={48000}
-      title="Watch: 2nd Law of Reflection"
+      title="Watch: Reflection Rule"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
@@ -137,7 +137,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
               <Label
                 x={CX}
                 y={50}
-                text="2nd Law of Reflection"
+                text="Reflection Rule"
                 color="#111827"
                 size={16}
                 anchor="middle"
@@ -345,7 +345,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
                 <Label
                   x={210}
                   y={246}
-                  text="2nd Law of Reflection:"
+                  text="Reflection Rule:"
                   color="#1E40AF"
                   size={13}
                   anchor="middle"
@@ -388,7 +388,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
               <Label
                 x={210}
                 y={CY + 30}
-                text="Let's learn about the 2nd Law of Reflection"
+                text="Let's learn the reflection rule"
                 color="#111827"
                 size={14}
                 anchor="middle"
@@ -502,7 +502,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
                 <Label
                   x={210}
                   y={25}
-                  text="This is the 2nd Law of Reflection:"
+                  text="This is the reflection rule:"
                   color="#16A34A"
                   size={14}
                   anchor="middle"

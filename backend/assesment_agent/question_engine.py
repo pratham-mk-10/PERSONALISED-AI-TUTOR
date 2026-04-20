@@ -40,15 +40,30 @@ def _topic_keywords(topic: str) -> list[str]:
     t = (topic or "").strip().lower()
     if "first law of reflection" in t or "second law of reflection" in t or "laws of reflection" in t:
         return [
+            "law of reflection",
             "angle of incidence",
             "angle of reflection",
             "i = r",
             "same plane",
-            "plane of incidence",
-            "plane of reflection",
+            "coplanar",
             "incident ray",
             "reflected ray",
             "normal",
+        ]
+    if "spherical mirror" in t or "concave" in t or "convex" in t:
+        return [
+            "spherical mirror",
+            "concave",
+            "convex",
+            "pole",
+            "centre of curvature",
+            "center of curvature",
+            "principal axis",
+            "principal focus",
+            "focal length",
+            "aperture",
+            "mirror formula",
+            "magnification",
         ]
     if "plane mirror" in t:
         return ["plane mirror", "lateral", "virtual", "erect", "image"]
@@ -80,6 +95,11 @@ def _is_topic_aligned(item: Dict[str, Any], topic: str) -> bool:
             "lens",
             "same plane",
         ]
+        if any(term in corpus for term in blocked_terms):
+            return False
+
+    if "spherical mirror" in (topic or "").lower() or "concave" in (topic or "").lower() or "convex" in (topic or "").lower():
+        blocked_terms = ["refraction", "snell", "lens", "same plane"]
         if any(term in corpus for term in blocked_terms):
             return False
 

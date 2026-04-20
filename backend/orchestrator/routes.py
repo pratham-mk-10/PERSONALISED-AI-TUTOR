@@ -68,7 +68,7 @@ def _load_content_agent_class():
         "content_agent_module",
         backend_root / "content-agent" / "content_agent.py",
     )
-    return module.ContentAgent
+    return module
 
 
 _adaptation_feedback = _load_adaptation_feedback_module()
@@ -98,7 +98,11 @@ def _allowed_misconceptions_for_topic(topic: str | None) -> list[str]:
 
 router = APIRouter()
 evaluator = Evaluator()
-ContentAgent = _load_content_agent_class()
+_content_agent_module = _load_content_agent_class()
+ContentAgent = _content_agent_module.ContentAgent
+get_template_quiz_scope = getattr(_content_agent_module, "get_template_quiz_scope", lambda _template: {"taught_concepts": [], "untaught_concepts": []})
+pick_svg_template = getattr(_content_agent_module, "pick_svg_template", lambda _topic, _tag=None: None)
+pick_svg_variant = getattr(_content_agent_module, "pick_svg_variant", lambda _tag=None: None)
 content_agent = ContentAgent(get_connection)
 
 
@@ -115,6 +119,9 @@ class GenerateQuestionsRequest(BaseModel):
     syllabus_scope: str | None = None
     question_count: int | None = None
     tutor_context: str | None = None
+    video_template: str | None = None
+    taught_concepts: list[str] | None = None
+    untaught_concepts: list[str] | None = None
 
 
 class SubmitAnswersRequest(BaseModel):
@@ -171,6 +178,15 @@ def get_questions(data: GetQuestionsRequest | None = None):
 @router.post("/generate-questions")
 def generate_questions_route(data: GenerateQuestionsRequest | None = None):
     payload = data or GenerateQuestionsRequest()
+    taught_concepts = payload.taught_concepts
+    untaught_concepts = payload.untaught_concepts
+
+    if payload.video_template and (not taught_concepts or not untaught_concepts):
+        scope_profile = get_template_quiz_scope(payload.video_template) or {}
+        if not taught_concepts:
+            taught_concepts = scope_profile.get("taught_concepts") or []
+        if not untaught_concepts:
+            untaught_concepts = scope_profile.get("untaught_concepts") or []
 
     try:
         questions = generate_questions(
@@ -179,6 +195,8 @@ def generate_questions_route(data: GenerateQuestionsRequest | None = None):
             syllabus_scope=payload.syllabus_scope or SYLLABUS_SCOPE,
             question_count=payload.question_count,
             tutor_context=payload.tutor_context,
+            taught_concepts=taught_concepts,
+            untaught_concepts=untaught_concepts,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -358,6 +376,8 @@ def submit_answers(data: SubmitAnswersRequest):
                 "question_text": ans.get("question_text"),
                 "reason": " ".join(str(reason_text or "").split()),
                 "focus_area": tag,
+                "svg_component": pick_svg_template(topic, tag),
+                "svg_variant": pick_svg_variant(tag),
             }
         )
 

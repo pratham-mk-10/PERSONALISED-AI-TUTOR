@@ -3,6 +3,7 @@ PLANE_MIRROR_TEMPLATE = "PlaneMirrorBasicsAnimation"
 SPHERICAL_MIRROR_BASICS_TEMPLATE = "SphericalMirrorBasicsWatch"
 SPHERICAL_MIRROR_DETAILED_TEMPLATE = "SphericalMirrorDetailedAnimation"
 SPHERICAL_MIRROR_IMAGE_TEMPLATE = "SphericalMirrorDetailedAnimation"
+SPHERICAL_MIRROR_FEEDBACK_TEMPLATE = "SphericalMirrorMisconceptionFeedback"
 
 REFLECTION_TAGS = {
     "angle_from_surface",
@@ -79,11 +80,11 @@ def pick_svg_template(subtopic: str | None, misconception_tag: str | None = None
     if tag in PLANE_MIRROR_TAGS:
         return PLANE_MIRROR_TEMPLATE
     if tag in SPHERICAL_MIRROR_BASICS_TAGS:
-        return SPHERICAL_MIRROR_BASICS_TEMPLATE
+        return SPHERICAL_MIRROR_FEEDBACK_TEMPLATE
     if tag in SPHERICAL_MIRROR_RAY_RULE_TAGS:
-        return SPHERICAL_MIRROR_DETAILED_TEMPLATE
+        return SPHERICAL_MIRROR_FEEDBACK_TEMPLATE
     if tag in SPHERICAL_MIRROR_IMAGE_TAGS:
-        return SPHERICAL_MIRROR_IMAGE_TEMPLATE
+        return SPHERICAL_MIRROR_FEEDBACK_TEMPLATE
 
     if "plane mirror" in topic:
         return PLANE_MIRROR_TEMPLATE
