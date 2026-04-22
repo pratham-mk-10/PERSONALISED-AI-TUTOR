@@ -55,35 +55,35 @@ function App() {
             return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow";
           })
           .map((s, i) => (
-          <div
-            key={s}
-            style={{
-              ...styles.stageStep,
-              backgroundColor:
-                stages.indexOf(s) === currentIndex
-                  ? "#2563EB"
-                  : stages.indexOf(s) < currentIndex
-                  ? "#BFDBFE"
-                  : "#E5E7EB",
-              color: stages.indexOf(s) === currentIndex ? "#FFFFFF" : "#374151",
-            }}
-          >
-            {{
-              pmTell: "1. Plane Basics",
-              pmShow: "2. Watch",
-              smTell: "1. Spherical Mirrors",
-              smShow: "2. Watch",
-              smQuiz: "3. Quiz",
-              tell1: "1. Reflection",
-              show1: "2. Watch",
-              try1: "3. Try",
-              tell2: "4. Reflection",
-              show2: "5. Watch",
-              try2: "6. Try",
-              test: "7. Quiz",
-            }[s]}
-          </div>
-        ))}
+            <div
+              key={s}
+              style={{
+                ...styles.stageStep,
+                backgroundColor:
+                  stages.indexOf(s) === currentIndex
+                    ? "#2563EB"
+                    : stages.indexOf(s) < currentIndex
+                      ? "#BFDBFE"
+                      : "#E5E7EB",
+                color: stages.indexOf(s) === currentIndex ? "#FFFFFF" : "#374151",
+              }}
+            >
+              {{
+                pmTell: "1. Plane Basics",
+                pmShow: "2. Watch",
+                smTell: "1. Spherical Mirrors",
+                smShow: "2. Watch",
+                smQuiz: "3. Quiz",
+                tell1: "1. Reflection",
+                show1: "2. Watch",
+                try1: "3. Try",
+                tell2: "4. Reflection",
+                show2: "5. Watch",
+                try2: "6. Try",
+                test: "7. Quiz",
+              }[s]}
+            </div>
+          ))}
       </div>
 
       {/* PLANE MIRROR BASICS - TELL */}
@@ -144,7 +144,7 @@ function App() {
         <div style={styles.cardWide}>
           <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smQuiz")} />
           <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
-            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz") }>
+            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz")}>
               Go to spherical mirror quiz →
             </button>
           </div>
@@ -201,7 +201,7 @@ function App() {
       {/* TRY 1 - REFLECTION */}
       {stage === "try1" && (
         <div style={styles.card}>
-          <FirstLawPlaneInteractive attempt={1} misconceptionTag="" onInteracted={() => {}} />
+          <FirstLawPlaneInteractive attempt={1} misconceptionTag="" onInteracted={() => { }} />
 
           <button
             style={{ ...styles.btnPrimary, marginTop: "16px" }}
@@ -273,8 +273,8 @@ function App() {
           <QuizPage />
         </div>
       )}
-  </div>
-);
+    </div>
+  );
 
   if (view === "session") {
     return <div style={styles.page}>{renderSession()}</div>;
@@ -287,7 +287,7 @@ function App() {
           if (topicId === "plane-mirror") {
             setStage("pmTell");
           } else if (topicId === "spherical-mirror-basics") {
-              setStage("smTell");
+            setStage("smTell");
           } else if (topicId === "laws-reflection") {
             setStage("tell1");
           } else {
