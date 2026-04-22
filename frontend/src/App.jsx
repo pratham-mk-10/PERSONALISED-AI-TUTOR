@@ -55,35 +55,35 @@ function App() {
             return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow";
           })
           .map((s, i) => (
-            <div
-              key={s}
-              style={{
-                ...styles.stageStep,
-                backgroundColor:
-                  stages.indexOf(s) === currentIndex
-                    ? "#2563EB"
-                    : stages.indexOf(s) < currentIndex
-                      ? "#BFDBFE"
-                      : "#E5E7EB",
-                color: stages.indexOf(s) === currentIndex ? "#FFFFFF" : "#374151",
-              }}
-            >
-              {{
-                pmTell: "1. Plane Basics",
-                pmShow: "2. Watch",
-                smTell: "1. Spherical Mirrors",
-                smShow: "2. Watch",
-                smQuiz: "3. Quiz",
-                tell1: "1. Reflection",
-                show1: "2. Watch",
-                try1: "3. Try",
-                tell2: "4. Reflection",
-                show2: "5. Watch",
-                try2: "6. Try",
-                test: "7. Quiz",
-              }[s]}
-            </div>
-          ))}
+          <div
+            key={s}
+            style={{
+              ...styles.stageStep,
+              backgroundColor:
+                stages.indexOf(s) === currentIndex
+                  ? "#2563EB"
+                  : stages.indexOf(s) < currentIndex
+                  ? "#BFDBFE"
+                  : "#E5E7EB",
+              color: stages.indexOf(s) === currentIndex ? "#FFFFFF" : "#374151",
+            }}
+          >
+            {{
+              pmTell: "1. Plane Basics",
+              pmShow: "2. Watch",
+              smTell: "1. Spherical Mirrors",
+              smShow: "2. Watch",
+              smQuiz: "3. Quiz",
+              tell1: "1. 1st Law",
+              show1: "2. Watch",
+              try1: "3. Try",
+              tell2: "4. 2nd Law",
+              show2: "5. Watch",
+              try2: "6. Try",
+              test: "7. Quiz",
+            }[s]}
+          </div>
+        ))}
       </div>
 
       {/* PLANE MIRROR BASICS - TELL */}
@@ -158,10 +158,10 @@ function App() {
         </div>
       )}
 
-      {/* TELL 1 - REFLECTION */}
+      {/* TELL 1 - 1st LAW */}
       {stage === "tell1" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Reflection Lesson</h2>
+          <h2 style={styles.h2}>1st Law of Reflection</h2>
 
           <p style={styles.explanation}>
             When a ray of light hits a mirror, it bounces back. This is called
@@ -212,10 +212,10 @@ function App() {
         </div>
       )}
 
-      {/* TELL 2 - REFLECTION */}
+      {/* TELL 2 - 2nd LAW */}
       {stage === "tell2" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Reflection Lesson</h2>
+          <h2 style={styles.h2}>2nd Law of Reflection</h2>
 
           <p style={styles.explanation}>
             The incident ray, reflected ray, and the normal all lie in the

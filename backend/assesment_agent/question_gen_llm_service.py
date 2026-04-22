@@ -279,6 +279,13 @@ def _fallback_response(prompt):
 
 
 def generate_text(prompt):
+    _load_env_files()
+    use_llm = os.getenv("USE_LLM", "false").lower() in {"1", "true", "yes"}
+    
+    if not use_llm:
+        # Returning empty triggers the local fallback mechanism in question_gen.py
+        return ""
+
     api_key = _get_api_key()
 
     if not api_key:
@@ -290,7 +297,7 @@ def generate_text(prompt):
     }
 
     data = {
-        "model": "mistral-large-latest",  # 🔥 BEST available from Mistral API
+        "model": "mistral-small-latest",  # Faster and reliable for MCQs
         "messages": [
             {"role": "system", "content": "You are a physics teacher."},
             {"role": "user", "content": prompt}
