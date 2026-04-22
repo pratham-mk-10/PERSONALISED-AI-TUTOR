@@ -18,6 +18,10 @@ def load_data():
 DATA = load_data()
 
 TAG_PROMPT_HINTS = {
+    "angle_from_surface": "Correct the mistake of measuring angle from the mirror surface. Explain that both angles are measured from the normal.",
+    "reflection_not_equal": "Correct the misconception that i and r are different. Explain first law clearly: angle of incidence equals angle of reflection.",
+    "normal_orientation_wrong": "Correct the normal-line confusion. Explain normal is perpendicular to mirror at point of incidence.",
+    "plane_not_same": "Correct the second-law misconception. Explain incident ray, reflected ray, and normal are coplanar.",
     "image_real_confusion": "Correct the idea that a plane mirror image is real. Explain why the image is virtual and cannot be formed on a screen.",
     "size_mismatch": "Correct the misconception that plane mirror image size changes. Explain that image size equals object size.",
     "distance_confusion": "Correct the misconception about object-image distance in plane mirrors. Explain that image distance behind mirror equals object distance in front.",
