@@ -23,13 +23,7 @@ def _load_prompt_builder():
 
 build_explanation_prompt = _load_prompt_builder().build_explanation_prompt
 
-FALLBACK_MODELS = [
-    "mistral-small-latest",
-    "open-mistral-nemo",
-    "open-mistral-7b",
-]
-
-MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _ENV_CANDIDATES = [
     BACKEND_ROOT / ".env",
@@ -49,45 +43,97 @@ _load_env_files()
 
 def _get_api_key():
     _load_env_files()
-    return os.getenv("MISTRAL_API_KEY", "").strip()
+    return os.getenv("GEMINI_API_KEY", "").strip()
 
 
-def _candidate_models():
-    configured = os.getenv("MISTRAL_MODEL", "").strip()
-    if configured:
-        return [configured]
-    return [FALLBACK_MODELS[0]]
-
-
-def _post_chat_completion(api_key, payload):
+def _post_chat_completion(api_key, system_instruction, user_prompt):
+    url = f"{API_URL}?key={api_key}"
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": user_prompt}]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 4096
+        }
+    }
+    if system_instruction:
+        payload["systemInstruction"] = {
+            "parts": [{"text": system_instruction}]
+        }
+    
     body = json.dumps(payload).encode("utf-8")
     req = request.Request(
-        MISTRAL_API_URL,
+        url,
         data=body,
         headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
+            "Content-Type": "application/json"
         },
         method="POST",
     )
-
-    with request.urlopen(req, timeout=12) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with request.urlopen(req, timeout=15) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            try:
+                return res["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError):
+                return ""
+    except Exception as e:
+        # Fallback to mistral
+        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
+        if not mistral_key:
+            return ""
+        
+        mistral_url = "https://api.mistral.ai/v1/chat/completions"
+        mistral_payload = {
+            "model": "mistral-small-latest",
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.4,
+            "max_tokens": 4096
+        }
+        m_req = request.Request(
+            mistral_url,
+            data=json.dumps(mistral_payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {mistral_key}",
+                "Content-Type": "application/json"
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(m_req, timeout=15) as m_resp:
+                m_res = json.loads(m_resp.read().decode("utf-8"))
+                return m_res["choices"][0]["message"]["content"]
+        except Exception:
+            return ""
 
 
 class ContentAgentLLMService:
 
     def __init__(self, db_connection_factory=None):
         self.db_connection_factory = db_connection_factory
-        self.model = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
+        self.model = "gemini-1.5-flash"
 
-    def get_explanation(self, subtopic: str, misconception_tag: str, attempt: int, question_text: str | None = None, student_answer: str | None = None, correct_answer: str | None = None) -> str:
+    def get_explanation(
+        self,
+        subtopic: str,
+        misconception_tag: str,
+        attempt: int = 1,
+        question_text: Optional[str] = None,
+        student_answer: Optional[str] = None,
+        correct_answer: Optional[str] = None,
+        use_cache: bool = False
+    ) -> str:
 
         if attempt == 1:
             return "Try again and observe the diagram carefully."
 
-        use_cache = not any([question_text, student_answer, correct_answer])
         if use_cache:
             cached = self._get_from_cache(subtopic, misconception_tag, attempt)
             if cached:
@@ -117,37 +163,8 @@ class ContentAgentLLMService:
         if not api_key:
             return ""
         try:
-            response_payload = None
-            for model_name in _candidate_models():
-                try:
-                    response_payload = _post_chat_completion(
-                        api_key,
-                        {
-                            "model": model_name,
-                            "temperature": 0.4,
-                            "messages": [
-                                {
-                                    "role": "system",
-                                    "content": "You are a clear NCERT physics teacher for a Class 10 student. Return a direct teaching explanation only.",
-                                },
-                                {"role": "user", "content": prompt},
-                            ],
-                        },
-                    )
-                    break
-                except (error.HTTPError, error.URLError, TimeoutError, ValueError):
-                    continue
-
-            if response_payload is None:
-                return ""
-
-            choices = response_payload.get("choices") or []
-            if not choices:
-                return ""
-
-            content = ((choices[0].get("message") or {}).get("content") or "").strip()
-            return content
-
+            system_instruction = "You are a clear NCERT physics teacher for a Class 10 student. Return a direct teaching explanation only."
+            return _post_chat_completion(api_key, system_instruction, prompt)
         except Exception:
             return ""
 

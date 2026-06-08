@@ -31,6 +31,7 @@ export const getGeneratedQuestions = async ({
   videoTemplate = null,
   taughtConcepts = null,
   untaughtConcepts = null,
+  lessonContent = null,
 } = {}) => {
   const payload = {
     topic,
@@ -40,6 +41,7 @@ export const getGeneratedQuestions = async ({
     video_template: videoTemplate,
     taught_concepts: taughtConcepts,
     untaught_concepts: untaughtConcepts,
+    lesson_content: lessonContent,
   };
 
   if (Number.isFinite(questionCount)) {
@@ -47,8 +49,8 @@ export const getGeneratedQuestions = async ({
   }
 
   const controller = new AbortController();
-  // LLM question generation can occasionally exceed 30s under load.
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  // LLM question generation can occasionally exceed 60s under heavy load.
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
 
   let res;
   try {

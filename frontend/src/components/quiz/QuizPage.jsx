@@ -65,8 +65,11 @@ const TOPIC_CONTEXTS = {
     taughtConcepts: [
       "definition of spherical mirror",
       "difference between concave and convex mirrors",
+      "concave mirror properties and reflecting surface",
+      "convex mirror properties and reflecting surface",
       "pole, principal axis, centre of curvature",
       "principal focus and focal length basic meaning",
+      "radius of curvature and focal length relation R=2f",
       "basic everyday uses of concave and convex mirrors",
     ],
     untaughtConcepts: [
@@ -209,6 +212,38 @@ const getPersonalization = (topicId, progress) => {
   };
 };
 
+const renderFormattedText = (text) => {
+  if (!text) return "";
+  const parts = String(text).split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
+const LESSON_TEXTS = {
+  "laws-reflection": `When a ray of light hits a mirror, it bounces back. This is called reflection.
+The ray that hits the mirror is called the incident ray, and the ray that bounces back is the reflected ray.
+The Normal is a line perpendicular (90°) to the mirror at the point of incidence.
+The Angle of Incidence = Angle of Reflection. Both are measured from the Normal.
+The incident ray, reflected ray, and the normal at the point of incidence all lie in the same plane (they are coplanar).`,
+  
+  "plane-mirror": `A plane mirror is a flat, polished surface that reflects light.
+A plane mirror forms a virtual, erect image of the same size as the object, placed as far behind the mirror as the object is in front. The image is laterally inverted (left-right reversed).`,
+  
+  "spherical-mirror-basics": `A spherical mirror is a mirror which has the shape of a piece cut out of a spherical surface.
+Its reflecting surface is curved. A concave mirror curves inwards (like the inside of a spoon) and converges light. A convex mirror curves outwards (like the back of a spoon) and diverges light.
+Key points include:
+- Pole (P): The geometric center of the reflecting surface of the spherical mirror.
+- Centre of Curvature (C): The center of the hollow sphere of which the mirror is a part.
+- Radius of Curvature (R): The radius of the hollow sphere of which the mirror is a part.
+- Principal Axis: A straight line passing through the pole and the centre of curvature.
+- Principal Focus (F): The point where parallel rays converge (for concave mirror) or appear to diverge from (for convex mirror) after reflection.
+- Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).`
+};
+
 const QuizPage = () => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
@@ -223,12 +258,12 @@ const QuizPage = () => {
   const [report, setReport] = useState(null);
   const [activeVisualByQuestion, setActiveVisualByQuestion] = useState({});
   const [quizMode, setQuizMode] = useState("regular");
-
+ 
   // 🔹 Load questions
   useEffect(() => {
     loadQuestions();
   }, []);
-
+ 
   const loadQuestions = async () => {
     setLoading(true);
     setError("");
@@ -236,7 +271,7 @@ const QuizPage = () => {
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
     setQuizMode("regular");
-
+ 
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
     const personalization = getPersonalization(currentTopicId, progress);
@@ -244,7 +279,8 @@ const QuizPage = () => {
     const tutorContext = [quizTopicContext.lessonFocus, personalization.tutorContext]
       .filter(Boolean)
       .join(" ");
-
+    const lessonContent = LESSON_TEXTS[currentTopicId] || "";
+ 
     try {
       const data = await getGeneratedQuestions({
         topic: quizTopicContext.title,
@@ -254,6 +290,7 @@ const QuizPage = () => {
         videoTemplate: quizTopicContext.videoTemplate,
         taughtConcepts: quizTopicContext.taughtConcepts,
         untaughtConcepts: quizTopicContext.untaughtConcepts,
+        lessonContent,
       });
 
       const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
@@ -308,6 +345,7 @@ const QuizPage = () => {
         difficulty: q.difficulty,
         misconception_map: q.misconception_map || {},
         topic: q.topic || quizTopicContext.title,
+        options: q.options || [],
       }));
 
       const total = questions.length;
@@ -505,7 +543,7 @@ const QuizPage = () => {
             }}
           >
             <h3 style={{ marginTop: 0 }}>Misconception Explanation</h3>
-            <p style={{ margin: 0 }}>{report.misconceptionExplanation}</p>
+            <p style={{ margin: 0 }}>{renderFormattedText(report.misconceptionExplanation)}</p>
           </div>
         )}
 
@@ -520,7 +558,7 @@ const QuizPage = () => {
 
         <div style={{ marginTop: "18px", padding: "14px", border: "1px solid #dbe4ff", borderRadius: "10px", background: "#f6f9ff" }}>
           <h3 style={{ marginTop: 0 }}>Personalized Feedback</h3>
-          <p style={{ marginBottom: "8px" }}>{report.reason}</p>
+          <p style={{ marginBottom: "8px" }}>{renderFormattedText(report.reason)}</p>
           <p style={{ margin: 0 }}>
             <strong>Focus Area:</strong> {report.focusArea}
           </p>
@@ -597,7 +635,7 @@ const QuizPage = () => {
                 {!item.isCorrect && (
                   <div style={{ marginTop: "8px" }}>
                     <p style={{ margin: "0 0 8px", color: "#374151" }}>
-                      <strong>Why wrong:</strong> {item.reason}
+                      <strong>Why wrong:</strong> {renderFormattedText(item.reason)}
                       {item.focusArea ? ` | Focus: ${item.focusArea}` : ""}
                     </p>
                     <button
@@ -647,7 +685,7 @@ const QuizPage = () => {
               <div key={`${item.question_id || "q"}-${idx}`} style={{ marginTop: idx === 0 ? 0 : "10px", paddingTop: idx === 0 ? 0 : "10px", borderTop: idx === 0 ? "none" : "1px solid #eef2ff" }}>
                 <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Question {idx + 1}</p>
                 <p style={{ margin: "0 0 6px", color: "#111827" }}>{item.question_text}</p>
-                <p style={{ margin: "0 0 6px" }}>{item.reason}</p>
+                <p style={{ margin: "0 0 6px" }}>{renderFormattedText(item.reason)}</p>
                 <p style={{ margin: 0 }}><strong>Focus:</strong> {item.focus_area}</p>
               </div>
             ))}
@@ -779,8 +817,8 @@ const QuizPage = () => {
                 selectedForCurrent === undefined
                   ? "#9ca3af"
                   : submitting
-                  ? "linear-gradient(90deg, #4b5563, #6b7280)"
-                  : "linear-gradient(90deg, #4f46e5, #6366f1)",
+                    ? "linear-gradient(90deg, #4b5563, #6b7280)"
+                    : "linear-gradient(90deg, #4f46e5, #6366f1)",
               boxShadow:
                 selectedForCurrent === undefined || submitting
                   ? "0 4px 10px rgba(156, 163, 175, 0.5)"

@@ -6,13 +6,7 @@ from dotenv import load_dotenv
 
 from database.misconception_catalog import format_misconceptions_for_prompt
 
-FALLBACK_MODELS = [
-	"mistral-small-latest",
-	"open-mistral-nemo",
-	"open-mistral-7b",
-]
-
-MISTRAL_API_URL = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _ENV_CANDIDATES = [
 	BACKEND_ROOT / ".env",
@@ -32,14 +26,7 @@ _load_env_files()
 
 def _get_api_key():
 	_load_env_files()
-	return os.getenv("MISTRAL_API_KEY", "").strip()
-
-
-def _candidate_models():
-	configured = os.getenv("MISTRAL_MODEL", "").strip()
-	if configured:
-		return [configured, *[m for m in FALLBACK_MODELS if m != configured]]
-	return FALLBACK_MODELS
+	return os.getenv("GEMINI_API_KEY", "").strip()
 
 
 def _friendly_error_message(exc):
@@ -47,25 +34,78 @@ def _friendly_error_message(exc):
 	if "429" in text or "quota" in text or "rate" in text:
 		return "LLM quota exceeded. Please wait and retry, or disable USE_LLM to use built-in feedback."
 	if "api key" in text or "credential" in text or "permission" in text or "unauth" in text or "401" in text:
-		return "LLM authentication failed. Check MISTRAL_API_KEY and model access."
+		return "LLM authentication failed. Check GEMINI_API_KEY and model access."
 	return "LLM is temporarily unavailable. Using built-in feedback instead."
 
 
-def _post_chat_completion(api_key, payload):
+def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=0.3):
+	url = f"{API_URL}?key={api_key}"
+	payload = {
+		"contents": [
+			{
+				"role": "user",
+				"parts": [{"text": user_prompt}]
+			}
+		],
+		"generationConfig": {
+			"temperature": temperature,
+			"maxOutputTokens": 600,
+			"responseMimeType": "application/json"
+		}
+	}
+	if system_instruction:
+		payload["systemInstruction"] = {
+			"parts": [{"text": system_instruction}]
+		}
+	
 	body = json.dumps(payload).encode("utf-8")
 	req = request.Request(
-		MISTRAL_API_URL,
+		url,
 		data=body,
 		headers={
-			"Authorization": f"Bearer {api_key}",
-			"Content-Type": "application/json",
-			"Accept": "application/json",
+			"Content-Type": "application/json"
 		},
 		method="POST",
 	)
 
-	with request.urlopen(req, timeout=30) as resp:
-		return json.loads(resp.read().decode("utf-8"))
+	try:
+		with request.urlopen(req, timeout=20) as resp:
+			res = json.loads(resp.read().decode("utf-8"))
+			try:
+				return res["candidates"][0]["content"]["parts"][0]["text"]
+			except (KeyError, IndexError):
+				return ""
+	except Exception as e:
+		mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
+		if not mistral_key:
+			return ""
+		
+		mistral_url = "https://api.mistral.ai/v1/chat/completions"
+		mistral_payload = {
+			"model": "mistral-small-latest",
+			"messages": [
+				{"role": "system", "content": system_instruction},
+				{"role": "user", "content": user_prompt}
+			],
+			"temperature": temperature,
+			"max_tokens": 600,
+			"response_format": {"type": "json_object"}
+		}
+		m_req = request.Request(
+			mistral_url,
+			data=json.dumps(mistral_payload).encode("utf-8"),
+			headers={
+				"Authorization": f"Bearer {mistral_key}",
+				"Content-Type": "application/json"
+			},
+			method="POST",
+		)
+		try:
+			with request.urlopen(m_req, timeout=20) as m_resp:
+				m_res = json.loads(m_resp.read().decode("utf-8"))
+				return m_res["choices"][0]["message"]["content"]
+		except Exception:
+			return ""
 
 
 def _extract_json(raw):
@@ -98,7 +138,7 @@ def generate_reasoning(misconception_tag, topic, question_text=None, student_ans
 
 	if not api_key:
 		return {
-			"reason": "LLM is not configured. Set MISTRAL_API_KEY to enable explanations.",
+			"reason": "LLM is not configured. Set GEMINI_API_KEY to enable explanations.",
 			"focus_area": "N/A",
 		}
 
@@ -117,57 +157,33 @@ A student made a mistake in {topic}.
 
 {context}
 
-Explain why the student's answer is incorrect and what the correct concept is. Keep explanation clear and concise in 2-3 sentences.
+Explain why the student's answer is incorrect and what the correct concept is. Keep explanation clear and concise in 2-3 sentences. Do not use raw markdown bolding in explanation.
 Also suggest which part of the diagram should be highlighted for learning.
 
 Output JSON only with keys: reason, focus_area.
 """.strip()
 
-	response_payload = None
-	last_exc = None
-	for model_name in _candidate_models():
-		try:
-			response_payload = _post_chat_completion(
-				api_key,
-				{
-					"model": model_name,
-					"temperature": 0.3,
-					"messages": [
-						{
-							"role": "system",
-							"content": "You are a teaching assistant. Return JSON only with keys reason and focus_area.",
-						},
-						{"role": "user", "content": prompt},
-					],
-				},
-			)
-			break
-		except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
-			last_exc = exc
-
-	if response_payload is None:
+	try:
+		raw = _post_chat_completion(
+			api_key,
+			"You are a teaching assistant. Return JSON only with keys reason and focus_area.",
+			prompt,
+			temperature=0.3
+		)
+		parsed = _extract_json(raw)
+		if not parsed:
+			return {
+				"reason": "Model returned non-JSON output.",
+				"focus_area": "N/A",
+			}
+		reason = str(parsed.get("reason", "")).strip() or "Reason unavailable"
+		focus_area = str(parsed.get("focus_area", "N/A")).strip() or "N/A"
+		return {"reason": reason, "focus_area": focus_area}
+	except Exception as exc:
 		return {
-			"reason": _friendly_error_message(last_exc),
+			"reason": _friendly_error_message(exc),
 			"focus_area": "N/A",
 		}
-
-	choices = response_payload.get("choices") or []
-	raw = ""
-	if choices:
-		raw = ((choices[0].get("message") or {}).get("content") or "").strip()
-	if not raw:
-		raw = json.dumps(response_payload)
-
-	parsed = _extract_json(raw)
-	if not parsed:
-		return {
-			"reason": "Model returned non-JSON output.",
-			"focus_area": "N/A",
-		}
-
-	reason = str(parsed.get("reason", "")).strip() or "Reason unavailable"
-	focus_area = str(parsed.get("focus_area", "N/A")).strip() or "N/A"
-	return {"reason": reason, "focus_area": focus_area}
 
 
 def classify_misconception_tag(topic, question_text, student_answer, correct_answer, allowed_tags=None):
@@ -216,41 +232,17 @@ Return STRICT JSON ONLY:
 {{"tag": "<chosen_tag>"}}
 """.strip()
 
-	response_payload = None
-	last_exc = None
-	for model_name in _candidate_models():
-		try:
-			response_payload = _post_chat_completion(
-				api_key,
-				{
-					"model": model_name,
-					"temperature": 0.1,
-					"messages": [
-						{
-							"role": "system",
-							"content": "You are a teaching assistant. Return JSON only with key 'tag'.",
-						},
-						{"role": "user", "content": prompt},
-					],
-				},
-			)
-			break
-		except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
-			last_exc = exc
-
-	if response_payload is None:
+	try:
+		raw = _post_chat_completion(
+			api_key,
+			"You are a teaching assistant. Return JSON only with key 'tag'.",
+			prompt,
+			temperature=0.1
+		)
+		parsed = _extract_json(raw) or {}
+		tag = str(parsed.get("tag", "")).strip()
+		if tag not in allowed_tags:
+			return None
+		return tag
+	except Exception:
 		return None
-
-	choices = response_payload.get("choices") or []
-	raw = ""
-	if choices:
-		raw = ((choices[0].get("message") or {}).get("content") or "").strip()
-	if not raw:
-		raw = json.dumps(response_payload)
-
-	parsed = _extract_json(raw) or {}
-	tag = str(parsed.get("tag", "")).strip()
-	if tag not in allowed_tags:
-		return None
-	return tag
-

@@ -47,11 +47,11 @@ def _default_misconception_tag(topic: str) -> str:
   topic_key = topic_key_for(topic)
 
   if topic_key == "laws_of_reflection":
-    return "angle_from_surface"
+    return "reflection_not_equal"
   if topic_key == "plane_mirror":
-    return "image_real_confusion"
+    return "plane_mirror_image_properties"
   if topic_key == "spherical_mirrors":
-    return "image_position_confusion"
+    return "concave_convex_confusion"
   if topic_key == "refraction":
     return "refraction_bending_normal"
 
@@ -66,6 +66,7 @@ def build_prompt(
   tutor_context=None,
   taught_concepts=None,
   untaught_concepts=None,
+  lesson_content=None,
 ):
     topic = topic.strip() if isinstance(topic, str) else "Laws of Reflection"
     difficulty = difficulty.strip().lower() if isinstance(difficulty, str) else "easy"
@@ -78,9 +79,10 @@ def build_prompt(
     untaught_concepts = [str(item).strip() for item in (untaught_concepts or []) if str(item).strip()]
 
     if requested_count is None:
-        count_rule = "Decide the number of questions yourself based on topic breadth and difficulty. Return only high-quality unique questions, usually between 2 and 10."
+        count_rule = "Generate EXACTLY 10 high-quality unique questions."
     else:
-        count_rule = f"Return up to {requested_count} questions. If the topic has limited high-quality question variety, return fewer questions instead of forcing low-quality/off-topic ones."
+        # Request a large batch of questions to ensure we survive strict untaught-concept filtering
+        count_rule = f"Generate EXACTLY 10 high-quality unique questions. DO NOT return fewer. We need a large pool to guarantee full misconception coverage."
 
     misconception_block = format_misconceptions_for_prompt(topic)
     taught_block = "\n".join(f"- {item}" for item in taught_concepts)
@@ -92,8 +94,10 @@ def build_prompt(
       coverage_rules += "- If multiple taught concepts are listed, distribute questions across them and cover each concept at least once when feasible.\n"
     if untaught_concepts:
       coverage_rules += f"\n- Concepts NOT taught in this video (forbidden):\n{untaught_block}\n"
-      coverage_rules += "- Never ask anything that depends on the forbidden list above.\n"
+      coverage_rules += "- CRITICAL: Never ask anything that mentions or depends on the forbidden concepts above. Do not use them in questions or options.\n"
+      coverage_rules += "- CRITICAL EXAMPLE: If 'complex image formation' or 'image formation' is forbidden, absolutely DO NOT ask questions like 'where will the image form if the object is placed at C' or 'what type of image is formed when the object is beyond F'.\n"
     coverage_text = coverage_rules or "\n- No explicit taught/untaught concept list was supplied."
+    lesson_text_block = f"\n- Lesson source content (strict basis for question content):\n{lesson_content}\n" if lesson_content else ""
 
     return f"""
 Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
@@ -101,12 +105,14 @@ Generate HIGHLY ACCURATE MCQs for the video topic: {topic}.
 Rules:
 - Follow this syllabus exactly:
 {syllabus_scope}
-- Questions must stay on the video topic and stay strictly within the syllabus scope.
+- Questions must stay on the video topic and stay strictly within the syllabus scope.{lesson_text_block}
+- Keep the questions strictly grounded in the provided Lesson source content if supplied. Do not ask details or principles not covered in the text, except that you may use simple real-world analogies (like a spoon to show convex/concave mirror curves) to verify understanding.
 - Difficulty level: {difficulty}.
 - Tutor context (for personalization): {tutor_context or "No prior learner profile available."}
 - Video coverage constraints:{coverage_text}
 - Allowed misconception tags for this topic:
 {misconception_block}
+- IMPORTANT: Ensure that the wrong option distractors across all generated questions collectively cover EVERY SINGLE allowed misconception tag listed above. Each of these allowed tags must appear in the 'misconception_map' of at least one question so that we can assess and demo every single misconception.
 - No conceptual errors.
 - Use only Class 10 NCERT physics level language.
 - Include common student misconceptions only when they are directly relevant to this topic.
@@ -126,11 +132,19 @@ Return STRICT JSON ONLY:
     "options": ["A","B","C","D"],
     "correct": 0,
     "type": "mcq",
+    "explanation": "A detailed, robust explanation of why the correct answer is right and why the other options are incorrect, specifically addressing the concepts in this question.",
     "misconception_map": {{
-      "1": "angle_from_surface"
+      "0": "first_law_reflection_angle",
+      "1": "normal_orientation_wrong"
     }}
   }}
 ]
+
+### Critical Misconception Map Rules
+1. The `misconception_map` MUST be a dictionary where the KEY is the string index of the incorrect option (e.g. "0", "1", "2") and the VALUE is the exact misconception tag string.
+2. DO NOT reverse the key and value.
+3. Strongly prefer using specific tags like `normal_orientation_wrong` or `plane_not_same` over `general_concept_gap`. Only use `general_concept_gap` if absolutely no other tag applies.
+4. IMPORTANT: Every VALUE in the `misconception_map` MUST EXACTLY match one of the tags from the "Allowed misconception tags" list. Do not invent or hallucinate new tags.
 """
 
 
@@ -292,14 +306,48 @@ def _contains_untaught_concept(question, untaught_concepts):
 
   question_text = str(question.get("question_text") or "")
   options = question.get("options") or []
-  corpus = f"{question_text} {' '.join(str(opt) for opt in options)}"
+  corpus = f"{question_text} {' '.join(str(opt) for opt in options)}".lower()
   normalized_corpus = _normalize_text(corpus)
 
   for concept in concepts:
     normalized_concept = _normalize_text(concept)
     if not normalized_concept:
       continue
+    # 1. Strict exact match
     if normalized_concept in normalized_corpus:
+      return True
+
+  # 2. Heuristic phrase blocking for notorious "bleeding" concepts
+  concept_text_lower = " ".join(concepts).lower()
+  
+  if "image formation" in concept_text_lower:
+    bad_phrases = [
+      "object is placed",
+      "where should the object",
+      "real image when the object",
+      "virtual image when the object",
+      "beyond c",
+      "between c and f",
+      "between f and p",
+      "at c",
+      "at infinity",
+      "position of the image",
+      "nature of the image",
+      "image is formed at",
+      "where will the image"
+    ]
+    if any(phrase in corpus for phrase in bad_phrases):
+      return True
+      
+  if "formula" in concept_text_lower or "magnification" in concept_text_lower:
+    bad_phrases = [
+      "1/v", "1/u", "1/f", 
+      "magnification is", "m =", "m=", 
+      "height of the image", "height of the object", 
+      "size of the image", "distance of the image",
+      "distance of the object", "cm away"
+    ]
+    if any(phrase in corpus for phrase in bad_phrases):
       return True
 
   return False
@@ -500,6 +548,7 @@ def generate_questions(
   tutor_context=None,
   taught_concepts=None,
   untaught_concepts=None,
+  lesson_content=None,
 ):
   prompt = build_prompt(
     topic,
@@ -509,6 +558,7 @@ def generate_questions(
     tutor_context=tutor_context,
     taught_concepts=taught_concepts,
     untaught_concepts=untaught_concepts,
+    lesson_content=lesson_content,
   )
 
   try:
@@ -550,10 +600,7 @@ def generate_questions(
         continue
       if _has_equivalent_answer_choices(q, topic):
         continue
-      if not _is_taught_scope_aligned(q, taught_concepts):
-        continue
-      if _contains_untaught_concept(q, untaught_concepts):
-        continue
+
 
       if not isinstance(q.get("misconception_map"), dict):
         mis_map = {}
@@ -565,10 +612,12 @@ def generate_questions(
       else:
         sanitized_map = {}
         for key, value in q["misconception_map"].items():
+          if not str(key).isdigit() or int(key) >= len(options):
+            continue
           coerced = coerce_misconception_tag(value, topic)
           if coerced in allowed_tags or coerced == "general_concept_gap":
             sanitized_map[str(key)] = coerced
-        if sanitized_map:
+        if sanitized_map and len(sanitized_map) > 0:
           q["misconception_map"] = sanitized_map
         else:
           mis_map = {}
@@ -583,15 +632,19 @@ def generate_questions(
       if not q.get("topic"):
         q["topic"] = topic
 
+      if _contains_untaught_concept(q, untaught_concepts):
+        continue
+
       _shuffle_question_options(q)
       validated_questions.append(q)
 
     max_count = _resolve_max_count(question_count)
-    return _select_questions_covering_taught_concepts(
-      validated_questions,
-      taught_concepts=taught_concepts,
-      max_count=max_count,
-    )
+    if taught_concepts:
+      validated_questions = _select_questions_covering_taught_concepts(
+        validated_questions, taught_concepts, max_count
+      )
+
+    return validated_questions[:max_count]
 
   except RuntimeError:
     raise
@@ -613,10 +666,7 @@ def generate_questions(
           continue
         if _has_equivalent_answer_choices(q, topic):
           continue
-        if not _is_taught_scope_aligned(q, taught_concepts):
-          continue
-        if _contains_untaught_concept(q, untaught_concepts):
-          continue
+
 
         if not isinstance(q.get("misconception_map"), dict):
           mis_map = {}
@@ -644,14 +694,18 @@ def generate_questions(
         if not q.get("topic"):
           q["topic"] = topic
 
+        if _contains_untaught_concept(q, untaught_concepts):
+          continue
+
         _shuffle_question_options(q)
         validated_fallback_questions.append(q)
 
       max_count = _resolve_max_count(question_count)
-      return _select_questions_covering_taught_concepts(
-        validated_fallback_questions,
-        taught_concepts=taught_concepts,
-        max_count=max_count,
-      )
+      if taught_concepts:
+        validated_fallback_questions = _select_questions_covering_taught_concepts(
+          validated_fallback_questions, taught_concepts, max_count
+        )
+
+      return validated_fallback_questions[:max_count]
 
     raise RuntimeError("Failed to parse LLM question response") from e

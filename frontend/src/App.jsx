@@ -8,11 +8,23 @@ import PlaneMirrorBasicsAnimation from "./svg-engine/reflection/animations/Plane
 import SphericalMirrorDetailedAnimation from "./svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorDetailedAnimation";
 import Dashboard from "./components/dashboard/Dashboard";
 import { useSessionStore } from "./state/sessionStore";
+import Sandbox from "./Sandbox";
 
 function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("pmTell");
   const selectTopic = useSessionStore((s) => s.selectTopic);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Secret keybind: press backtick (`) to toggle Sandbox
+      if (e.key === '`') {
+         setView(v => v === 'sandbox' ? 'dashboard' : 'sandbox');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const stages = [
     "pmTell",
@@ -52,38 +64,47 @@ function App() {
             if (stage === "smTell" || stage === "smShow" || stage === "smQuiz") {
               return s === "smTell" || s === "smShow" || s === "smQuiz";
             }
-            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow";
+            // Hide all prior stages (including smQuiz) when in Laws of Reflection
+            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz";
           })
-          .map((s, i) => (
-          <div
-            key={s}
-            style={{
-              ...styles.stageStep,
-              backgroundColor:
-                stages.indexOf(s) === currentIndex
-                  ? "#2563EB"
-                  : stages.indexOf(s) < currentIndex
-                  ? "#BFDBFE"
-                  : "#E5E7EB",
-              color: stages.indexOf(s) === currentIndex ? "#FFFFFF" : "#374151",
-            }}
-          >
-            {{
-              pmTell: "1. Plane Basics",
-              pmShow: "2. Watch",
-              smTell: "1. Spherical Mirrors",
-              smShow: "2. Watch",
-              smQuiz: "3. Quiz",
-              tell1: "1. Reflection",
-              show1: "2. Watch",
-              try1: "3. Try",
-              tell2: "4. Reflection",
-              show2: "5. Watch",
-              try2: "6. Try",
-              test: "7. Quiz",
-            }[s]}
-          </div>
-        ))}
+          .map((s, i) => {
+            const isActive = stages.indexOf(s) === currentIndex;
+            const isCompleted = stages.indexOf(s) < currentIndex;
+            
+            return (
+              <div
+                key={s}
+                style={{
+                  ...styles.stageStep,
+                  background: isActive 
+                    ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" 
+                    : isCompleted ? "#EFF6FF" : "transparent",
+                  color: isActive ? "#FFFFFF" : isCompleted ? "#2563EB" : "#9CA3AF",
+                  border: isActive 
+                    ? "1px solid #2563EB" 
+                    : isCompleted ? "1px solid #DBEAFE" : "1px solid #E5E7EB",
+                  boxShadow: isActive ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                  transform: isActive ? "scale(1.05)" : "scale(1)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
+              >
+                {{
+                  pmTell: "1. Plane Basics",
+                  pmShow: "2. Watch",
+                  smTell: "1. Spherical Mirrors",
+                  smShow: "2. Watch",
+                  smQuiz: "3. Quiz",
+                  tell1: "1. 1st Law",
+                  show1: "2. Watch",
+                  try1: "3. Try",
+                  tell2: "4. 2nd Law",
+                  show2: "5. Watch",
+                  try2: "6. Try",
+                  test: "7. Quiz",
+                }[s]}
+              </div>
+            );
+          })}
       </div>
 
       {/* PLANE MIRROR BASICS - TELL */}
@@ -280,6 +301,10 @@ function App() {
     return <div style={styles.page}>{renderSession()}</div>;
   }
 
+  if (view === "sandbox") {
+    return <Sandbox />;
+  }
+
   return (
     <div style={styles.page}>
       <Dashboard
@@ -330,14 +355,27 @@ const styles = {
   },
   stageBar: {
     display: "flex",
-    gap: "8px",
-    marginBottom: "20px",
+    gap: "12px",
+    marginBottom: "32px",
+    padding: "12px",
+    background: "rgba(255, 255, 255, 0.4)",
+    backdropFilter: "blur(12px)",
+    borderRadius: "24px",
+    border: "1px solid rgba(255, 255, 255, 0.5)",
+    boxShadow: "0 8px 32px rgba(31, 38, 135, 0.05)",
+    justifyContent: "center",
+    flexWrap: "wrap",
   },
   stageStep: {
-    padding: "6px 14px",
-    borderRadius: "20px",
+    padding: "8px 18px",
+    borderRadius: "14px",
     fontSize: "13px",
-    fontWeight: 600,
+    fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "default",
+    userSelect: "none",
   },
   card: {
     background: "#FFFFFF",

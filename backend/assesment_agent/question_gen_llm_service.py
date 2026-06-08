@@ -16,25 +16,21 @@ _ENV_CANDIDATES = [
 def _load_env_files():
     for env_path in _ENV_CANDIDATES:
         if env_path.exists():
-            load_dotenv(dotenv_path=env_path, override=False)
+            load_dotenv(dotenv_path=env_path, override=True)
 
 
 _load_env_files()
 
-API_URL = "https://api.mistral.ai/v1/chat/completions"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
 
 def _get_api_key():
     # Reload env each request to pick up updates without relying on import-time values.
     _load_env_files()
-    return (
-        os.getenv("MISTRAL_API_KEY")
-        or os.getenv("MISTRAL_API_TOKEN")
-        or os.getenv("MISTRAL_KEY")
-    )
+    return os.getenv("GEMINI_API_KEY", "").strip()
 
 
 def _extract_topic(prompt: str) -> str:
-    match = re.search(r"video topic:\s*(.+?)\\.", prompt, flags=re.IGNORECASE | re.DOTALL)
+    match = re.search(r"video topic:\s*(.+?)\.", prompt, flags=re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip().lower()
     return "laws of reflection"
@@ -278,36 +274,78 @@ def _fallback_response(prompt):
     return json.dumps(questions)
 
 
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+
 def generate_text(prompt):
-    api_key = _get_api_key()
+    _load_env_files()
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-    if not api_key:
-        raise RuntimeError("Mistral API key is missing. Add it to backend/.env or backend/env")
+    if not gemini_key:
+        return _fallback_response(prompt)
 
+    url = f"{API_URL}?key={gemini_key}"
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 
     data = {
-        "model": "mistral-large-latest",  # 🔥 BEST available from Mistral API
-        "messages": [
-            {"role": "system", "content": "You are a physics teacher."},
-            {"role": "user", "content": prompt}
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}]
+            }
         ],
-        "temperature": 0.4,
-        "max_tokens": 800
+        "systemInstruction": {
+            "parts": [{"text": "You are an expert physics teacher. You must output perfectly formatted JSON. Do not include markdown blocks."}]
+        },
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 8192,
+            "responseMimeType": "application/json"
+        }
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, json=data, timeout=60)
+        response = requests.post(url, headers=headers, json=data, timeout=45)
         response.raise_for_status()
         result = response.json()
-        return result["choices"][0]["message"]["content"]
-    except requests.Timeout as exc:
-        raise RuntimeError("Mistral request timed out") from exc
-    except requests.HTTPError as exc:
-        status_code = exc.response.status_code if exc.response is not None else "unknown"
-        raise RuntimeError(f"Mistral API returned HTTP {status_code}") from exc
-    except Exception as exc:
-        raise RuntimeError("Mistral request failed") from exc
+        content = result["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # Ensure it parses as a list of questions if the LLM outputted just the array
+        content_stripped = content.strip()
+        if content_stripped.startswith("[") and content_stripped.endswith("]"):
+            content = f'{{"questions": {content}}}'
+        return content
+    except Exception as e:
+        print(f"Gemini API failed (possibly rate limited 429): {e}. Falling back to Mistral...")
+        
+        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
+        if not mistral_key:
+            return _fallback_response(prompt)
+            
+        mistral_url = "https://api.mistral.ai/v1/chat/completions"
+        mistral_headers = {
+            "Authorization": f"Bearer {mistral_key}",
+            "Content-Type": "application/json"
+        }
+        mistral_data = {
+            "model": "mistral-small-latest",
+            "messages": [
+                {"role": "system", "content": "You are a physics teacher. You must generate valid JSON only. Do not use markdown blocks."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.4,
+            "max_tokens": 8192,
+            "response_format": {"type": "json_object"}
+        }
+        try:
+            m_resp = requests.post(mistral_url, headers=mistral_headers, json=mistral_data, timeout=45)
+            m_resp.raise_for_status()
+            content = m_resp.json()["choices"][0]["message"]["content"]
+            content_stripped = content.strip()
+            if content_stripped.startswith("[") and content_stripped.endswith("]"):
+                content = f'{{"questions": {content}}}'
+            return content
+        except Exception as m_exc:
+            print(f"Mistral fallback also failed: {m_exc}")
+            return _fallback_response(prompt)

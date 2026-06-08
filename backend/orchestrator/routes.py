@@ -122,6 +122,7 @@ class GenerateQuestionsRequest(BaseModel):
     video_template: str | None = None
     taught_concepts: list[str] | None = None
     untaught_concepts: list[str] | None = None
+    lesson_content: str | None = None
 
 
 class GenerateMisconceptionQuizRequest(BaseModel):
@@ -206,6 +207,7 @@ def generate_questions_route(data: GenerateQuestionsRequest | None = None):
             tutor_context=payload.tutor_context,
             taught_concepts=taught_concepts,
             untaught_concepts=untaught_concepts,
+            lesson_content=payload.lesson_content,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -312,7 +314,8 @@ def submit_answers(data: SubmitAnswersRequest):
     student_id = data.student_id or "guest"
     topic = data.topic or "reflection_refraction"
     topic_key = topic_key_for(topic)
-    use_laws_reflection_llm = topic_key == "laws_of_reflection"
+    # Enable personalized LLM feedback for all core physics topics
+    use_llm_feedback = topic_key in {"laws_of_reflection", "spherical_mirrors", "refraction"}
 
     tags: list[str] = []
     wrong_entries: list[dict[str, Any]] = []
@@ -348,11 +351,25 @@ def submit_answers(data: SubmitAnswersRequest):
                 "no_concept",
                 "general_concept_gap",
             }:
+                selected_text = selected
+                correct_text = correct_ans
+                options = ans.get("options")
+                if options and isinstance(options, list):
+                    try:
+                        sel_idx = int(selected_raw)
+                        corr_idx = int(correct_raw)
+                        if 0 <= sel_idx < len(options):
+                            selected_text = str(options[sel_idx])
+                        if 0 <= corr_idx < len(options):
+                            correct_text = str(options[corr_idx])
+                    except (ValueError, TypeError):
+                        pass
+
                 auto_tag = _classify_misconception_tag(
                     topic or "Laws of Reflection",
                     question_text,
-                    selected,
-                    correct_ans,
+                    selected_text,
+                    correct_text,
                     allowed_tags=_allowed_misconceptions_for_topic(topic),
                 )
                 if isinstance(auto_tag, str) and auto_tag.strip():
@@ -365,6 +382,9 @@ def submit_answers(data: SubmitAnswersRequest):
                     "question_id": ans.get("question_id"),
                     "question_text": question_text,
                     "tag": tag,
+                    "selected": selected_raw,
+                    "correct": correct_raw,
+                    "options": ans.get("options"),
                 }
             )
 
@@ -383,19 +403,35 @@ def submit_answers(data: SubmitAnswersRequest):
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
     explanations_by_tag: dict[str, str] = {}
-    if use_laws_reflection_llm:
+    if use_llm_feedback:
         for entry in wrong_entries:
             tag = entry["tag"]
             if tag in explanations_by_tag:
                 continue
             try:
+                sel_opt = entry.get("selected")
+                corr_opt = entry.get("correct")
+                opts = entry.get("options")
+                sel_text = None
+                corr_text = None
+                if opts and isinstance(opts, list):
+                    try:
+                        sel_idx = int(sel_opt)
+                        corr_idx = int(corr_opt)
+                        if 0 <= sel_idx < len(opts):
+                            sel_text = str(opts[sel_idx])
+                        if 0 <= corr_idx < len(opts):
+                            corr_text = str(opts[corr_idx])
+                    except (ValueError, TypeError):
+                        pass
+
                 explanation_data = content_agent.generate(
                     subtopic=topic,
                     misconception_tag=tag,
                     attempt=2,
                     question_text=entry.get("question_text") or None,
-                    student_answer=None,
-                    correct_answer=None,
+                    student_answer=sel_text or (str(sel_opt) if sel_opt is not None else None),
+                    correct_answer=corr_text or (str(corr_opt) if corr_opt is not None else None),
                 )
                 explanations_by_tag[tag] = explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
             except Exception:
@@ -405,7 +441,7 @@ def submit_answers(data: SubmitAnswersRequest):
     visual_payload = None
     if main_misconception != "none":
         try:
-            if use_laws_reflection_llm:
+            if use_llm_feedback:
                 explanation = explanations_by_tag.get(main_misconception)
                 if not explanation:
                     explanation_data = content_agent.generate(
@@ -468,7 +504,7 @@ def submit_answers(data: SubmitAnswersRequest):
             or "general_concept_gap"
         )
         tag = coerce_misconception_tag(tag, topic)
-        reason_text = explanations_by_tag.get(tag) if use_laws_reflection_llm else _get_misconception_explanation(tag)
+        reason_text = explanations_by_tag.get(tag) if use_llm_feedback else _get_misconception_explanation(tag)
         if not reason_text:
             reason_text = _get_misconception_explanation(tag)
 
@@ -526,14 +562,17 @@ def misconception_reason(req: MisconceptionReasonRequest):
             "focus_area": "N/A",
         }
 
-    explanation = _get_misconception_explanation(req.misconception_tag)
-    if explanation:
-        return {
-            "reason": _trim_feedback(explanation),
-            "focus_area": req.misconception_tag,
-        }
-
     reasoning = generate_reasoning(req.misconception_tag, req.topic)
+    
+    # If the LLM failed (e.g. quota exceeded), use the DB fallback
+    if "quota exceeded" in reasoning.get("reason", "").lower() or "unauth" in reasoning.get("reason", "").lower() or "unavailable" in reasoning.get("reason", "").lower():
+        explanation = _get_misconception_explanation(req.misconception_tag)
+        if explanation:
+            return {
+                "reason": _trim_feedback(explanation),
+                "focus_area": req.misconception_tag,
+            }
+
     return {
         "reason": _trim_feedback(reasoning.get("reason", "Review the concept carefully.")),
         "focus_area": reasoning.get("focus_area", req.misconception_tag),

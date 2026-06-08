@@ -76,7 +76,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
   return (
     <AnimationPlayer
       duration={48000}
-      title="Watch: Reflection Rule"
+      title="2nd Law of Reflection"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
@@ -345,7 +345,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
                 <Label
                   x={210}
                   y={246}
-                  text="Reflection Rule:"
+                  text="2nd Law of Reflection:"
                   color="#1E40AF"
                   size={13}
                   anchor="middle"
@@ -388,7 +388,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
               <Label
                 x={210}
                 y={CY + 30}
-                text="Let's learn the reflection rule"
+                text="Let's learn the 2nd law of reflection"
                 color="#111827"
                 size={14}
                 anchor="middle"
@@ -520,17 +520,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
               </>
             )}
 
-            {step === 7 && (
-              <Label
-                x={210}
-                y={295}
-                text="This plane is perpendicular to the mirror surface"
-                color="#6B7280"
-                size={11}
-                anchor="middle"
-                italic={true}
-              />
-            )}
+            {/* The redundant text has been removed to prevent overlap */}
           </svg>
         );
       }}

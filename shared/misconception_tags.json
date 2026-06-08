@@ -47,5 +47,55 @@
     "explanation": "The incident ray, reflected ray and the normal at the point of incidence must all lie in the same plane. If you draw them in different planes, the second law of reflection is violated.",
     "focus_area": "Show the mirror, normal and both rays drawn together on a single flat surface to emphasize they are coplanar.",
     "topic": "Laws of reflection"
+  },
+  "concave_convex_confusion": {
+    "title": "Concave vs Convex Identification",
+    "explanation": "The reflecting surface of a concave mirror is curved inwards (like the inside of a spoon), while for a convex mirror, it is curved outwards (like the back of a spoon).",
+    "focus_area": "Differentiate between the reflecting side and the polished/shaded side for both types of mirrors."
+  },
+  "pole_confusion": {
+    "title": "Pole Location",
+    "explanation": "The pole (P) is the geometric center of the reflecting surface of a spherical mirror. It lies on the surface of the mirror, not inside or outside it.",
+    "focus_area": "Mark the exact midpoint of the mirror's aperture and label it as P."
+  },
+  "center_of_curvature_confusion": {
+    "title": "Center of Curvature Position",
+    "explanation": "The center of curvature (C) is the center of the hollow sphere of which the mirror is a part. It is not a part of the mirror surface itself.",
+    "focus_area": "Draw the full imaginary sphere from which the mirror is cut and mark its center C."
+  },
+  "radius_focal_relation_wrong": {
+    "title": "R and f Relation Error",
+    "explanation": "For spherical mirrors of small aperture, the radius of curvature is found to be equal to twice the focal length (R = 2f).",
+    "focus_area": "Show the distance CP (Radius R) and the distance FP (Focal length f) and explain that f = R/2."
+  },
+  "principal_axis_confusion": {
+    "title": "Principal Axis",
+    "explanation": "The principal axis is a straight line passing through the pole and the center of curvature of a spherical mirror. It is normal to the mirror at its pole.",
+    "focus_area": "Draw a long straight line passing through both P and C to represent the principal axis."
+  },
+  "focus_definition_wrong": {
+    "title": "Principal Focus",
+    "explanation": "For a concave mirror, rays parallel to the principal axis actually meet at a point called the principal focus (F). For a convex mirror, they appear to diverge from it.",
+    "focus_area": "Show parallel rays converging to F for concave, and appearing to come from F behind the mirror for convex."
+  },
+  "image_position_wrong": {
+    "title": "Incorrect Image Position",
+    "explanation": "The position of the image depends strictly on the position of the object relative to P, F, and C. Using the mirror formula or standard ray tracing reveals the exact location.",
+    "focus_area": "Show the correct ray tracing intersection for the given object position to prove where the image must form."
+  },
+  "image_size_wrong": {
+    "title": "Incorrect Image Size",
+    "explanation": "The size of the image (magnified or diminished) depends on where the object is placed. For example, an object beyond C forms a diminished image, while an object between C and F forms an enlarged one.",
+    "focus_area": "Compare the height of the object arrow to the height of the image arrow formed by the intersecting rays."
+  },
+  "image_nature_wrong": {
+    "title": "Real vs Virtual Confusion",
+    "explanation": "A real image forms when reflected rays actually intersect in front of the mirror. A virtual image forms when rays diverge and only appear to intersect behind the mirror.",
+    "focus_area": "Highlight whether the actual solid rays meet (real) or if dashed, extended rays meet behind the mirror (virtual)."
+  },
+  "ray_tracing_rule_violation": {
+    "title": "Incorrect Ray Tracing",
+    "explanation": "There are strict rules for ray tracing: a ray parallel to the principal axis reflects through the focus; a ray through the focus reflects parallel; a ray through the center of curvature reflects back along its path.",
+    "focus_area": "Draw one standard ray correctly and emphasize the rule it follows upon hitting the mirror."
   }
 }

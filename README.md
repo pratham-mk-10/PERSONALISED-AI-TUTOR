@@ -55,6 +55,23 @@ This ensures:
 
 ---
 
+## 📐 Architectural Decisions & Engineering Philosophy
+
+To build a production-grade educational tool, we had to make critical engineering decisions regarding where to use AI and where to use deterministic code.
+
+### 1. The "Hybrid" SVG Architecture vs. Zero-Shot Generation
+Initially, we attempted to use the Gemini LLM to dynamically generate raw SVG React components at runtime based on student errors. 
+
+**The Problem:** We discovered that while LLMs excel at semantic logic (understanding *why* a student is wrong), they fundamentally lack reliable spatial reasoning. Zero-shot generation resulted in "spherical aberration" (rays missing the focal point by a few pixels), overlapping text boxes, and mathematically incorrect mirror curves.
+
+**The Hybrid Solution:** We abandoned raw LLM code generation and built a **Deterministic Physics Engine** in React. 
+- **Frontend (The Engine):** We hand-coded mathematically perfect, strictly-timed SVG animations using exact algebraic paraxial intersection math and Bezier curves. This guarantees 100% physical accuracy for every lesson.
+- **Backend (The Cognitive Layer):** The LLM is restricted to its core strength. When a student makes a mistake, the LLM outputs a strict JSON object containing a pedagogical explanation and the exact `(x1, y1)` coordinates of the student's error. The frontend engine then cleanly overlays this data on top of the perfect baseline.
+
+*Why Interviewers Should Care:* This demonstrates an understanding of the **limitations of Generative AI** and the ability to design system architectures that mitigate those weaknesses using traditional, robust engineering patterns.
+
+---
+
 ## 🗂️ Folder Structure
 
 ```

@@ -1,8 +1,41 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from database.connection import get_connection
+
+TAG_TO_TOPIC_KEY = {
+    "general_concept_gap": "general",
+    "first_law_reflection_angle": "laws_of_reflection",
+    "second_law_reflection_plane": "laws_of_reflection",
+    "plane_mirror_image_properties": "plane_mirror",
+    "refraction_bending_normal": "refraction",
+    "angle_from_surface": "laws_of_reflection",
+    "reflection_not_equal": "laws_of_reflection",
+    "normal_orientation_wrong": "laws_of_reflection",
+    "plane_not_same": "laws_of_reflection",
+    "concave_convex_confusion": "spherical_mirrors",
+    "pole_confusion": "spherical_mirrors",
+    "center_of_curvature_confusion": "spherical_mirrors",
+    "radius_focal_relation_wrong": "spherical_mirrors",
+    "principal_axis_confusion": "spherical_mirrors",
+    "focus_definition_wrong": "spherical_mirrors",
+}
+
+
+def _load_local_misconceptions_json():
+    try:
+        json_path = Path(__file__).resolve().parents[2] / "shared" / "misconception_tags.json"
+        if not json_path.exists():
+            json_path = Path(__file__).resolve().parents[1] / "shared" / "misconception_tags.json"
+        if json_path.exists():
+            with open(json_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print("Error loading local misconceptions JSON:", e)
+    return {}
 
 
 def _normalize_text(value: Any) -> str:
@@ -28,8 +61,36 @@ def topic_key_for(topic: str | None) -> str:
     return "general"
 
 
-def get_topic_misconceptions(topic: str | None, include_general: bool = True, source: str = "db") -> list[dict[str, Any]]:
+def get_topic_misconceptions(topic: str | None, include_general: bool = True, source: str = "json") -> list[dict[str, Any]]:
     topic_key = topic_key_for(topic)
+
+    # ALWAYS prefer local JSON file to ensure robust, uncorrupted tags and explanations
+    local_data = _load_local_misconceptions_json()
+    if local_data:
+        results = []
+        for tag, details in local_data.items():
+            t_key = TAG_TO_TOPIC_KEY.get(tag)
+            if not t_key:
+                t_key = "general"
+                if "refraction" in tag or "lens" in tag:
+                    t_key = "refraction"
+                elif "mirror" in tag or "convex" in tag or "concave" in tag:
+                    t_key = "spherical_mirrors"
+                elif "reflection" in tag or "angle" in tag:
+                    t_key = "laws_of_reflection"
+            
+            if t_key == topic_key or (include_general and t_key == "general"):
+                results.append({
+                    "topic_key": t_key,
+                    "tag": tag,
+                    "title": details.get("title", tag.replace("_", " ").title()),
+                    "explanation": details.get("explanation", ""),
+                    "focus_area": details.get("focus_area", ""),
+                    "sort_order": 0,
+                })
+        
+        if results:
+            return results
 
     try:
         conn = get_connection()
@@ -45,6 +106,8 @@ def get_topic_misconceptions(topic: str | None, include_general: bool = True, so
         )
         rows = cur.fetchall()
         conn.close()
+        if not rows:
+            return []
         return [
             {
                 "topic_key": row[0],
@@ -57,7 +120,29 @@ def get_topic_misconceptions(topic: str | None, include_general: bool = True, so
             for row in rows
         ]
     except Exception:
-        return []
+        local_data = _load_local_misconceptions_json()
+        results = []
+        for tag, details in local_data.items():
+            t_key = TAG_TO_TOPIC_KEY.get(tag)
+            if not t_key:
+                t_key = "general"
+                if "refraction" in tag or "lens" in tag:
+                    t_key = "refraction"
+                elif "mirror" in tag or "convex" in tag or "concave" in tag:
+                    t_key = "spherical_mirrors"
+                elif "reflection" in tag or "angle" in tag:
+                    t_key = "laws_of_reflection"
+            
+            if t_key == topic_key or (include_general and t_key == "general"):
+                results.append({
+                    "topic_key": t_key,
+                    "tag": tag,
+                    "title": details.get("title", tag.replace("_", " ").title()),
+                    "explanation": details.get("explanation", ""),
+                    "focus_area": details.get("focus_area", ""),
+                    "sort_order": 0,
+                })
+        return results
 
 
 def get_allowed_misconception_tags(topic: str | None, include_general: bool = True) -> list[str]:
@@ -71,6 +156,28 @@ def get_misconception_metadata(tag: str | None) -> dict[str, Any] | None:
     normalized = str(tag).strip()
     if not normalized:
         return None
+
+    # ALWAYS prefer local JSON file to ensure robust, uncorrupted fallback text
+    local_data = _load_local_misconceptions_json()
+    if normalized in local_data:
+        details = local_data[normalized]
+        t_key = TAG_TO_TOPIC_KEY.get(normalized)
+        if not t_key:
+            t_key = "general"
+            if "refraction" in normalized or "lens" in normalized:
+                t_key = "refraction"
+            elif "mirror" in normalized or "convex" in normalized or "concave" in normalized:
+                t_key = "spherical_mirrors"
+            elif "reflection" in normalized or "angle" in normalized:
+                t_key = "laws_of_reflection"
+        return {
+            "topic_key": t_key,
+            "tag": normalized,
+            "title": details.get("title", normalized.replace("_", " ").title()),
+            "explanation": details.get("explanation", ""),
+            "focus_area": details.get("focus_area", ""),
+            "sort_order": 0,
+        }
 
     try:
         conn = get_connection()
@@ -107,9 +214,7 @@ def coerce_misconception_tag(tag: str | None, topic: str | None = None, fallback
 
     if candidate and candidate in allowed:
         return candidate
-    if fallback in allowed:
-        return fallback
-    return allowed[0] if allowed else fallback
+    return fallback
 
 
 def format_misconceptions_for_prompt(topic: str | None, include_general: bool = True) -> str:
