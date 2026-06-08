@@ -1,5 +1,6 @@
 import React from "react";
 import AnimationPlayer from "../../../../shared/AnimationPlayer";
+import { clamp, lerp } from "../../../../shared/PhysicsEngine";
 
 const SVG_W = 760;
 const SVG_H = 400; // Increased height to prevent overlap

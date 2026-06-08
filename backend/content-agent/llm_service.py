@@ -159,6 +159,11 @@ class ContentAgentLLMService:
         return explanation
 
     def _call_llm(self, prompt: str) -> str:
+        _load_env_files()
+        use_llm = os.getenv("USE_LLM", "false").lower() in {"1", "true", "yes"}
+        if not use_llm:
+            return ""
+
         api_key = _get_api_key()
         if not api_key:
             return ""

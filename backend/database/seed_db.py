@@ -1,7 +1,14 @@
+from pathlib import Path
+import json
+
 try:
 	from database.connection import get_connection
 except ImportError:
 	from backend.database.connection import get_connection
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SHARED_TAGS_FILE = ROOT / "shared" / "misconception_tags.json"
 
 
 def ensure_schema(cur):

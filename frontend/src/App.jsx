@@ -165,7 +165,7 @@ function App() {
         <div style={styles.cardWide}>
           <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smQuiz")} />
           <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
-            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz") }>
+            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz")}>
               Go to spherical mirror quiz →
             </button>
           </div>
@@ -179,10 +179,10 @@ function App() {
         </div>
       )}
 
-      {/* TELL 1 - REFLECTION */}
+      {/* TELL 1 - 1st LAW */}
       {stage === "tell1" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Reflection Lesson</h2>
+          <h2 style={styles.h2}>1st Law of Reflection</h2>
 
           <p style={styles.explanation}>
             When a ray of light hits a mirror, it bounces back. This is called
@@ -222,7 +222,7 @@ function App() {
       {/* TRY 1 - REFLECTION */}
       {stage === "try1" && (
         <div style={styles.card}>
-          <FirstLawPlaneInteractive attempt={1} misconceptionTag="" onInteracted={() => {}} />
+          <FirstLawPlaneInteractive attempt={1} misconceptionTag="" onInteracted={() => { }} />
 
           <button
             style={{ ...styles.btnPrimary, marginTop: "16px" }}
@@ -233,10 +233,10 @@ function App() {
         </div>
       )}
 
-      {/* TELL 2 - REFLECTION */}
+      {/* TELL 2 - 2nd LAW */}
       {stage === "tell2" && (
         <div style={styles.card}>
-          <h2 style={styles.h2}>Reflection Lesson</h2>
+          <h2 style={styles.h2}>2nd Law of Reflection</h2>
 
           <p style={styles.explanation}>
             The incident ray, reflected ray, and the normal all lie in the
@@ -294,8 +294,8 @@ function App() {
           <QuizPage />
         </div>
       )}
-  </div>
-);
+    </div>
+  );
 
   if (view === "session") {
     return <div style={styles.page}>{renderSession()}</div>;
@@ -312,7 +312,7 @@ function App() {
           if (topicId === "plane-mirror") {
             setStage("pmTell");
           } else if (topicId === "spherical-mirror-basics") {
-              setStage("smTell");
+            setStage("smTell");
           } else if (topicId === "laws-reflection") {
             setStage("tell1");
           } else {

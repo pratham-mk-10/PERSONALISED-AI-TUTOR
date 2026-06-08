@@ -34,14 +34,14 @@ const convexHits = [
 ];
 
 const STEP_AUDIO_FILES = {
-  1: "/audio/spherical mirror 1.wav",
-  2: "/audio/spherical mirror 2.wav",
-  3: "/audio/spherical mirror 3.mp3",
-  4: "/audio/spherical mirror 4.mp3",
-  5: "/audio/spherical mirror 5.mp3",
-  6: "/audio/spherical mirror 6.mp3",
-  7: "/audio/spherical mirror 7.mp3",
-  8: "/audio/spherical mirror 8.mp3",
+  1: ["/audio/spherical mirror 1.wav", "/audio/spherical mirror 1.mp3"],
+  2: ["/audio/spherical mirror 2.wav", "/audio/spherical mirror 2.mp3"],
+  3: ["/audio/spherical mirror 3.mp3", "/audio/spherical mirror 3.wav"],
+  4: ["/audio/spherical mirror 4.mp3", "/audio/spherical mirror 4.wav"],
+  5: ["/audio/spherical mirror 5.mp3", "/audio/spherical mirror 5.wav"],
+  6: ["/audio/spherical mirror 6.mp3", "/audio/spherical mirror 6.wav"],
+  7: ["/audio/spherical mirror 7.mp3", "/audio/spherical mirror 7.wav"],
+  8: ["/audio/spherical mirror 8.mp3", "/audio/spherical mirror 8.wav"],
 };
 
 const STEP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -59,6 +59,8 @@ const DEFAULT_STEP_DURATIONS_MS = {
 
 const SUMMARY_DURATION_MS = 11000;
 const AUDIO_END_PADDING_MS = 450;
+
+const clamp01 = (n) => Math.max(0, Math.min(1, n));
 
 const normalizeBetween = (value, start, end) => {
   if (end <= start) return 0;
@@ -317,7 +319,7 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
 
     const audio = new Audio(audioFile);
     audioRef.current = audio;
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
   };
 
   useEffect(() => {
