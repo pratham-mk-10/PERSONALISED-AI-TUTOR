@@ -6,6 +6,8 @@ import SecondLawOfReflectionAnimation from "./svg-engine/reflection/animations/S
 import SecondLawPlaneInteractive from "./svg-engine/reflection/interactive/SecondLawPlaneInteractive";
 import PlaneMirrorBasicsAnimation from "./svg-engine/reflection/animations/PlaneMirrorBasicsAnimation";
 import SphericalMirrorDetailedAnimation from "./svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorDetailedAnimation";
+import RayTracingRulesLesson from "./svg-engine/reflection/spherical-mirrors/animations/RayTracingRulesLesson";
+import ImageFormationLesson from "./svg-engine/reflection/spherical-mirrors/animations/ImageFormationLesson";
 import Dashboard from "./components/dashboard/Dashboard";
 import { useSessionStore } from "./state/sessionStore";
 import Sandbox from "./Sandbox";
@@ -13,6 +15,7 @@ import Sandbox from "./Sandbox";
 function App() {
   const [view, setView] = useState("dashboard");
   const [stage, setStage] = useState("pmTell");
+  const [activeCaseId, setActiveCaseId] = useState("concave-infinity");
   const selectTopic = useSessionStore((s) => s.selectTopic);
 
   React.useEffect(() => {
@@ -32,6 +35,10 @@ function App() {
     "smTell",
     "smShow",
     "smQuiz",
+    "smRulesTell",
+    "smRulesShow",
+    "smFormationTell",
+    "smFormationShow",
     "tell1",
     "show1",
     "try1",
@@ -64,8 +71,11 @@ function App() {
             if (stage === "smTell" || stage === "smShow" || stage === "smQuiz") {
               return s === "smTell" || s === "smShow" || s === "smQuiz";
             }
-            // Hide all prior stages (including smQuiz) when in Laws of Reflection
-            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz";
+            if (stage === "smRulesTell" || stage === "smRulesShow" || stage === "smFormationTell" || stage === "smFormationShow") {
+              return s === "smRulesTell" || s === "smRulesShow" || s === "smFormationTell" || s === "smFormationShow";
+            }
+            // Hide all prior stages when in Laws of Reflection
+            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz" && s !== "smRulesTell" && s !== "smRulesShow" && s !== "smFormationTell" && s !== "smFormationShow";
           })
           .map((s, i) => {
             const isActive = stages.indexOf(s) === currentIndex;
@@ -94,6 +104,10 @@ function App() {
                   smTell: "1. Spherical Mirrors",
                   smShow: "2. Watch",
                   smQuiz: "3. Quiz",
+                  smRulesTell: "1. Rules",
+                  smRulesShow: "2. Watch",
+                  smFormationTell: "3. Image Formation",
+                  smFormationShow: "4. Watch",
                   tell1: "1. 1st Law",
                   show1: "2. Watch",
                   try1: "3. Try",
@@ -163,10 +177,91 @@ function App() {
       {/* SPHERICAL MIRROR BASICS - SHOW */}
       {stage === "smShow" && (
         <div style={styles.cardWide}>
-          <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smQuiz")} />
+          <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smRulesTell")} />
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
+            <button style={styles.btnPrimary} onClick={() => setStage("smRulesTell")}>
+              Continue to Ray Tracing Rules →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* RAY TRACING RULES - TELL */}
+      {stage === "smRulesTell" && (
+        <div style={styles.card}>
+          <h2 style={styles.h2}>Prerequisite: Ray Tracing Rules</h2>
+          <p style={styles.explanation}>
+            Before we can form images with spherical mirrors, we need to know how light rays behave.
+            There are 3 standard rules of ray tracing that you must master.
+          </p>
+          <button style={styles.btnPrimary} onClick={() => setStage("smRulesShow")}>
+            Watch the 3 Rules →
+          </button>
+        </div>
+      )}
+
+      {/* RAY TRACING RULES - SHOW */}
+      {stage === "smRulesShow" && (
+        <div style={styles.cardWide}>
+          <RayTracingRulesLesson onTryItClicked={() => setStage("smFormationTell")} />
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
+            <button style={styles.btnPrimary} onClick={() => setStage("smFormationTell")}>
+              Continue to Image Formation →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* IMAGE FORMATION - TELL */}
+      {stage === "smFormationTell" && (
+        <div style={styles.card}>
+          <h2 style={styles.h2}>Image Formation by Spherical Mirrors</h2>
+          <p style={styles.explanation}>
+            By combining the 3 rules you just learned, we can predict exactly where an image will form for any object!
+            There are 8 total cases (6 for Concave, 2 for Convex). Let's watch them in action.
+          </p>
+          <button style={styles.btnPrimary} onClick={() => setStage("smFormationShow")}>
+            Watch Image Formation →
+          </button>
+        </div>
+      )}
+
+      {/* IMAGE FORMATION - SHOW */}
+      {stage === "smFormationShow" && (
+        <div style={styles.cardWide}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px", gap: "10px", flexWrap: "wrap" }}>
+            {[
+              { id: "concave-infinity", label: "Concave: Obj At Infinity" },
+              { id: "concave-beyond-c", label: "Concave: Obj Beyond C" },
+              { id: "concave-at-c", label: "Concave: Obj At C" },
+              { id: "concave-between-c-and-f", label: "Concave: Obj Between C & F" },
+              { id: "concave-at-f", label: "Concave: Obj At F" },
+              { id: "concave-between-f-and-p", label: "Concave: Obj Between F & P" },
+              { id: "convex-infinity", label: "Convex: Obj At Infinity" },
+              { id: "convex-finite", label: "Convex: Obj Finite Distance" },
+            ].map(c => (
+              <button 
+                key={c.id} 
+                onClick={() => setActiveCaseId(c.id)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  border: `1px solid ${activeCaseId === c.id ? "#2563EB" : "#D1D5DB"}`,
+                  background: activeCaseId === c.id ? "#2563EB" : "#fff",
+                  color: activeCaseId === c.id ? "#fff" : "#111827",
+                  fontWeight: activeCaseId === c.id ? "600" : "500",
+                }}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <ImageFormationLesson caseId={activeCaseId} onTryItClicked={() => setStage("smQuiz")} />
           <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
             <button style={styles.btnPrimary} onClick={() => setStage("smQuiz")}>
-              Go to spherical mirror quiz →
+              Go to Spherical Mirror Quiz →
             </button>
           </div>
         </div>
@@ -313,6 +408,8 @@ function App() {
             setStage("pmTell");
           } else if (topicId === "spherical-mirror-basics") {
             setStage("smTell");
+          } else if (topicId === "spherical-mirror-image-formation") {
+            setStage("smRulesTell");
           } else if (topicId === "laws-reflection") {
             setStage("tell1");
           } else {

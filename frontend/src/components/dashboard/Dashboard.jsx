@@ -9,7 +9,8 @@ const CHAPTERS = [
 		topics: [
 			{ id: "plane-mirror", title: "Plane Mirror Basics" },
 			{ id: "spherical-mirror-basics", title: "Spherical Mirror Basics" },
-				{ id: "laws-reflection", title: "Laws of Reflection" },
+			{ id: "spherical-mirror-image-formation", title: "Image Formation by Spherical Mirrors" },
+			{ id: "laws-reflection", title: "Laws of Reflection" },
 			{ id: "refraction-intro", title: "Introduction to Refraction" },
 		],
 	},

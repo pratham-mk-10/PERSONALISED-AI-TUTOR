@@ -7,6 +7,16 @@ const SVG_W = 800;
 const SVG_H = 500;
 const AXIS_Y = 250;
 
+const generateHatchPath = (poleX) => {
+  let path = "";
+  for (let y = 60; y <= 430; y += 15) {
+    const t = (y - 50) / 400;
+    const curveX = Math.pow(1 - t, 2) * (poleX - 30) + 2 * t * (1 - t) * (poleX + 30) + Math.pow(t, 2) * (poleX - 30);
+    path += `M ${curveX.toFixed(1)} ${y} L ${(curveX + 12).toFixed(1)} ${y + 10} `;
+  }
+  return path;
+};
+
 // Geometry
 const MIRROR_X = 650;
 const RADIUS = 200;
@@ -154,7 +164,7 @@ const RayTracingRulesLesson = ({ onTryItClicked }) => {
               <PrincipalAxis startX={50} endX={750} y={AXIS_Y} />
               
               <path d="M 620 50 Q 680 250 620 450" fill="none" stroke="#333" strokeWidth="4" />
-              <path d="M 622 60 L 632 70 M 626 100 L 636 110 M 633 140 L 643 150 M 640 180 L 650 190 M 645 220 L 655 230 M 648 260 L 658 270 M 642 300 L 652 310 M 635 340 L 645 350 M 628 380 L 638 390 M 622 420 L 632 430" stroke="#888" strokeWidth="1" />
+              <path d={generateHatchPath(MIRROR_X)} stroke="#888" strokeWidth="1" />
               
               <circle cx={POLE.x} cy={POLE.y} r={4} fill="#DC2626" />
               <text x={POLE.x + 10} y={POLE.y - 10} fontSize="14" fontWeight="bold">P</text>

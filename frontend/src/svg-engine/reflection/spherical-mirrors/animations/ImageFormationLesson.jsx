@@ -7,6 +7,27 @@ import { getMirrorCaseData } from "./MirrorPhysicsEngine";
 const SVG_W = 800;
 const SVG_H = 500;
 
+const generateHatchPath = (poleX, mirrorType) => {
+  let path = "";
+  for (let y = 60; y <= 430; y += 15) {
+    const t = (y - 50) / 400;
+    // Bezier x(t) = (1-t)^2 x0 + 2t(1-t) x1 + t^2 x2
+    let x0, x1;
+    if (mirrorType === 'concave') {
+      x0 = poleX - 30;
+      x1 = poleX + 30;
+    } else {
+      x0 = poleX + 30;
+      x1 = poleX - 30;
+    }
+    const curveX = Math.pow(1 - t, 2) * x0 + 2 * t * (1 - t) * x1 + Math.pow(t, 2) * x0;
+    
+    // Hatch goes from curveX to curveX + 12 (always pointing right, indicating the non-reflective back)
+    path += `M ${curveX.toFixed(1)} ${y} L ${(curveX + 12).toFixed(1)} ${y + 10} `;
+  }
+  return path;
+};
+
 const ImageFormationLesson = ({ caseId = "concave-beyond-c", onTryItClicked }) => {
   const data = useMemo(() => getMirrorCaseData(caseId), [caseId]);
   
@@ -142,12 +163,12 @@ const DefinitionCard = ({ title, lines }) => {
               {mirrorType === 'concave' ? (
                 <>
                   <path d={`M ${poleX - 30} 50 Q ${poleX + 30} 250 ${poleX - 30} 450`} fill="none" stroke="#333" strokeWidth="4" />
-                  <path d={`M ${poleX - 28} 60 L ${poleX - 18} 70 M ${poleX - 24} 100 L ${poleX - 14} 110 M ${poleX - 17} 140 L ${poleX - 7} 150 M ${poleX - 10} 180 L ${poleX} 190 M ${poleX - 5} 220 L ${poleX + 5} 230 M ${poleX - 2} 260 L ${poleX + 8} 270 M ${poleX - 8} 300 L ${poleX + 2} 310 M ${poleX - 15} 340 L ${poleX - 5} 350 M ${poleX - 22} 380 L ${poleX - 12} 390 M ${poleX - 28} 420 L ${poleX - 18} 430`} stroke="#888" strokeWidth="1" />
+                  <path d={generateHatchPath(poleX, 'concave')} stroke="#888" strokeWidth="1" />
                 </>
               ) : (
                 <>
                   <path d={`M ${poleX + 30} 50 Q ${poleX - 30} 250 ${poleX + 30} 450`} fill="none" stroke="#333" strokeWidth="4" />
-                  <path d={`M ${poleX + 28} 60 L ${poleX + 18} 70 M ${poleX + 24} 100 L ${poleX + 14} 110 M ${poleX + 17} 140 L ${poleX + 7} 150 M ${poleX + 10} 180 L ${poleX} 190 M ${poleX + 5} 220 L ${poleX - 5} 230 M ${poleX + 2} 260 L ${poleX - 8} 270 M ${poleX + 8} 300 L ${poleX - 2} 310 M ${poleX + 15} 340 L ${poleX + 5} 350 M ${poleX + 22} 380 L ${poleX + 12} 390 M ${poleX + 28} 420 L ${poleX + 18} 430`} stroke="#888" strokeWidth="1" />
+                  <path d={generateHatchPath(poleX, 'convex')} stroke="#888" strokeWidth="1" />
                 </>
               )}
               
