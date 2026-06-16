@@ -261,3 +261,30 @@ def fetch_misconception_for_answer(question_id, selected_option):
     conn.close()
 
     return row[0] if row else None
+
+
+def fetch_descriptive_questions_by_topic(topic):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, topic, question_text, rubric_items, required_keywords
+        FROM descriptive_questions
+        WHERE topic = %s
+        """,
+        (topic,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": r[0],
+            "topic": r[1],
+            "question_text": r[2],
+            "rubric_items": r[3],
+            "required_keywords": r[4],
+        }
+        for r in rows
+    ]
+
