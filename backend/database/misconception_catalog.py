@@ -67,7 +67,7 @@ def topic_key_for(topic: str | None) -> str:
     return "general"
 
 
-def get_topic_misconceptions(topic: str | None, include_general: bool = True, source: str = "json") -> list[dict[str, Any]]:
+def topic_keys_for(topic: str | None) -> list[str]:
     topic_key = topic_key_for(topic)
     if topic_key == "reflection_of_light":
         return [
@@ -138,7 +138,7 @@ def get_topic_misconceptions(topic: str | None, include_general: bool = False, s
                 elif "reflection" in tag or "angle" in tag:
                     t_key = "laws_of_reflection"
             
-            if t_key == topic_key or (include_general and t_key == "general"):
+            if t_key in topic_keys or (include_general and t_key == "general"):
                 results.append({
                     "topic_key": t_key,
                     "tag": tag,
@@ -201,7 +201,7 @@ def get_topic_misconceptions(topic: str | None, include_general: bool = False, s
                 elif "reflection" in tag or "angle" in tag:
                     t_key = "laws_of_reflection"
             
-            if t_key == topic_key or (include_general and t_key == "general"):
+            if t_key in topic_keys or (include_general and t_key == "general"):
                 results.append({
                     "topic_key": t_key,
                     "tag": tag,
