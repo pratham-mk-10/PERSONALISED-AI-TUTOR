@@ -14,7 +14,9 @@ try:
         set_student_current_topic,
         update_student_level,
         update_student_topic_resolution,
+        get_descriptive_question,
     )
+    from database.queries import fetch_descriptive_questions_by_topic
     from database.connection import get_connection
     from database.misconception_catalog import (
         coerce_misconception_tag,
@@ -23,6 +25,7 @@ try:
         topic_key_for,
     )
     from assesment_agent.evaluator import Evaluator
+    from assesment_agent.descriptive_evaluator import DescriptiveEvaluator
     from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
 except ImportError:
     from backend.database.models import (
@@ -32,7 +35,9 @@ except ImportError:
         set_student_current_topic,
         update_student_level,
         update_student_topic_resolution,
+        get_descriptive_question,
     )
+    from backend.database.queries import fetch_descriptive_questions_by_topic
     from backend.database.connection import get_connection
     from backend.database.misconception_catalog import (
         coerce_misconception_tag,
@@ -41,7 +46,9 @@ except ImportError:
         topic_key_for,
     )
     from backend.assesment_agent.evaluator import Evaluator
+    from backend.assesment_agent.descriptive_evaluator import DescriptiveEvaluator
     from backend.assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
+
 
 
 def _load_module(module_name: str, file_path: Path):
@@ -98,6 +105,8 @@ def _allowed_misconceptions_for_topic(topic: str | None) -> list[str]:
 
 router = APIRouter()
 evaluator = Evaluator()
+descriptive_evaluator = DescriptiveEvaluator()
+
 _content_agent_module = _load_content_agent_class()
 ContentAgent = _content_agent_module.ContentAgent
 get_template_quiz_scope = getattr(_content_agent_module, "get_template_quiz_scope", lambda _template: {"taught_concepts": [], "untaught_concepts": []})
@@ -543,6 +552,86 @@ def evaluate_answer(req: EvaluationRequest):
         misconception_map=req.misconception_map,
         topic=req.topic,
     )
+
+
+class DescriptiveEvaluationRequest(BaseModel):
+    student_id: str
+    question_id: int
+    student_answer: str
+
+
+@router.get("/descriptive-questions/{topic}")
+def get_descriptive_questions_route(topic: str):
+    """Retrieve descriptive questions by topic."""
+    questions = fetch_descriptive_questions_by_topic(topic)
+    return {"questions": questions}
+
+
+@router.post("/eval/descriptive")
+def evaluate_descriptive_answer_route(req: DescriptiveEvaluationRequest):
+    """Evaluate a descriptive text answer using the v5.0 Unified LLM pipeline."""
+    # 1. Fetch descriptive question details
+    question = get_descriptive_question(req.question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Descriptive question not found")
+
+    # 2. Get allowed misconception tags for the topic
+    allowed_tags = get_allowed_misconception_tags(question["topic"])
+
+    # 3. Call descriptive evaluator
+    result = descriptive_evaluator.evaluate_answer(
+        student_id=req.student_id,
+        question_id=req.question_id,
+        question=question["question_text"],
+        student_answer=req.student_answer,
+        rubric_items=question["rubric_items"],
+        known_misconceptions=allowed_tags,
+        required_keywords=question["required_keywords"]
+    )
+
+    # 4. Extract scores and calculate weighted final score
+    scores = result.get("scores", {})
+    conceptual = scores.get("conceptual", 0)
+    completeness = scores.get("completeness", 0)
+    terminology = scores.get("terminology", 0)
+    
+    # Calculate weighted score (Conceptual * 0.6 + Completeness * 0.4)
+    weighted_score = (conceptual * 0.6) + (completeness * 0.4)
+
+    # 5. Log behavior event
+    tag = result.get("misconception_tag")
+    # Mark is_correct = True if conceptual score >= 8
+    is_correct = conceptual >= 8
+    
+    try:
+        log_student_behavior(
+            student_id=req.student_id,
+            topic=question["topic"],
+            selected_option="descriptive_response",
+            correct_option="n/a",
+            is_correct=is_correct,
+            misconception_tag=tag
+        )
+        
+        # 6. Update student level
+        level = "beginner"
+        if weighted_score >= 8.0:
+            level = "advanced"
+        elif weighted_score >= 5.0:
+            level = "intermediate"
+            
+        update_student_level(req.student_id, level)
+        set_student_current_topic(req.student_id, question["topic"])
+        update_student_topic_resolution(req.student_id, question["topic"], tag)
+    except Exception as exc:
+        print(f"Failed to update student profile / log behavior: {exc}")
+
+    return {
+        "evaluation": result,
+        "weighted_score": weighted_score,
+        "is_correct": is_correct
+    }
+
 
 
 @router.get("/student/{student_id}")

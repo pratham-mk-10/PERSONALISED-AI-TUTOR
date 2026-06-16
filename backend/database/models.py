@@ -247,3 +247,76 @@ def get_student_profile(student_id, limit=25):
 
 	return {"student": student, "behavior": behavior}
 
+
+def ensure_descriptive_tables():
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		CREATE TABLE IF NOT EXISTS descriptive_questions (
+			id SERIAL PRIMARY KEY,
+			topic TEXT NOT NULL,
+			question_text TEXT NOT NULL UNIQUE,
+			rubric_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+			required_keywords TEXT[] NOT NULL DEFAULT '{}'::text[]
+		);
+		"""
+	)
+	cur.execute(
+		"""
+		CREATE TABLE IF NOT EXISTS flagged_evaluations (
+			id SERIAL PRIMARY KEY,
+			student_id TEXT NOT NULL,
+			question_id INTEGER NOT NULL REFERENCES descriptive_questions(id) ON DELETE CASCADE,
+			student_answer TEXT NOT NULL,
+			raw_response TEXT,
+			error_message TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		"""
+	)
+	conn.commit()
+	conn.close()
+
+
+def get_descriptive_question(question_id):
+	ensure_descriptive_tables()
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		SELECT id, topic, question_text, rubric_items, required_keywords
+		FROM descriptive_questions
+		WHERE id = %s
+		""",
+		(question_id,),
+	)
+	row = cur.fetchone()
+	conn.close()
+
+	if row:
+		return {
+			"id": row[0],
+			"topic": row[1],
+			"question_text": row[2],
+			"rubric_items": row[3],
+			"required_keywords": row[4],
+		}
+	return None
+
+
+def log_flagged_evaluation(student_id, question_id, student_answer, raw_response, error_message):
+	ensure_descriptive_tables()
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		INSERT INTO flagged_evaluations (student_id, question_id, student_answer, raw_response, error_message)
+		VALUES (%s, %s, %s, %s, %s)
+		""",
+		(student_id, question_id, student_answer, raw_response, error_message),
+	)
+	conn.commit()
+	conn.close()
+
+
