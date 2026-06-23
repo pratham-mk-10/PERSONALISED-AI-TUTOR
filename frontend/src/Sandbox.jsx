@@ -6,6 +6,7 @@ import Case4AtF from "./sandbox-tests/Case_4_At_F";
 import Case5BetweenPF from "./sandbox-tests/Case_5_Between_P_and_F";
 import RayTracingRulesLesson from "./svg-engine/reflection/spherical-mirrors/animations/RayTracingRulesLesson";
 import ImageFormationLesson from "./svg-engine/reflection/spherical-mirrors/animations/ImageFormationLesson";
+import DynamicMirrorFeedback from "./components/quiz/DynamicMirrorFeedback";
 
 const Sandbox = () => {
   const smMisconceptions = [
@@ -37,6 +38,26 @@ const Sandbox = () => {
     <div style={{ padding: "20px", background: "#F3F4F6", minHeight: "100vh" }}>
       <h1 style={{ textAlign: "center", marginBottom: "20px", color: "#1F2937" }}>Animation Sandbox</h1>
       
+      <h2 style={{ textAlign: "center", marginTop: "20px", color: "#DC2626", fontWeight: "bold" }}>Dynamic Try Stage (Red/Green Overlay)</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "40px", alignItems: "center", marginBottom: "60px" }}>
+          <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            <DynamicMirrorFeedback 
+              mirrorType="concave" 
+              focalLength={100} 
+              initialObjectDistance={150} 
+              flawedModel={{ v: 50, hPrime: 30, isVirtual: true }} 
+            />
+          </div>
+          <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            <DynamicMirrorFeedback 
+              mirrorType="convex" 
+              focalLength={100} 
+              initialObjectDistance={150} 
+              flawedModel={{ v: -100, hPrime: -50, isVirtual: false }} 
+            />
+          </div>
+      </div>
+
       <h2 style={{ textAlign: "center", marginTop: "40px", color: "#2563EB" }}>Laws of Reflection Feedbacks</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "40px", alignItems: "center", marginBottom: "60px" }}>
         {reflMisconceptions.map(tag => (
