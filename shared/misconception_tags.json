@@ -35,53 +35,135 @@
     "topic": "Laws of reflection"
   },
   "concave_convex_confusion": {
+    "topic_key": "spherical_mirrors",
     "title": "Concave vs Convex Identification",
     "explanation": "The reflecting surface of a concave mirror is curved inwards (like the inside of a spoon), while for a convex mirror, it is curved outwards (like the back of a spoon).",
     "focus_area": "Differentiate between the reflecting side and the polished/shaded side for both types of mirrors."
   },
   "pole_confusion": {
+    "topic_key": "spherical_mirrors",
     "title": "Pole Location",
     "explanation": "The pole (P) is the geometric center of the reflecting surface of a spherical mirror. It lies on the surface of the mirror, not inside or outside it.",
     "focus_area": "Mark the exact midpoint of the mirror's aperture and label it as P."
   },
   "center_of_curvature_confusion": {
+    "topic_key": "spherical_mirrors",
     "title": "Center of Curvature Position",
     "explanation": "The center of curvature (C) is the center of the hollow sphere of which the mirror is a part. It is not a part of the mirror surface itself.",
     "focus_area": "Draw the full imaginary sphere from which the mirror is cut and mark its center C."
   },
   "radius_focal_relation_wrong": {
+    "topic_key": "spherical_mirrors",
     "title": "R and f Relation Error",
     "explanation": "For spherical mirrors of small aperture, the radius of curvature is found to be equal to twice the focal length (R = 2f).",
     "focus_area": "Show the distance CP (Radius R) and the distance FP (Focal length f) and explain that f = R/2."
   },
   "principal_axis_confusion": {
+    "topic_key": "spherical_mirrors",
     "title": "Principal Axis",
     "explanation": "The principal axis is a straight line passing through the pole and the center of curvature of a spherical mirror. It is normal to the mirror at its pole.",
     "focus_area": "Draw a long straight line passing through both P and C to represent the principal axis."
   },
   "focus_definition_wrong": {
+    "topic_key": "spherical_mirrors",
     "title": "Principal Focus",
     "explanation": "For a concave mirror, rays parallel to the principal axis actually meet at a point called the principal focus (F). For a convex mirror, they appear to diverge from it.",
     "focus_area": "Show parallel rays converging to F for concave, and appearing to come from F behind the mirror for convex."
   },
   "image_position_wrong": {
+    "topic_key": "spherical_mirrors",
     "title": "Incorrect Image Position",
     "explanation": "The position of the image depends strictly on the position of the object relative to P, F, and C. Using the mirror formula or standard ray tracing reveals the exact location.",
     "focus_area": "Show the correct ray tracing intersection for the given object position to prove where the image must form."
   },
   "image_size_wrong": {
+    "topic_key": "spherical_mirrors",
     "title": "Incorrect Image Size",
     "explanation": "The size of the image (magnified or diminished) depends on where the object is placed. For example, an object beyond C forms a diminished image, while an object between C and F forms an enlarged one.",
     "focus_area": "Compare the height of the object arrow to the height of the image arrow formed by the intersecting rays."
   },
   "image_nature_wrong": {
+    "topic_key": "spherical_mirrors",
     "title": "Real vs Virtual Confusion",
     "explanation": "A real image forms when reflected rays actually intersect in front of the mirror. A virtual image forms when rays diverge and only appear to intersect behind the mirror.",
     "focus_area": "Highlight whether the actual solid rays meet (real) or if dashed, extended rays meet behind the mirror (virtual)."
   },
   "ray_tracing_rule_violation": {
+    "topic_key": "spherical_mirrors",
     "title": "Incorrect Ray Tracing",
     "explanation": "There are strict rules for ray tracing: a ray parallel to the principal axis reflects through the focus; a ray through the focus reflects parallel; a ray through the center of curvature reflects back along its path.",
     "focus_area": "Draw one standard ray correctly and emphasize the rule it follows upon hitting the mirror."
+  },
+  "convex_real_image_myth": {
+    "topic_key": "spherical_mirrors",
+    "title": "Convex Real Image Myth",
+    "explanation": "Believing that a convex mirror can form a real image. Convex mirrors always diverge light and form virtual, erect, and diminished images behind the mirror.",
+    "focus_area": "Verify that reflected rays from a convex mirror always diverge."
+  },
+  "convex_size_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Convex Image Size Error",
+    "explanation": "Thinking a convex mirror can form a magnified or same-sized image. Images formed by convex mirrors are always diminished.",
+    "focus_area": "Observe the image size formed by a convex mirror."
+  },
+  "real_virtual_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Real vs Virtual Image confusion",
+    "explanation": "Mixing up the characteristics of real (always inverted, formed in front) and virtual (always erect, formed behind) images.",
+    "focus_area": "Differentiate between actual ray intersection and projection."
+  },
+  "image_position_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Image Position Mistake",
+    "explanation": "Incorrectly predicting where the image forms relative to P, F, and C for a given object distance.",
+    "focus_area": "Trace the standard rays to find the intersection point."
+  },
+  "image_size_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Image Size Mistake",
+    "explanation": "Mixing up the magnification of the image (diminished, magnified, same size) for different object positions.",
+    "focus_area": "Compare object and image heights."
+  },
+  "inverted_erect_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Inverted vs Erect Orientation",
+    "explanation": "Incorrectly predicting if the image is upright (erect) or upside-down (inverted).",
+    "focus_area": "Check the sign of the image height."
+  },
+  "focus_infinity_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "At Focus to Infinity Rule",
+    "explanation": "Not knowing that when an object is placed exactly at the focus (F) of a concave mirror, the reflected rays are parallel and the image is formed at infinity.",
+    "focus_area": "Draw parallel reflected rays."
+  },
+  "beyond_c_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Beyond C Placement Rule",
+    "explanation": "Incorrectly predicting that an object placed beyond C forms an image beyond C. It actually forms a diminished image between C and F.",
+    "focus_area": "Observe the intersection point for object beyond C."
+  },
+  "parallel_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Parallel Ray Rule Mistake",
+    "explanation": "Not knowing that a ray parallel to the principal axis reflects back through the principal focus.",
+    "focus_area": "Draw parallel incident ray reflecting through F."
+  },
+  "focus_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Focus Ray Rule Mistake",
+    "explanation": "Not knowing that a ray passing through the focus reflects parallel to the principal axis.",
+    "focus_area": "Draw incident ray through F reflecting parallel."
+  },
+  "center_ray_rule_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Center Ray Rule Mistake",
+    "explanation": "Not knowing that a ray passing through the center of curvature retraces its path back after reflection.",
+    "focus_area": "Draw ray through C retracing itself."
+  },
+  "sign_convention_confusion": {
+    "topic_key": "spherical_mirrors",
+    "title": "Sign Convention Error",
+    "explanation": "Confusing the sign of object distance (always negative), image distance, or focal length under Cartesian sign convention.",
+    "focus_area": "Measure distances from the pole."
   }
 }

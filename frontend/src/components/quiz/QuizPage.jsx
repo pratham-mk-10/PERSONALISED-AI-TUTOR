@@ -78,6 +78,68 @@ const TOPIC_CONTEXTS = {
       "sign convention",
       "complex image formation cases for different object positions",
       "numerical problems on spherical mirrors",
+      "plane mirrors",
+      "laws of reflection",
+      "rules of ray tracing",
+      "parallel ray reflecting through focus",
+      "focus ray reflecting parallel",
+      "centre of curvature ray retracing path",
+    ],
+  },
+  "spherical-mirror-rules": {
+    title: "Ray Tracing Rules of Spherical Mirrors",
+    videoTemplate: "SphericalMirrorBasicsWatch",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to the rules of ray tracing for spherical mirrors: a ray parallel to principal axis passing through focus, a ray passing through focus reflecting parallel, and a ray passing through centre of curvature retracing its path. Do NOT include mirror formula, magnification, detailed object placements, or sign convention.",
+    lessonFocus:
+      "Lesson video focus: the 3 main ray tracing rules for concave and convex mirrors.",
+    taughtConcepts: [
+      "rules of ray tracing for spherical mirrors",
+      "parallel ray reflecting through focus",
+      "focus ray reflecting parallel to principal axis",
+      "centre of curvature ray retracing its path",
+    ],
+    untaughtConcepts: [
+      "mirror formula",
+      "magnification formula",
+      "sign convention",
+      "complex image formation cases for different object positions",
+      "plane mirrors",
+      "laws of reflection",
+      "definition of spherical mirror",
+      "difference between concave and convex mirrors",
+      "pole, principal axis, centre of curvature",
+      "radius of curvature and focal length relation R=2f",
+      "everyday uses of concave and convex mirrors",
+    ],
+  },
+  "spherical-mirror-image-formation": {
+    title: "Image Formation by Spherical Mirrors",
+    videoTemplate: "SphericalMirrorBasicsWatch",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to image formation by concave and convex mirrors for different object positions, real vs virtual images, inverted vs erect images, and size characteristics. Do NOT include mirror formula, magnification calculations, sign convention, or advanced numericals.",
+    lessonFocus:
+      "Lesson video focus: ray tracing rules for image formation and the 6 concave + 2 convex mirror object placement positions.",
+    taughtConcepts: [
+      "rules of ray tracing for spherical mirrors",
+      "concave mirror image formation for different object positions",
+      "convex mirror image formation for different object positions",
+      "real and inverted images formed by concave mirrors",
+      "virtual and erect images formed by concave and convex mirrors",
+    ],
+    untaughtConcepts: [
+      "plane mirrors",
+      "laws of reflection",
+      "mirror formula",
+      "magnification formula",
+      "sign convention",
+      "refraction",
+      "lenses",
+      "definition of spherical mirror",
+      "difference between concave and convex mirrors",
+      "pole, principal axis, centre of curvature",
+      "radius of curvature and focal length relation R=2f",
+      "everyday uses of concave and convex mirrors",
     ],
   },
   "refraction-intro": {
@@ -556,11 +618,11 @@ const QuizPage = () => {
           />
         )}
 
-        <div style={{ marginTop: "18px", padding: "14px", border: "1px solid #dbe4ff", borderRadius: "10px", background: "#f6f9ff" }}>
-          <h3 style={{ marginTop: 0 }}>Personalized Feedback</h3>
-          <p style={{ marginBottom: "8px" }}>{renderFormattedText(report.reason)}</p>
-          <p style={{ margin: 0 }}>
-            <strong>Focus Area:</strong> {report.focusArea}
+        <div style={{ marginTop: "18px", padding: "20px", border: "1px solid rgba(255,255,255,0.02)", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)" }}>
+          <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Personalized Feedback</h3>
+          <p style={{ marginBottom: "12px", color: "#D1D5DB", lineHeight: 1.6 }}>{renderFormattedText(report.reason)}</p>
+          <p style={{ margin: 0, color: "#9CA3AF" }}>
+            <strong style={{ color: "#F8FAFC" }}>Focus Area:</strong> {report.focusArea}
           </p>
         </div>
 
@@ -571,9 +633,9 @@ const QuizPage = () => {
         )}
 
         {!!report.detailedResults?.length && (
-          <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
-            <h3 style={{ marginTop: 0 }}>Answer Review</h3>
-            <p style={{ marginTop: 0, color: "#4b5563" }}>
+          <div style={{ marginTop: "24px", padding: "24px", border: "1px solid rgba(255,255,255,0.02)", borderRadius: "16px", background: "rgba(15, 23, 42, 0.6)" }}>
+            <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Answer Review</h3>
+            <p style={{ marginTop: 0, color: "#9CA3AF", marginBottom: "24px" }}>
               Green = correct option, Red = your wrong selected option.
             </p>
 
@@ -586,57 +648,60 @@ const QuizPage = () => {
                   borderTop: idx === 0 ? "none" : "1px solid #eef2ff",
                 }}
               >
-                <p style={{ margin: "0 0 8px", fontWeight: 700 }}>
+                <p style={{ margin: "0 0 8px", color: "#60A5FA", fontWeight: 700 }}>
                   Question {item.index}
                 </p>
-                <p style={{ margin: "0 0 8px", color: "#111827" }}>{item.questionText}</p>
+                <p style={{ margin: "0 0 16px", color: "#F8FAFC", fontSize: "16px" }}>{item.questionText}</p>
 
-                <div style={{ display: "grid", gap: "6px" }}>
+                <div style={{ display: "grid", gap: "10px" }}>
                   {item.options.map((opt, optionIdx) => {
                     const isSelected = optionIdx === item.selectedIndex;
                     const isCorrectOption = optionIdx === item.correctIndex;
 
-                    let background = "#f9fafb";
-                    let border = "1px solid #e5e7eb";
-                    let color = "#111827";
+                    let background = "#1E293B";
+                    let border = "1px solid rgba(255,255,255,0.02)";
+                    let color = "#94A3B8";
 
                     if (isCorrectOption) {
-                      background = "#ecfdf3";
-                      border = "1px solid #86efac";
-                      color = "#166534";
+                      background = "rgba(16, 185, 129, 0.1)"; // emerald
+                      border = "1px solid #10B981";
+                      color = "#34D399";
                     }
 
                     if (isSelected && !isCorrectOption) {
-                      background = "#fef2f2";
-                      border = "1px solid #fca5a5";
-                      color = "#991b1b";
+                      background = "rgba(239, 68, 68, 0.1)"; // red
+                      border = "1px solid #EF4444";
+                      color = "#F87171";
                     }
 
                     return (
                       <div
                         key={`opt-${item.index}-${optionIdx}`}
                         style={{
-                          padding: "8px 10px",
-                          borderRadius: "8px",
+                          padding: "14px 16px",
+                          borderRadius: "10px",
                           border,
                           background,
                           color,
-                          fontWeight: isSelected || isCorrectOption ? 700 : 500,
+                          fontWeight: isSelected || isCorrectOption ? 600 : 400,
                         }}
                       >
+                        <span style={{ marginRight: "12px", opacity: 0.7, fontWeight: "bold" }}>
+                          {String.fromCharCode(65 + optionIdx)}.
+                        </span>
                         {opt}
-                        {isSelected ? " (Your answer)" : ""}
-                        {isCorrectOption ? " (Correct)" : ""}
+                        {isSelected && !isCorrectOption ? " ✗" : ""}
+                        {isCorrectOption ? " ✓" : ""}
                       </div>
                     );
                   })}
                 </div>
 
                 {!item.isCorrect && (
-                  <div style={{ marginTop: "8px" }}>
-                    <p style={{ margin: "0 0 8px", color: "#374151" }}>
-                      <strong>Why wrong:</strong> {renderFormattedText(item.reason)}
-                      {item.focusArea ? ` | Focus: ${item.focusArea}` : ""}
+                  <div style={{ marginTop: "16px" }}>
+                    <p style={{ margin: "0 0 12px", color: "#CBD5E1", lineHeight: 1.5 }}>
+                      <strong style={{ color: "#F8FAFC" }}>Why wrong:</strong> {renderFormattedText(item.reason)}
+                      {item.focusArea ? <span style={{ color: "#94A3B8" }}> | Focus: {item.focusArea}</span> : ""}
                     </p>
                     <button
                       onClick={() => {
@@ -669,6 +734,10 @@ const QuizPage = () => {
                         svgVariant={item.svgVariant || item.focusArea || report.mainMisconception}
                         misconceptionTag={item.focusArea || report.mainMisconception}
                         explanation={item.reason || report.misconceptionExplanation || report.reason}
+                        questionText={item.questionText}
+                        selectedOptionText={item.options[item.selectedIndex]}
+                        correctOptionText={item.options[item.correctIndex]}
+                        topicId={currentTopicId}
                       />
                     )}
                   </div>
@@ -679,14 +748,14 @@ const QuizPage = () => {
         )}
 
         {!!report.questionFeedback?.length && (
-          <div style={{ marginTop: "14px", padding: "14px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#ffffff" }}>
-            <h3 style={{ marginTop: 0 }}>Per-Question Feedback</h3>
+          <div style={{ marginTop: "24px", padding: "24px", border: "1px solid rgba(255,255,255,0.02)", borderRadius: "16px", background: "rgba(15, 23, 42, 0.6)" }}>
+            <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Per-Question Feedback</h3>
             {report.questionFeedback.map((item, idx) => (
-              <div key={`${item.question_id || "q"}-${idx}`} style={{ marginTop: idx === 0 ? 0 : "10px", paddingTop: idx === 0 ? 0 : "10px", borderTop: idx === 0 ? "none" : "1px solid #eef2ff" }}>
-                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Question {idx + 1}</p>
-                <p style={{ margin: "0 0 6px", color: "#111827" }}>{item.question_text}</p>
-                <p style={{ margin: "0 0 6px" }}>{renderFormattedText(item.reason)}</p>
-                <p style={{ margin: 0 }}><strong>Focus:</strong> {item.focus_area}</p>
+              <div key={`${item.question_id || "q"}-${idx}`} style={{ marginTop: idx === 0 ? 0 : "16px", paddingTop: idx === 0 ? 0 : "16px", borderTop: idx === 0 ? "none" : "1px solid rgba(255,255,255,0.02)" }}>
+                <p style={{ margin: "0 0 8px", color: "#60A5FA", fontWeight: 700 }}>Question {idx + 1}</p>
+                <p style={{ margin: "0 0 8px", color: "#F8FAFC" }}>{item.question_text}</p>
+                <p style={{ margin: "0 0 8px", color: "#CBD5E1" }}>{renderFormattedText(item.reason)}</p>
+                <p style={{ margin: 0, color: "#9CA3AF" }}><strong>Focus:</strong> {item.focus_area}</p>
               </div>
             ))}
           </div>
@@ -773,12 +842,14 @@ const QuizPage = () => {
           onClick={handlePrevious}
           disabled={currentIndex === 0}
           style={{
-            padding: "10px 16px",
+            padding: "12px 24px",
             cursor: currentIndex === 0 ? "not-allowed" : "pointer",
             borderRadius: "999px",
-            border: "1px solid #e5e7eb",
-            background: currentIndex === 0 ? "#f3f4f6" : "#ffffff",
+            border: "1px solid rgba(255,255,255,0.02)",
+            background: currentIndex === 0 ? "rgba(255,255,255,0.02)" : "rgba(30, 41, 59, 0.8)",
+            color: currentIndex === 0 ? "#6B7280" : "#F8FAFC",
             fontWeight: 600,
+            transition: "all 0.2s"
           }}
         >
           Previous
@@ -789,12 +860,15 @@ const QuizPage = () => {
             onClick={handleNext}
             disabled={selectedForCurrent === undefined}
             style={{
-              padding: "10px 16px",
+              padding: "12px 24px",
               cursor: selectedForCurrent === undefined ? "not-allowed" : "pointer",
               borderRadius: "999px",
-              border: "1px solid #e5e7eb",
-              background: selectedForCurrent === undefined ? "#f3f4f6" : "#eef2ff",
+              border: selectedForCurrent === undefined ? "1px solid rgba(255,255,255,0.02)" : "none",
+              background: selectedForCurrent === undefined ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+              color: selectedForCurrent === undefined ? "#6B7280" : "#FFFFFF",
               fontWeight: 600,
+              boxShadow: selectedForCurrent === undefined ? "none" : "0 4px 14px rgba(59, 130, 246, 0.3)",
+              transition: "all 0.2s"
             }}
           >
             Next

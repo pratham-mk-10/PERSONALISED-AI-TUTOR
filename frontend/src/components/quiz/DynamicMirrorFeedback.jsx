@@ -35,24 +35,146 @@ const DynamicMirrorFeedback = ({
     };
   }
 
+  // Mirror curve helper
+  const getMirrorX = (y) => {
+    const minY = poleY - 150;
+    const maxY = poleY + 150;
+    const clampedY = Math.max(minY, Math.min(maxY, y));
+    const t = (clampedY - minY) / 300;
+    
+    let x0, xc, x1;
+    if (mirrorType === 'concave') {
+      x0 = poleX - 20;
+      xc = poleX + 40;
+      x1 = poleX - 20;
+    } else {
+      x0 = poleX + 20;
+      xc = poleX - 40;
+      x1 = poleX + 20;
+    }
+    return (1 - t) * (1 - t) * x0 + 2 * t * (1 - t) * xc + t * t * x1;
+  };
+
   // Convert key logical points to SVG points using robust direct math
   const objTip = toSVG(-uDistance, objectHeight);
   const objBase = toSVG(-uDistance, 0);
-  const imgTip = toSVG(physics.properties.v, physics.properties.hPrime);
-  const imgBase = toSVG(physics.properties.v, 0);
+  
+  // Handle infinity case for image tip positioning safely
+  let imgTip = { x: 50, y: poleY };
+  let imgBase = { x: 50, y: poleY };
+  if (!physics.properties.isInfinity) {
+    imgTip = toSVG(physics.properties.v, physics.properties.hPrime);
+    imgBase = toSVG(physics.properties.v, 0);
+  }
   
   const F = toSVG(physics.focus.x, physics.focus.y);
   const C = toSVG(physics.center.x, physics.center.y);
 
-  // Ray Intersection Points on the mirror plane (approximate x=0 for paraxial rays)
-  const hit1 = toSVG(0, objectHeight); // Ray 1: Parallel to axis, hits at height h
+  // --- RAY 1 CALCULATIONS (Parallel -> Focus) ---
+  const ray1_inc_start = objTip;
+  const ray1_hit = { x: getMirrorX(objTip.y), y: objTip.y };
+  const ray1_inc_mid = { x: (ray1_inc_start.x + ray1_hit.x) / 2, y: (ray1_inc_start.y + ray1_hit.y) / 2 };
+
+  let ray1_ref_end = { x: 50, y: poleY };
+  let ray1_virtual_end = null;
+
+  if (mirrorType === 'concave') {
+    if (physics.properties.isInfinity) {
+      // Reflected ray passes through F and goes to left edge
+      const slope = (F.y - ray1_hit.y) / (F.x - ray1_hit.x);
+      ray1_ref_end = { x: 50, y: ray1_hit.y + slope * (50 - ray1_hit.x) };
+    } else if (physics.properties.isVirtual) {
+      // Virtual extension behind mirror to imgTip
+      ray1_virtual_end = imgTip;
+      // Real reflected ray goes to the left, pointing away from virtual focus / through focus F
+      const slope = (imgTip.y - ray1_hit.y) / (imgTip.x - ray1_hit.x);
+      ray1_ref_end = { x: 50, y: ray1_hit.y + slope * (50 - ray1_hit.x) };
+    } else {
+      // Real image: Reflected ray goes through imgTip
+      ray1_ref_end = imgTip;
+    }
+  } else {
+    // Convex mirror: reflects to the left, virtual extension to virtual focus F (which passes through imgTip)
+    const slope = (F.y - ray1_hit.y) / (F.x - ray1_hit.x);
+    ray1_virtual_end = F;
+    // Bounces back to the left (diverging)
+    ray1_ref_end = { x: 50, y: ray1_hit.y - slope * (ray1_hit.x - 50) };
+  }
+
+  const ray1_ref_mid = { x: (ray1_hit.x + ray1_ref_end.x) / 2, y: (ray1_hit.y + ray1_ref_end.y) / 2 };
+
+  // --- RAY 2 CALCULATIONS (Focus -> Parallel or Center -> Center) ---
+  // Concave Between F and P (u < f) OR Concave At F (u = f) uses the C-ray
+  const useCenterRay = (mirrorType === 'concave' && uDistance <= focalLength);
   
-  // Ray 2: Passes through Focus, hits mirror, reflects parallel
-  const yHit2 = (objectHeight * physics.properties.f) / (physics.properties.f - (-uDistance));
-  const hit2 = toSVG(0, yHit2);
-  
-  // Ray 3 (Rule 4): Passes through Pole, reflects obliquely
-  const hitPole = toSVG(0, 0);
+  let ray2_inc_start = objTip;
+  let ray2_hit = { x: poleX, y: poleY };
+  let ray2_inc_mid = { x: poleX, y: poleY };
+  let ray2_ref_end = { x: 50, y: poleY };
+  let ray2_virtual_end = null;
+  let ray2_focus_helper_end = null; // for dotted trace to focus/center
+
+  if (useCenterRay) {
+    // C-ray: passes through C(200, 200) and objTip. Retraces path.
+    const slope = (objTip.y - C.y) / (objTip.x - C.x);
+    const approxY = C.y + slope * (poleX - C.x);
+    const hitX = getMirrorX(approxY);
+    const hitY = C.y + slope * (hitX - C.x);
+    ray2_hit = { x: hitX, y: hitY };
+    ray2_inc_mid = { x: (ray2_inc_start.x + ray2_hit.x) / 2, y: (ray2_inc_start.y + ray2_hit.y) / 2 };
+    
+    // Help line from objTip back to C (shows alignment with C)
+    ray2_focus_helper_end = C;
+
+    if (physics.properties.isInfinity) {
+      // Retraces through C to left edge
+      ray2_ref_end = { x: 50, y: ray2_hit.y + slope * (50 - ray2_hit.x) };
+    } else if (physics.properties.isVirtual) {
+      // Virtual extension behind mirror to imgTip
+      ray2_virtual_end = imgTip;
+      // Real reflected ray goes to the left through C
+      ray2_ref_end = { x: 50, y: ray2_hit.y + slope * (50 - ray2_hit.x) };
+    } else {
+      // Real image case (if u distance is close to C but triggered useCenterRay)
+      ray2_ref_end = imgTip;
+    }
+  } else {
+    // Aligned with Focus
+    let slope = 0;
+    if (mirrorType === 'concave') {
+      if (uDistance > focalLength) {
+        // Real: Ray passes through F to hit mirror
+        slope = (F.y - objTip.y) / (F.x - objTip.x);
+      } else {
+        // Virtual: Ray comes as if from F (on the left) through objTip
+        slope = (objTip.y - F.y) / (objTip.x - F.x);
+        ray2_focus_helper_end = F;
+      }
+    } else {
+      // Convex: Directed towards virtual F on the right
+      slope = (F.y - objTip.y) / (F.x - objTip.x);
+      ray2_focus_helper_end = F;
+    }
+
+    const approxY = objTip.y + slope * (poleX - objTip.x);
+    const hitX = getMirrorX(approxY);
+    const hitY = objTip.y + slope * (hitX - objTip.x);
+    ray2_hit = { x: hitX, y: hitY };
+    ray2_inc_mid = { x: (ray2_inc_start.x + ray2_hit.x) / 2, y: (ray2_inc_start.y + ray2_hit.y) / 2 };
+
+    if (physics.properties.isInfinity) {
+      ray2_ref_end = { x: 50, y: ray2_hit.y };
+    } else if (physics.properties.isVirtual) {
+      // Reflects parallel to left, virtual extension parallel behind mirror to imgTip
+      ray2_ref_end = { x: 50, y: ray2_hit.y };
+      ray2_virtual_end = { x: imgTip.x, y: ray2_hit.y };
+    } else {
+      // Real: goes from hit to imgTip (which is at imgTip.x and approximately parallel height)
+      ray2_ref_end = imgTip;
+    }
+  }
+
+  const ray2_ref_mid = { x: (ray2_hit.x + ray2_ref_end.x) / 2, y: (ray2_hit.y + ray2_ref_end.y) / 2 };
 
   // Object Position Text Logic
   let positionText = "";
@@ -61,19 +183,33 @@ const DynamicMirrorFeedback = ({
   const c = 2 * f;
   
   if (mirrorType === 'concave') {
-    if (u > c + 5) positionText = "Beyond C";
-    else if (Math.abs(u - c) <= 5) positionText = "At C";
-    else if (u > f + 5 && u < c - 5) positionText = "Between C and F";
-    else if (Math.abs(u - f) <= 5) positionText = "At F";
-    else if (u < f - 5) positionText = "Between F and P";
+    if (u > c) positionText = "Beyond C";
+    else if (u === c) positionText = "At C";
+    else if (u > f && u < c) positionText = "Between C and F";
+    else if (u === f) positionText = "At F";
+    else if (u < f) positionText = "Between F and P";
   } else {
     positionText = "In front of mirror";
+  }
+
+  // Correct position of the image formed logic
+  let imagePositionText = "";
+  if (mirrorType === 'concave') {
+    if (u === f) imagePositionText = "At Infinity";
+    else if (u < f) imagePositionText = "Behind the mirror";
+    else if (u > c) imagePositionText = "Between C and F";
+    else if (u === c) imagePositionText = "At C";
+    else if (u > f && u < c) imagePositionText = "Beyond C";
+  } else {
+    imagePositionText = "Behind the mirror (Between P and F)";
   }
 
   // Image Nature Text Logic
   const m = Math.abs(physics.properties.hPrime / objectHeight);
   let sizeText = "Same Size";
-  if (m > 1.05) sizeText = "Magnified";
+  if (physics.properties.isInfinity) sizeText = "Highly Magnified";
+  else if (m > 1.05) sizeText = "Magnified";
+  else if (m < 0.05) sizeText = "Highly Diminished";
   else if (m < 0.95) sizeText = "Diminished";
 
   // Styles
@@ -145,52 +281,116 @@ const DynamicMirrorFeedback = ({
           </g>
         )}
 
-        {/* Actual Physics Image (Green) & Rays */}
+        {/* Actual Physics Rays (Green) */}
+        <g>
+          {/* Ray 1: Parallel to Principal Axis */}
+          {/* Incident Ray 1 */}
+          <line 
+            x1={ray1_inc_start.x} y1={ray1_inc_start.y} 
+            x2={ray1_inc_mid.x} y2={ray1_inc_mid.y} 
+            stroke="#10b981" strokeWidth="2.5" 
+            markerEnd="url(#arrow-green)" opacity="0.8" 
+          />
+          <line 
+            x1={ray1_inc_mid.x} y1={ray1_inc_mid.y} 
+            x2={ray1_hit.x} y2={ray1_hit.y} 
+            stroke="#10b981" strokeWidth="2.5" opacity="0.8" 
+          />
+
+          {/* Reflected Ray 1 */}
+          <line 
+            x1={ray1_hit.x} y1={ray1_hit.y} 
+            x2={ray1_ref_mid.x} y2={ray1_ref_mid.y} 
+            stroke="#10b981" strokeWidth="2.5" 
+            markerEnd="url(#arrow-green)" opacity="0.8" 
+          />
+          <line 
+            x1={ray1_ref_mid.x} y1={ray1_ref_mid.y} 
+            x2={ray1_ref_end.x} y2={ray1_ref_end.y} 
+            stroke="#10b981" strokeWidth="2.5" opacity="0.8" 
+          />
+
+          {/* Ray 1 Virtual Extension */}
+          {ray1_virtual_end && (
+            <line 
+              x1={ray1_hit.x} y1={ray1_hit.y} 
+              x2={ray1_virtual_end.x} y2={ray1_virtual_end.y} 
+              stroke="#10b981" strokeWidth="2" 
+              strokeDasharray="6,4" opacity="0.7" 
+            />
+          )}
+
+          {/* Ray 2: Focus / Center of Curvature Ray */}
+          {/* Incident Ray 2 */}
+          <line 
+            x1={ray2_inc_start.x} y1={ray2_inc_start.y} 
+            x2={ray2_inc_mid.x} y2={ray2_inc_mid.y} 
+            stroke="#10b981" strokeWidth="2.5" 
+            markerEnd="url(#arrow-green)" opacity="0.8" 
+          />
+          <line 
+            x1={ray2_inc_mid.x} y1={ray2_inc_mid.y} 
+            x2={ray2_hit.x} y2={ray2_hit.y} 
+            stroke="#10b981" strokeWidth="2.5" opacity="0.8" 
+          />
+
+          {/* Reflected Ray 2 */}
+          <line 
+            x1={ray2_hit.x} y1={ray2_hit.y} 
+            x2={ray2_ref_mid.x} y2={ray2_ref_mid.y} 
+            stroke="#10b981" strokeWidth="2.5" 
+            markerEnd="url(#arrow-green)" opacity="0.8" 
+          />
+          <line 
+            x1={ray2_ref_mid.x} y1={ray2_ref_mid.y} 
+            x2={ray2_ref_end.x} y2={ray2_ref_end.y} 
+            stroke="#10b981" strokeWidth="2.5" opacity="0.8" 
+          />
+
+          {/* Ray 2 Focus Helper (alignment guide before/after focus or center) */}
+          {ray2_focus_helper_end && (
+            <line 
+              x1={ray2_inc_start.x} y1={ray2_inc_start.y} 
+              x2={ray2_focus_helper_end.x} y2={ray2_focus_helper_end.y} 
+              stroke="#10b981" strokeWidth="1.5" 
+              strokeDasharray="4,4" opacity="0.5" 
+            />
+          )}
+
+          {/* Ray 2 Virtual Extension */}
+          {ray2_virtual_end && (
+            <line 
+              x1={ray2_hit.x} y1={ray2_hit.y} 
+              x2={ray2_virtual_end.x} y2={ray2_virtual_end.y} 
+              stroke="#10b981" strokeWidth="2" 
+              strokeDasharray="6,4" opacity="0.7" 
+            />
+          )}
+        </g>
+
+        {/* Actual Physics Image (Green Arrow) */}
         {!physics.properties.isInfinity && (
           <g>
-            {/* Green Ray 1: Parallel to Axis -> Through F */}
-            <line x1={objTip.x} y1={objTip.y} x2={hit1.x} y2={hit1.y} stroke="#10b981" strokeWidth="2" opacity="0.6" />
-            <line 
-              x1={hit1.x} y1={hit1.y} 
-              x2={physics.properties.isVirtual ? (F.x > poleX ? F.x + 100 : F.x - 100) : imgTip.x} 
-              y2={physics.properties.isVirtual ? (F.y > poleY ? F.y + 100 : F.y - 100) : imgTip.y} 
-              stroke="#10b981" strokeWidth="2" opacity="0.6" 
-              strokeDasharray={physics.properties.isVirtual ? "5,5" : "none"} 
-            />
-            {/* Green Ray 2: Through Focus -> Parallel */}
-            <line x1={objTip.x} y1={objTip.y} x2={hit2.x} y2={hit2.y} stroke="#10b981" strokeWidth="2" opacity="0.6" />
-            <line 
-              x1={hit2.x} y1={hit2.y} 
-              x2={physics.properties.isVirtual ? (hit2.x > poleX ? hit2.x + 100 : hit2.x - 100) : imgTip.x} 
-              y2={hit2.y} /* Reflects strictly parallel */
-              stroke="#10b981" strokeWidth="2" opacity="0.6" 
-              strokeDasharray={physics.properties.isVirtual ? "5,5" : "none"} 
-            />
-            
-            {/* Green Ray 3 (Rule 4): Through Pole -> Equal Angle */}
-            <line x1={objTip.x} y1={objTip.y} x2={hitPole.x} y2={hitPole.y} stroke="#10b981" strokeWidth="2" opacity="0.6" />
-            <line 
-              x1={hitPole.x} y1={hitPole.y} 
-              x2={physics.properties.isVirtual ? (imgTip.x > poleX ? imgTip.x + 100 : imgTip.x - 100) : imgTip.x} 
-              y2={physics.properties.isVirtual ? (imgTip.y > poleY ? imgTip.y + 100 : imgTip.y - 100) : imgTip.y} 
-              stroke="#10b981" strokeWidth="2" opacity="0.6" 
-              strokeDasharray={physics.properties.isVirtual ? "5,5" : "none"} 
-            />
-
             <line 
               x1={imgBase.x} y1={imgBase.y} 
               x2={imgTip.x} y2={imgTip.y} 
-              stroke="#10b981" strokeWidth="6" markerEnd="url(#arrow-green)" 
+              stroke="#10b981" strokeWidth="8" 
+              markerEnd="url(#arrow-green)" 
               strokeDasharray={physics.properties.isVirtual ? "8,4" : "none"} 
             />
-            <text x={imgTip.x} y={imgTip.y > poleY ? imgTip.y + 20 : imgTip.y - 15} fill="#10b981" fontSize="14" fontWeight="bold" textAnchor="middle">
+            <text 
+              x={imgTip.x} 
+              y={imgTip.y > poleY ? imgTip.y + 25 : imgTip.y - 15} 
+              fill="#10b981" fontSize="14" fontWeight="bold" 
+              textAnchor="middle"
+            >
               {physics.properties.isVirtual ? "Virtual Image" : "Real Image"}
             </text>
           </g>
         )}
 
         {/* Physical Object (Blue) */}
-        <line x1={objBase.x} y1={objBase.y} x2={objTip.x} y2={objTip.y} stroke="#3b82f6" strokeWidth="8" markerEnd="url(#arrow-blue)" filter="url(#glow)" />
+        <line x1={objBase.x} y1={objBase.y} x2={objTip.x} y2={objTip.y} stroke="#3b82f6" strokeWidth="8" markerEnd="url(#arrow-blue)" />
         <text x={objTip.x} y={objTip.y - 15} fill="#3b82f6" fontSize="16" fontWeight="bold" textAnchor="middle">Object</text>
       </svg>
 
@@ -217,6 +417,7 @@ const DynamicMirrorFeedback = ({
         <div style={{ flex: 1, background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '15px', borderRadius: '12px' }}>
           <h4 style={{ margin: '0 0 10px 0', color: '#34d399', fontSize: '16px' }}>🟢 The Physics Reality</h4>
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#cbd5e1' }}>Image forms at: <strong>{physics.properties.isInfinity ? "Infinity" : `${physics.properties.v.toFixed(1)} cm`}</strong></p>
+          <p style={{ margin: '5px 0', fontSize: '14px', color: '#cbd5e1' }}>Position: <strong>{imagePositionText}</strong></p>
           <p style={{ margin: '5px 0', fontSize: '14px', color: '#cbd5e1' }}>Nature: <strong>{physics.properties.isVirtual ? "Virtual & Erect" : "Real & Inverted"}</strong> ({sizeText})</p>
         </div>
 
