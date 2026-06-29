@@ -59,12 +59,14 @@ const AudioAnimationPlayer = ({
           const res = await fetch(url);
           const blob = await res.blob();
           const blobUrl = URL.createObjectURL(blob);
-          const audio = new Audio(blobUrl);
+          const audio = new Audio();
           audio.preload = "auto";
           // Wait for metadata to be loaded so duration is definitely known
           await new Promise(resolve => {
             audio.onloadedmetadata = resolve;
             audio.onerror = resolve; // don't hang if it fails
+            audio.src = blobUrl;
+            audio.load();
           });
           return audio;
         } catch (e) {
@@ -150,13 +152,26 @@ const AudioAnimationPlayer = ({
     }
   }, [playing, hasStarted, done]);
 
+  const lastSyncRef = useRef({ audioTime: 0, sysTime: 0 });
+
   // Update visual progress continuously while playing
   const updateProgress = useCallback(() => {
     if (playing && audioRef.current && !done) {
       const audio = audioRef.current;
-      if (audio.duration && audio.currentTime > 0) {
+      if (audio.duration && audio.duration !== Infinity && audio.currentTime > 0) {
+        let currentAudioTime = audio.currentTime;
+        
+        // Smooth interpolation for choppy audio.currentTime updates
+        const now = performance.now();
+        if (currentAudioTime === lastSyncRef.current.audioTime) {
+          const elapsed = (now - lastSyncRef.current.sysTime) / 1000;
+          currentAudioTime = Math.min(currentAudioTime + elapsed, audio.duration);
+        } else {
+          lastSyncRef.current = { audioTime: currentAudioTime, sysTime: now };
+        }
+
         const { start, end } = getStepBounds(currentStep);
-        const segmentRatio = audio.currentTime / audio.duration;
+        const segmentRatio = currentAudioTime / audio.duration;
         const currentGlobalProgress = start + (end - start) * segmentRatio;
         setProgress(currentGlobalProgress);
       }
