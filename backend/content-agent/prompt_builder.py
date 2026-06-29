@@ -19,7 +19,7 @@ DATA = load_data()
 
 
 TAG_PROMPT_HINTS = {
-    "general_concept_gap": "The student has a broader gap in the core ideas. Rebuild the concept from the relevant NCERT definition and diagram.",
+    "general_concept_gap": "Directly address the question text, explaining why the student's selected answer is incorrect and why the correct answer is right in the context of the NCERT Class 10 syllabus. Do not give a generic definition of mirrors.",
     "concave_convex_confusion": "Clarify concave vs convex mirror shape and behavior (inward vs outward) using simple NCERT definitions.",
     "pole_confusion": "Explain the pole as the geometric center of the mirror surface, not the center of curvature.",
     "center_of_curvature_confusion": "Explain center of curvature as the center of the original sphere and its relation with radius of curvature.",

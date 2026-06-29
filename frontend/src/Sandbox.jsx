@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import SphericalMirrorMisconceptionFeedback from "./svg-engine/reflection/spherical-mirrors/animations/feedback/SphericalMirrorMisconceptionFeedback";
 import ReflectionMisconceptionFeedback from "./svg-engine/reflection/animations/feedback/ReflectionMisconceptionFeedback";
 import Case1BeyondC from "./sandbox-tests/Case_1_Beyond_C";
@@ -6,8 +6,26 @@ import Case4AtF from "./sandbox-tests/Case_4_At_F";
 import Case5BetweenPF from "./sandbox-tests/Case_5_Between_P_and_F";
 import RayTracingRulesLesson from "./svg-engine/reflection/spherical-mirrors/animations/RayTracingRulesLesson";
 import ImageFormationLesson from "./svg-engine/reflection/spherical-mirrors/animations/ImageFormationLesson";
+import DynamicMirrorFeedback from "./components/quiz/DynamicMirrorFeedback";
+import AudioSpeechSandbox from "./sandbox-tests/AudioSpeechSandbox";
 
 const Sandbox = () => {
+  const [concaveModel, setConcaveModel] = useState("B");
+  const [convexModel, setConvexModel] = useState("B");
+
+  const concaveOptions = {
+    A: { label: "Option A: Between C and F (Correct Physics)", flawedModel: null },
+    B: { label: "Option B: Behind the mirror (Real/Virtual Confusion)", flawedModel: { v: 100, hPrime: 40, isVirtual: true } },
+    C: { label: "Option C: At C (Image Position Confusion)", flawedModel: { v: -200, hPrime: -60, isVirtual: false } },
+    D: { label: "Option D: Between C and F, Real & Erect (Inverted/Erect Confusion)", flawedModel: { v: -300, hPrime: 120, isVirtual: false } }
+  };
+
+  const convexOptions = {
+    A: { label: "Option A: Behind the mirror, Diminished (Correct Physics)", flawedModel: null },
+    B: { label: "Option B: In front of the mirror (Convex Real Image Myth)", flawedModel: { v: -100, hPrime: -40, isVirtual: false } },
+    C: { label: "Option C: Behind the mirror, Magnified (Convex Size Confusion)", flawedModel: { v: 60, hPrime: 100, isVirtual: true } }
+  };
+
   const smMisconceptions = [
     "pole_confusion",
     "center_of_curvature_confusion",
@@ -34,9 +52,94 @@ const Sandbox = () => {
   ];
 
   return (
-    <div style={{ padding: "20px", background: "#F3F4F6", minHeight: "100vh" }}>
-      <h1 style={{ textAlign: "center", marginBottom: "20px", color: "#1F2937" }}>Animation Sandbox</h1>
+    <div style={{ padding: "20px", background: "#0B0F19", minHeight: "100vh", color: "white" }}>
+      <h1 style={{ textAlign: "center", marginBottom: "20px", color: "#60A5FA" }}>Animation Sandbox</h1>
       
+      <AudioSpeechSandbox />
+      
+      <h2 style={{ textAlign: "center", marginTop: "20px", color: "#DC2626", fontWeight: "bold" }}>Interactive Misconception Quiz Simulator</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "40px", alignItems: "center", marginBottom: "60px", width: "100%", maxWidth: "900px", margin: "0 auto" }}>
+        
+        {/* Concave Simulator Card */}
+        <div style={{ width: "100%", background: "#1E293B", color: "white", padding: "24px", borderRadius: "16px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)", boxSizing: "border-box" }}>
+          <h3 style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "12px", color: "#60A5FA" }}>Scenario 1: Concave Mirror (Object between C and F)</h3>
+          <p style={{ fontSize: "14px", color: "#94A3B8", marginBottom: "20px" }}>
+            <strong>Question:</strong> An object is placed at u = -150 cm in front of a concave mirror (f = 100 cm). Choose a student's answer option below to see how the interactive feedback overlays their prediction in red against the green physics reality:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
+            {Object.entries(concaveOptions).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => setConcaveModel(key)}
+                style={{
+                  textAlign: "left",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  border: "2px solid",
+                  borderColor: concaveModel === key ? (key === "A" ? "#10B981" : "#EF4444") : "#334155",
+                  background: concaveModel === key ? (key === "A" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)") : "#0F172A",
+                  color: "white",
+                  fontSize: "14px",
+                  fontWeight: concaveModel === key ? "bold" : "normal",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                {opt.label} {key === "A" ? "✓" : "✗"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <DynamicMirrorFeedback 
+              mirrorType="concave" 
+              focalLength={100} 
+              initialObjectDistance={150} 
+              flawedModel={concaveOptions[concaveModel].flawedModel} 
+            />
+          </div>
+        </div>
+
+        {/* Convex Simulator Card */}
+        <div style={{ width: "100%", background: "#1E293B", color: "white", padding: "24px", borderRadius: "16px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)", boxSizing: "border-box" }}>
+          <h3 style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "12px", color: "#60A5FA" }}>Scenario 2: Convex Mirror (Object in front of mirror)</h3>
+          <p style={{ fontSize: "14px", color: "#94A3B8", marginBottom: "20px" }}>
+            <strong>Question:</strong> An object is placed at u = -150 cm in front of a convex mirror (f = 100 cm). Choose a student's answer option below to see how the feedback highlights their misconception:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
+            {Object.entries(convexOptions).map(([key, opt]) => (
+              <button
+                key={key}
+                onClick={() => setConvexModel(key)}
+                style={{
+                  textAlign: "left",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  border: "2px solid",
+                  borderColor: convexModel === key ? (key === "A" ? "#10B981" : "#EF4444") : "#334155",
+                  background: convexModel === key ? (key === "A" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)") : "#0F172A",
+                  color: "white",
+                  fontSize: "14px",
+                  fontWeight: convexModel === key ? "bold" : "normal",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                {opt.label} {key === "A" ? "✓" : "✗"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <DynamicMirrorFeedback 
+              mirrorType="convex" 
+              focalLength={100} 
+              initialObjectDistance={150} 
+              flawedModel={convexOptions[convexModel].flawedModel} 
+            />
+          </div>
+        </div>
+
+      </div>
+
       <h2 style={{ textAlign: "center", marginTop: "40px", color: "#2563EB" }}>Laws of Reflection Feedbacks</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "40px", alignItems: "center", marginBottom: "60px" }}>
         {reflMisconceptions.map(tag => (

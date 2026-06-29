@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import AnimationPlayer from "../../../shared/AnimationPlayer";
+import React from "react";
+import AudioAnimationPlayer from "../../../shared/AudioAnimationPlayer";
 import { clamp, lerp } from "../../../shared/PhysicsEngine";
 import { Label, PrincipalAxis } from "../../../shared/SVGUtils";
 
@@ -23,32 +23,30 @@ const RADIUS = 200;
 const FOCAL_LENGTH = 100;
 
 const POLE = { x: MIRROR_X, y: AXIS_Y };
-const CENTER = { x: MIRROR_X - RADIUS, y: AXIS_Y }; // 450
-const FOCUS = { x: MIRROR_X - FOCAL_LENGTH, y: AXIS_Y }; // 550
+const CENTER = { x: MIRROR_X - RADIUS, y: AXIS_Y };
+const FOCUS = { x: MIRROR_X - FOCAL_LENGTH, y: AXIS_Y };
 
 // Rule 1: Parallel -> Focus
 const R1_INC_START = { x: 150, y: 150 };
 const R1_HIT = { x: MIRROR_X, y: 150 };
-const R1_REF_END = { x: 350, y: 450 }; // slope = -1 through F(550, 250)
+const R1_REF_END = { x: 350, y: 450 };
 
 // Rule 2: Focus -> Parallel
-const R2_INC_START = { x: 150, y: 50 }; // passes through F(550, 250)
+const R2_INC_START = { x: 150, y: 50 };
 const R2_HIT = { x: MIRROR_X, y: 300 };
 const R2_REF_END = { x: 50, y: 300 };
 
 // Rule 3: Centre -> Centre
-// Line through C(450, 250) and hitting mirror at (650, 100)
 const R3_INC_START = { x: 250, y: 400 };
 const R3_HIT = { x: MIRROR_X, y: 100 };
 const R3_REF_END = { x: 250, y: 400 };
 
-const STEP_ORDER = [1, 2, 3, 4];
-const DEFAULT_STEP_DURATIONS_MS = {
-  1: 4000, // Show mirror, P, F, C
-  2: 6000, // Rule 1
-  3: 6000, // Rule 2
-  4: 6000  // Rule 3
-};
+const AUDIO_STEPS = [
+  { progress: 0.25, text: "Any ray diagram can be drawn using two of these three standard rays." },
+  { progress: 0.50, text: "Rule 1: A ray parallel to the principal axis reflects through the Focus, F." },
+  { progress: 0.75, text: "Rule 2: A ray passing through the Focus, F, reflects parallel to the principal axis." },
+  { progress: 1.0, text: "Rule 3: A ray passing through the Centre of Curvature, C, reflects back along its exact same path." }
+];
 
 const normalizeBetween = (value, start, end) => {
   if (end <= start) return 0;
@@ -56,45 +54,24 @@ const normalizeBetween = (value, start, end) => {
 };
 
 const RayTracingRulesLesson = ({ onTryItClicked }) => {
-  const [stepDurationsMs] = useState(DEFAULT_STEP_DURATIONS_MS);
-
-  const totalDurationMs = useMemo(() => {
-    return STEP_ORDER.reduce((acc, step) => acc + (stepDurationsMs[step] || 0), 0);
-  }, [stepDurationsMs]);
-
-  const stepRanges = useMemo(() => {
-    let elapsed = 0;
-    const ranges = {};
-    STEP_ORDER.forEach((step) => {
-      const stepDuration = stepDurationsMs[step];
-      const start = elapsed / totalDurationMs;
-      elapsed += stepDuration;
-      const end = elapsed / totalDurationMs;
-      ranges[step] = { start, end };
-    });
-    return ranges;
-  }, [stepDurationsMs, totalDurationMs]);
-
   return (
-    <AnimationPlayer
-      duration={totalDurationMs}
+    <AudioAnimationPlayer
+      audioSteps={AUDIO_STEPS}
       title="Watch: 3 Rules of Ray Tracing (Spherical Mirrors)"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
       {({ progress }) => {
         let step = 4;
-        for (const candidateStep of STEP_ORDER) {
-          if (progress < stepRanges[candidateStep].end) {
-            step = candidateStep;
-            break;
-          }
-        }
+        if (progress < 0.25) step = 1;
+        else if (progress < 0.50) step = 2;
+        else if (progress < 0.75) step = 3;
+        else step = 4;
 
-        const setupPhase = normalizeBetween(progress, stepRanges[1].start, stepRanges[1].end);
+        const setupPhase = normalizeBetween(progress, 0, 0.25);
         
         // Rule 1
-        const r1Total = normalizeBetween(progress, stepRanges[2].start, stepRanges[2].end);
+        const r1Total = normalizeBetween(progress, 0.25, 0.50);
         const r1Inc = clamp(r1Total * 2, 0, 1);
         const r1Ref = clamp((r1Total - 0.5) * 2, 0, 1);
         const currR1Inc = {
@@ -107,7 +84,7 @@ const RayTracingRulesLesson = ({ onTryItClicked }) => {
         };
 
         // Rule 2
-        const r2Total = normalizeBetween(progress, stepRanges[3].start, stepRanges[3].end);
+        const r2Total = normalizeBetween(progress, 0.50, 0.75);
         const r2Inc = clamp(r2Total * 2, 0, 1);
         const r2Ref = clamp((r2Total - 0.5) * 2, 0, 1);
         const currR2Inc = {
@@ -120,7 +97,7 @@ const RayTracingRulesLesson = ({ onTryItClicked }) => {
         };
 
         // Rule 3
-        const r3Total = normalizeBetween(progress, stepRanges[4].start, stepRanges[4].end);
+        const r3Total = normalizeBetween(progress, 0.75, 1.0);
         const r3Inc = clamp(r3Total * 2, 0, 1);
         const r3Ref = clamp((r3Total - 0.5) * 2, 0, 1);
         const currR3Inc = {
@@ -214,7 +191,7 @@ const RayTracingRulesLesson = ({ onTryItClicked }) => {
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 

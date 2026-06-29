@@ -1,5 +1,5 @@
 import React from "react";
-import AnimationPlayer from "../../../shared/AnimationPlayer";
+import AudioAnimationPlayer from "../../../shared/AudioAnimationPlayer";
 
 // --- Math Helpers ---
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
@@ -297,26 +297,56 @@ const ReflectionMisconceptionFeedback = ({ misconceptionTag }) => {
     reflection_not_equal: {
       Definition: "First Law of Reflection: The angle of incidence (∠i) is exactly equal to the angle of reflection (∠r).",
       Visualizer: ReflectionNotEqualVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Wait, look at this. The reflected ray is shooting off at a completely random angle. This is a common misconception." },
+        { progress: 0.7, text: "This is incorrect! The angle of incidence and the angle of reflection cannot be different." },
+        { progress: 1.0, text: "Remember the first law of reflection: The Angle of Incidence ALWAYS equals the Angle of Reflection." }
+      ]
     },
     first_law_reflection_angle: {
       Definition: "First Law of Reflection: The angle of incidence (∠i) is exactly equal to the angle of reflection (∠r).",
       Visualizer: ReflectionNotEqualVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Wait, look at this. The reflected ray is shooting off at a completely random angle. This is a common misconception." },
+        { progress: 0.7, text: "This is incorrect! The angle of incidence and the angle of reflection cannot be different." },
+        { progress: 1.0, text: "Remember the first law of reflection: The Angle of Incidence ALWAYS equals the Angle of Reflection." }
+      ]
     },
     angle_from_surface: {
       Definition: "Angles are always measured between the Ray and the Normal, NEVER from the mirror surface.",
       Visualizer: AngleFromSurfaceVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Watch out. Here, the angle is being measured directly from the mirror surface." },
+        { progress: 0.7, text: "This is incorrect! You must never measure angles from the physical surface of the mirror." },
+        { progress: 1.0, text: "Correct. Angles must always be measured starting from the Normal line." }
+      ]
     },
     normal_orientation_wrong: {
       Definition: "The Normal is an imaginary line drawn exactly perpendicular (at 90°) to the mirror surface at the point of incidence.",
       Visualizer: NormalOrientationVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Look closely at the dotted line. It is drawn at a random, tilted angle. This is a mistake." },
+        { progress: 0.7, text: "This is incorrect. The Normal is not just any dashed line you can draw freely." },
+        { progress: 1.0, text: "The Normal must be drawn exactly perpendicular, making a ninety degree angle to the mirror surface." }
+      ]
     },
     plane_not_same: {
       Definition: "Second Law of Reflection: The incident ray, reflected ray, and the normal all lie in the exact same plane.",
       Visualizer: PlaneNotSameVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Notice how the reflected ray seems to pop out of the page towards you. This is a very common misconception." },
+        { progress: 0.7, text: "This is incorrect! Light doesn't jump out of the plane during normal reflection." },
+        { progress: 1.0, text: "Remember the second law: The incident ray, normal, and reflected ray all lie flat on the exact same plane." }
+      ]
     },
     second_law_reflection_plane: {
       Definition: "Second Law of Reflection: The incident ray, reflected ray, and the normal all lie in the exact same plane.",
       Visualizer: PlaneNotSameVisualizer,
+      AudioSteps: [
+        { progress: 0.45, text: "Notice how the reflected ray seems to pop out of the page towards you. This is a very common misconception." },
+        { progress: 0.7, text: "This is incorrect! Light doesn't jump out of the plane during normal reflection." },
+        { progress: 1.0, text: "Remember the second law: The incident ray, normal, and reflected ray all lie flat on the exact same plane." }
+      ]
     },
   };
 
@@ -332,7 +362,7 @@ const ReflectionMisconceptionFeedback = ({ misconceptionTag }) => {
         overflow: "hidden", 
         boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)" 
       }}>
-        <AnimationPlayer duration={12000} showTryIt={false}>
+        <AudioAnimationPlayer audioSteps={config.AudioSteps} showTryIt={false}>
           {({ progress }) => {
             let step = 0;
             if (progress < 0.45) step = 0;       
@@ -350,7 +380,7 @@ const ReflectionMisconceptionFeedback = ({ misconceptionTag }) => {
               </svg>
             );
           }}
-        </AnimationPlayer>
+        </AudioAnimationPlayer>
       </div>
 
       <div style={{

@@ -10,8 +10,8 @@
 // - Nature + size + position of image
 // ============================================================
 
-import React, { useRef, useEffect } from "react";
-import AnimationPlayer from "../../../shared/AnimationPlayer";
+import React from "react";
+import AudioAnimationPlayer from "../../../shared/AudioAnimationPlayer";
 import { lerp, clamp } from "../../../shared/PhysicsEngine";
 import {
   ConcaveMirrorArc,
@@ -77,48 +77,22 @@ const POSITIONS = [
   },
 ];
 
+const AUDIO_STEPS = [
+  { progress: 0.08, text: "Every spherical mirror has key landmarks: the Pole, Focal point, and Centre of Curvature." },
+  { progress: 0.18, text: "Any two standard rays determine the image. Ray one goes parallel and reflects through the focus." },
+  { progress: 0.30, text: "When the object is at infinity, the light rays arrive parallel and the image forms at the Focus." },
+  { progress: 0.42, text: "When the object is beyond C, the image forms between C and F. It is real, inverted, and smaller." },
+  { progress: 0.54, text: "When the object is exactly at C, the image also forms at C, and is exactly the same size." },
+  { progress: 0.64, text: "When the object is between C and F, the image forms beyond C. The image is now magnified." },
+  { progress: 0.76, text: "If the object is placed exactly at the focal point, the reflected rays are parallel, so the image forms at infinity." },
+  { progress: 0.88, text: "If the object is between the Focus and the Pole, a virtual, erect, and magnified image forms behind the mirror." },
+  { progress: 1.0,  text: "In summary, as the object moves closer to the mirror, the image generally moves further away and grows larger." }
+];
+
 const SphericalMirrorImageFormationWatch = ({ onTryItClicked }) => {
-  const audioRef = useRef(null);
-  const lastStepRef = useRef(-1);
-
-  const playAudio = (step) => {
-    if (step === lastStepRef.current) return;
-    lastStepRef.current = step;
-
-    const audioFiles = {
-      0: ["/audio/mirror-anatomy.wav"],
-      1: ["/audio/ray-rules.wav"],
-      2: ["/audio/position-at-infinity.wav"],
-      3: ["/audio/position-beyond-c.wav"],
-      4: ["/audio/position-at-c.wav"],
-      5: ["/audio/position-between-c-f.wav"],
-      6: ["/audio/position-at-f.wav"],
-      7: ["/audio/position-between-f-p.wav"],
-      8: ["/audio/summary.wav"],
-    };
-
-    const audioFile = audioFiles[step]?.[0];
-    if (!audioFile) return;
-
-    if (audioRef.current) audioRef.current.pause();
-
-    const audio = new Audio(audioFile);
-    audioRef.current = audio;
-    audio.play().catch(() => {});
-  };
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
   return (
-    <AnimationPlayer
-      duration={66000} // 66 seconds for 8 steps + buffer
+    <AudioAnimationPlayer
+      audioSteps={AUDIO_STEPS}
       title="Watch: Image Formation by Spherical Mirrors"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
@@ -135,8 +109,6 @@ const SphericalMirrorImageFormationWatch = ({ onTryItClicked }) => {
         else if (progress < 0.76) step = 6; // At F
         else if (progress < 0.88) step = 7; // Between F & P
         else step = 8; // Summary
-
-        playAudio(step);
 
         // ── MIRROR ANATOMY PHASE (step 0-1) ──────────────────
         const anatomyFade = clamp(1 - Math.abs(step - 0.5) / 1.5, 0, 1);
@@ -471,7 +443,7 @@ const SphericalMirrorImageFormationWatch = ({ onTryItClicked }) => {
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 

@@ -22,6 +22,22 @@ TAG_TO_TOPIC_KEY = {
     "radius_focal_relation_wrong": "spherical_mirrors",
     "principal_axis_confusion": "spherical_mirrors",
     "focus_definition_wrong": "spherical_mirrors",
+    "image_position_wrong": "spherical_mirrors",
+    "image_size_wrong": "spherical_mirrors",
+    "image_nature_wrong": "spherical_mirrors",
+    "ray_tracing_rule_violation": "spherical_mirrors",
+    "convex_real_image_myth": "spherical_mirrors",
+    "convex_size_confusion": "spherical_mirrors",
+    "real_virtual_confusion": "spherical_mirrors",
+    "image_position_confusion": "spherical_mirrors",
+    "image_size_confusion": "spherical_mirrors",
+    "inverted_erect_confusion": "spherical_mirrors",
+    "focus_infinity_confusion": "spherical_mirrors",
+    "beyond_c_confusion": "spherical_mirrors",
+    "parallel_ray_rule_wrong": "spherical_mirrors",
+    "focus_ray_rule_wrong": "spherical_mirrors",
+    "center_ray_rule_wrong": "spherical_mirrors",
+    "sign_convention_confusion": "spherical_mirrors",
 }
 
 

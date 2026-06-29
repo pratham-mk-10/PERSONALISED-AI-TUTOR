@@ -17,6 +17,7 @@ function App() {
   const [stage, setStage] = useState("pmTell");
   const [activeCaseId, setActiveCaseId] = useState("concave-infinity");
   const selectTopic = useSessionStore((s) => s.selectTopic);
+  const currentTopicId = useSessionStore((s) => s.currentTopicId);
 
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -46,6 +47,7 @@ function App() {
     "show2",
     "try2",
     "test",
+    "mirrorFormulaComingSoon",
   ];
   const currentIndex = stages.indexOf(stage);
 
@@ -68,18 +70,24 @@ function App() {
             if (stage === "pmTell" || stage === "pmShow") {
               return s === "pmTell" || s === "pmShow";
             }
-            if (stage === "smTell" || stage === "smShow" || stage === "smQuiz") {
+            if (currentTopicId === "spherical-mirror-basics") {
               return s === "smTell" || s === "smShow" || s === "smQuiz";
             }
-            if (stage === "smRulesTell" || stage === "smRulesShow" || stage === "smFormationTell" || stage === "smFormationShow") {
-              return s === "smRulesTell" || s === "smRulesShow" || s === "smFormationTell" || s === "smFormationShow";
+            if (currentTopicId === "spherical-mirror-rules") {
+              return s === "smRulesTell" || s === "smRulesShow" || s === "smQuiz";
+            }
+            if (currentTopicId === "spherical-mirror-image-formation") {
+              return s === "smFormationTell" || s === "smFormationShow" || s === "smQuiz";
+            }
+            if (stage === "mirrorFormulaComingSoon") {
+              return s === "mirrorFormulaComingSoon";
             }
             // Hide all prior stages when in Laws of Reflection
-            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz" && s !== "smRulesTell" && s !== "smRulesShow" && s !== "smFormationTell" && s !== "smFormationShow";
+            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz" && s !== "smRulesTell" && s !== "smRulesShow" && s !== "smFormationTell" && s !== "smFormationShow" && s !== "mirrorFormulaComingSoon";
           })
           .map((s, i) => {
-            const isActive = stages.indexOf(s) === currentIndex;
-            const isCompleted = stages.indexOf(s) < currentIndex;
+            const isActive = stage === s;
+            const isCompleted = stages.indexOf(s) < stages.indexOf(stage);
             
             return (
               <div
@@ -87,13 +95,13 @@ function App() {
                 style={{
                   ...styles.stageStep,
                   background: isActive 
-                    ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" 
-                    : isCompleted ? "#EFF6FF" : "transparent",
-                  color: isActive ? "#FFFFFF" : isCompleted ? "#2563EB" : "#9CA3AF",
+                    ? "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)" 
+                    : isCompleted ? "rgba(59, 130, 246, 0.15)" : "transparent",
+                  color: isActive ? "#FFFFFF" : isCompleted ? "#60A5FA" : "#6B7280",
                   border: isActive 
-                    ? "1px solid #2563EB" 
-                    : isCompleted ? "1px solid #DBEAFE" : "1px solid #E5E7EB",
-                  boxShadow: isActive ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                    ? "1px solid #3B82F6" 
+                    : isCompleted ? "1px solid rgba(59, 130, 246, 0.3)" : "1px solid rgba(255, 255, 255, 0.02)",
+                  boxShadow: isActive ? "0 4px 12px rgba(59,130,246,0.3)" : "none",
                   transform: isActive ? "scale(1.05)" : "scale(1)",
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
@@ -101,13 +109,13 @@ function App() {
                 {{
                   pmTell: "1. Plane Basics",
                   pmShow: "2. Watch",
-                  smTell: "1. Spherical Mirrors",
+                  smTell: "1. Basics",
                   smShow: "2. Watch",
-                  smQuiz: "3. Quiz",
                   smRulesTell: "1. Rules",
                   smRulesShow: "2. Watch",
-                  smFormationTell: "3. Image Formation",
-                  smFormationShow: "4. Watch",
+                  smFormationTell: "1. Image Formation",
+                  smFormationShow: "2. Watch",
+                  smQuiz: "3. Quiz",
                   tell1: "1. 1st Law",
                   show1: "2. Watch",
                   try1: "3. Try",
@@ -115,6 +123,7 @@ function App() {
                   show2: "5. Watch",
                   try2: "6. Try",
                   test: "7. Quiz",
+                  mirrorFormulaComingSoon: "Coming Soon",
                 }[s]}
               </div>
             );
@@ -177,10 +186,10 @@ function App() {
       {/* SPHERICAL MIRROR BASICS - SHOW */}
       {stage === "smShow" && (
         <div style={styles.cardWide}>
-          <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smRulesTell")} />
+          <SphericalMirrorDetailedAnimation onTryItClicked={() => setStage("smQuiz")} />
           <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
-            <button style={styles.btnPrimary} onClick={() => setStage("smRulesTell")}>
-              Continue to Ray Tracing Rules →
+            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz")}>
+              Continue to Basics Quiz →
             </button>
           </div>
         </div>
@@ -203,10 +212,10 @@ function App() {
       {/* RAY TRACING RULES - SHOW */}
       {stage === "smRulesShow" && (
         <div style={styles.cardWide}>
-          <RayTracingRulesLesson onTryItClicked={() => setStage("smFormationTell")} />
+          <RayTracingRulesLesson onTryItClicked={() => setStage("smQuiz")} />
           <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
-            <button style={styles.btnPrimary} onClick={() => setStage("smFormationTell")}>
-              Continue to Image Formation →
+            <button style={styles.btnPrimary} onClick={() => setStage("smQuiz")}>
+              Continue to Rules Quiz →
             </button>
           </div>
         </div>
@@ -389,6 +398,22 @@ function App() {
           <QuizPage />
         </div>
       )}
+
+      {/* MIRROR FORMULA - COMING SOON */}
+      {stage === "mirrorFormulaComingSoon" && (
+        <div style={styles.card}>
+          <h2 style={styles.h2}>4. Mirror Formula (Numerical Section)</h2>
+          <p style={styles.explanation}>
+            This numerical and formula section is currently under development.
+          </p>
+          <div style={styles.lawBox || { padding: "12px", background: "#fef2f2", border: "1px dashed #fca5a5", borderRadius: "8px", margin: "16px 0", textAlign: "center" }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "#991b1b" }}>Coming Soon!</p>
+          </div>
+          <button style={styles.btnPrimary} onClick={() => setView("dashboard")}>
+            ← Back to Dashboard
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -408,8 +433,12 @@ function App() {
             setStage("pmTell");
           } else if (topicId === "spherical-mirror-basics") {
             setStage("smTell");
-          } else if (topicId === "spherical-mirror-image-formation") {
+          } else if (topicId === "spherical-mirror-rules") {
             setStage("smRulesTell");
+          } else if (topicId === "spherical-mirror-image-formation") {
+            setStage("smFormationTell");
+          } else if (topicId === "mirror-formula") {
+            setStage("mirrorFormulaComingSoon");
           } else if (topicId === "laws-reflection") {
             setStage("tell1");
           } else {
@@ -425,12 +454,13 @@ function App() {
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#F0F4FF",
+    background: "#0B0F19",
+    color: "#F8FAFC",
     fontFamily:
-      "Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
   sessionPage: {
-    maxWidth: "900px",
+    maxWidth: "1000px",
     margin: "0 auto",
     padding: "24px",
     display: "flex",
@@ -443,23 +473,23 @@ const styles = {
   },
   h1: {
     fontSize: "26px",
-    color: "#1E3A8A",
+    color: "#60A5FA",
     marginBottom: 4,
   },
   subtitle: {
     fontSize: "14px",
-    color: "#6B7280",
+    color: "#9CA3AF",
   },
   stageBar: {
     display: "flex",
     gap: "12px",
     marginBottom: "32px",
     padding: "12px",
-    background: "rgba(255, 255, 255, 0.4)",
+    background: "rgba(30, 41, 59, 0.7)",
     backdropFilter: "blur(12px)",
     borderRadius: "24px",
-    border: "1px solid rgba(255, 255, 255, 0.5)",
-    boxShadow: "0 8px 32px rgba(31, 38, 135, 0.05)",
+    border: "1px solid rgba(255, 255, 255, 0.02)",
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
     justifyContent: "center",
     flexWrap: "wrap",
   },
@@ -475,63 +505,77 @@ const styles = {
     userSelect: "none",
   },
   card: {
-    background: "#FFFFFF",
-    padding: "20px",
-    borderRadius: "10px",
+    background: "#1E293B",
+    padding: "30px",
+    borderRadius: "16px",
     width: "100%",
-    maxWidth: "600px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+    maxWidth: "700px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+    border: "1px solid rgba(255, 255, 255, 0.02)",
   },
   cardWide: {
-    background: "#FFFFFF",
-    padding: "20px",
-    borderRadius: "10px",
+    background: "#1E293B",
+    padding: "30px",
+    borderRadius: "16px",
     width: "100%",
-    maxWidth: "860px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+    maxWidth: "960px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+    border: "1px solid rgba(255, 255, 255, 0.02)",
   },
   h2: {
-    color: "#1E3A8A",
+    color: "#F8FAFC",
+    marginBottom: "16px",
   },
   explanation: {
-    fontSize: "14px",
-    color: "#374151",
+    fontSize: "15px",
+    color: "#D1D5DB",
+    lineHeight: "1.6",
+    marginBottom: "16px",
   },
   lawBox: {
-    background: "#EFF6FF",
-    padding: "10px",
-    borderRadius: "6px",
+    background: "rgba(59, 130, 246, 0.1)",
+    padding: "16px",
+    borderRadius: "8px",
     marginTop: 10,
     marginBottom: 10,
+    border: "1px solid rgba(59, 130, 246, 0.3)",
   },
   lawText: {
     fontWeight: 600,
-    color: "#1E40AF",
+    color: "#60A5FA",
   },
   btnPrimary: {
-    background: "#2563EB",
+    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
     color: "#FFFFFF",
-    padding: "10px",
+    padding: "12px 24px",
     border: "none",
-    borderRadius: "6px",
+    borderRadius: "9999px",
     cursor: "pointer",
     fontWeight: 600,
+    boxShadow: "0 4px 14px rgba(59, 130, 246, 0.3)",
+    transition: "transform 0.2s",
   },
   btnSecondary: {
-    padding: "8px",
-    border: "1px solid #D1D5DB",
+    padding: "12px 24px",
+    border: "1px solid rgba(255,255,255,0.2)",
     cursor: "pointer",
-    borderRadius: "6px",
-    backgroundColor: "#FFFFFF",
+    borderRadius: "9999px",
+    backgroundColor: "transparent",
+    color: "#FFFFFF",
+    fontWeight: 600,
   },
   backBtn: {
     alignSelf: "flex-start",
-    marginBottom: 12,
+    marginBottom: 16,
     border: "none",
     background: "transparent",
-    color: "#2563EB",
+    color: "#60A5FA",
     cursor: "pointer",
     fontSize: "14px",
+    fontWeight: 500,
+    padding: "8px 12px",
+    borderRadius: "8px",
+    transition: "background 0.2s",
   },
 };
 
