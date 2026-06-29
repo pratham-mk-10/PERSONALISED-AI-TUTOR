@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import QuizCard from "./QuizCard";
 import {
   getMisconceptionReason,
@@ -320,7 +320,61 @@ const QuizPage = () => {
   const [report, setReport] = useState(null);
   const [activeVisualByQuestion, setActiveVisualByQuestion] = useState({});
   const [quizMode, setQuizMode] = useState("regular");
- 
+  const [currentPlayingKey, setCurrentPlayingKey] = useState(null);
+  const [loadingTts, setLoadingTts] = useState(null);
+  const audioInstanceRef = useRef(null);
+
+  // Clean up audio on unmount or report change
+  useEffect(() => {
+    return () => {
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+      }
+    };
+  }, [report]);
+
+  const handlePlaySpeech = (text, key) => {
+    if (audioInstanceRef.current) {
+      audioInstanceRef.current.pause();
+      audioInstanceRef.current = null;
+      if (currentPlayingKey === key || loadingTts === key) {
+        setCurrentPlayingKey(null);
+        setLoadingTts(null);
+        return;
+      }
+    }
+
+    const cleanText = text
+      .replace(/\*\*|__/g, "")
+      .replace(/[*#-]/g, "")
+      .trim();
+
+    setLoadingTts(key);
+    const url = `http://localhost:8000/api/tts?text=${encodeURIComponent(cleanText)}`;
+    const audio = new Audio(url);
+    audioInstanceRef.current = audio;
+
+    audio.oncanplaythrough = () => {
+      setLoadingTts(null);
+      setCurrentPlayingKey(key);
+      audio.play().catch(e => {
+        console.error("TTS playback failed:", e);
+        setCurrentPlayingKey(null);
+      });
+    };
+
+    audio.onerror = () => {
+      setLoadingTts(null);
+      setCurrentPlayingKey(null);
+      audioInstanceRef.current = null;
+    };
+
+    audio.onended = () => {
+      setCurrentPlayingKey(null);
+      audioInstanceRef.current = null;
+    };
+  };
+
   // 🔹 Load questions
   useEffect(() => {
     loadQuestions();
@@ -582,7 +636,20 @@ const QuizPage = () => {
     }
   };
 
-  if (loading) return <h2>Loading questions...</h2>;
+  if (loading) {
+    return (
+      <div style={{ padding: "60px 20px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <h2 style={{ color: "#60A5FA", marginBottom: "20px" }}>Generating your Personalized Quiz...</h2>
+        <div style={{ width: "48px", height: "48px", border: "4px solid rgba(59, 130, 246, 0.2)", borderTop: "4px solid #3B82F6", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+        <p style={{ marginTop: "24px", color: "#9CA3AF", maxWidth: "450px", lineHeight: "1.6" }}>
+          Our AI tutor is analyzing your progress and crafting the perfect conceptual questions just for you. Hang tight!
+        </p>
+        <style>
+          {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+        </style>
+      </div>
+    );
+  }
 
   if (report) {
     return (
@@ -604,7 +671,16 @@ const QuizPage = () => {
               border: "1px solid #bbf7d0",
             }}
           >
-            <h3 style={{ marginTop: 0 }}>Misconception Explanation</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <h3 style={{ marginTop: 0, color: "#166534" }}>Misconception Explanation</h3>
+              <button
+                onClick={() => handlePlaySpeech(report.misconceptionExplanation, "misconception")}
+                style={currentPlayingKey === "misconception" ? styles.audioBtnActive : loadingTts === "misconception" ? styles.audioBtnLoading : styles.audioBtn}
+                disabled={loadingTts !== null && loadingTts !== "misconception"}
+              >
+                {currentPlayingKey === "misconception" ? "⏸ Stop Audio" : loadingTts === "misconception" ? "⏳ Loading..." : "🔊 Listen Feedback"}
+              </button>
+            </div>
             <p style={{ margin: 0 }}>{renderFormattedText(report.misconceptionExplanation)}</p>
           </div>
         )}
@@ -619,7 +695,16 @@ const QuizPage = () => {
         )}
 
         <div style={{ marginTop: "18px", padding: "20px", border: "1px solid rgba(255,255,255,0.02)", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)" }}>
-          <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Personalized Feedback</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Personalized Feedback</h3>
+            <button
+              onClick={() => handlePlaySpeech(report.reason, "reason")}
+              style={currentPlayingKey === "reason" ? styles.audioBtnActive : loadingTts === "reason" ? styles.audioBtnLoading : styles.audioBtn}
+              disabled={loadingTts !== null && loadingTts !== "reason"}
+            >
+              {currentPlayingKey === "reason" ? "⏸ Stop Audio" : loadingTts === "reason" ? "⏳ Loading..." : "🔊 Listen Feedback"}
+            </button>
+          </div>
           <p style={{ marginBottom: "12px", color: "#D1D5DB", lineHeight: 1.6 }}>{renderFormattedText(report.reason)}</p>
           <p style={{ margin: 0, color: "#9CA3AF" }}>
             <strong style={{ color: "#F8FAFC" }}>Focus Area:</strong> {report.focusArea}
@@ -699,9 +784,19 @@ const QuizPage = () => {
 
                 {!item.isCorrect && (
                   <div style={{ marginTop: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <strong style={{ color: "#F8FAFC" }}>Why wrong:</strong>
+                      <button
+                        onClick={() => handlePlaySpeech(item.reason, `reason-${item.index}`)}
+                        style={currentPlayingKey === `reason-${item.index}` ? styles.audioBtnActive : loadingTts === `reason-${item.index}` ? styles.audioBtnLoading : styles.audioBtn}
+                        disabled={loadingTts !== null && loadingTts !== `reason-${item.index}`}
+                      >
+                        {currentPlayingKey === `reason-${item.index}` ? "⏸ Stop Audio" : loadingTts === `reason-${item.index}` ? "⏳ Loading..." : "🔊 Listen"}
+                      </button>
+                    </div>
                     <p style={{ margin: "0 0 12px", color: "#CBD5E1", lineHeight: 1.5 }}>
-                      <strong style={{ color: "#F8FAFC" }}>Why wrong:</strong> {renderFormattedText(item.reason)}
-                      {item.focusArea ? <span style={{ color: "#94A3B8" }}> | Focus: {item.focusArea}</span> : ""}
+                      {renderFormattedText(item.reason)}
+                      {item.focusArea ? <span style={{ color: "#94A3B8", display: "block", marginTop: "4px" }}> Focus: {item.focusArea}</span> : ""}
                     </p>
                     <button
                       onClick={() => {
@@ -811,7 +906,16 @@ const QuizPage = () => {
   const isLast = currentIndex === questions.length - 1;
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: "20px", position: "relative", minHeight: "300px" }}>
+      {submitting && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(11, 15, 25, 0.8)", zIndex: 100, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: "12px", backdropFilter: "blur(6px)" }}>
+          <div style={{ width: "48px", height: "48px", border: "4px solid rgba(16, 185, 129, 0.2)", borderTop: "4px solid #10B981", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+          <h2 style={{ color: "#34D399", marginTop: "24px", marginBottom: "8px" }}>Evaluating your answers...</h2>
+          <p style={{ color: "#D1D5DB", textAlign: "center", maxWidth: "350px", lineHeight: "1.6" }}>
+            The AI is analyzing your conceptual understanding to generate personalized feedback.
+          </p>
+        </div>
+      )}
       <h1>{quizMode === "misconception" ? "🎯 Misconception Quiz" : "🧠 AI Tutor Quiz"}</h1>
       {quizMode === "misconception" && (
         <p style={{ marginTop: "4px", color: "#374151", fontWeight: 600 }}>
@@ -907,6 +1011,42 @@ const QuizPage = () => {
       </div>
     </div>
   );
+};
+
+const styles = {
+  audioBtn: {
+    padding: "6px 12px",
+    fontSize: "12px",
+    fontWeight: "bold",
+    borderRadius: "6px",
+    border: "1px solid #3B82F6",
+    background: "#EFF6FF",
+    color: "#1D4ED8",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  },
+  audioBtnActive: {
+    padding: "6px 12px",
+    fontSize: "12px",
+    fontWeight: "bold",
+    borderRadius: "6px",
+    border: "1px solid #DC2626",
+    background: "#FEF2F2",
+    color: "#991B1B",
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+  },
+  audioBtnLoading: {
+    padding: "6px 12px",
+    fontSize: "12px",
+    fontWeight: "bold",
+    borderRadius: "6px",
+    border: "1px solid #D1D5DB",
+    background: "#F3F4F6",
+    color: "#6B7280",
+    cursor: "not-allowed",
+    transition: "all 0.15s ease",
+  }
 };
 
 export default QuizPage;

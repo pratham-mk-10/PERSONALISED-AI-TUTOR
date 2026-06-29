@@ -34,14 +34,14 @@ const convexHits = [
 ];
 
 const STEP_AUDIO_FILES = {
-  1: ["/audio/spherical mirror 1.wav", "/audio/spherical mirror 1.mp3"],
-  2: ["/audio/spherical mirror 2.wav", "/audio/spherical mirror 2.mp3"],
-  3: ["/audio/spherical mirror 3.mp3", "/audio/spherical mirror 3.wav"],
-  4: ["/audio/spherical mirror 4.mp3", "/audio/spherical mirror 4.wav"],
-  5: ["/audio/spherical mirror 5.mp3", "/audio/spherical mirror 5.wav"],
-  6: ["/audio/spherical mirror 6.mp3", "/audio/spherical mirror 6.wav"],
-  7: ["/audio/spherical mirror 7.mp3", "/audio/spherical mirror 7.wav"],
-  8: ["/audio/spherical mirror 8.mp3", "/audio/spherical mirror 8.wav"],
+  1: "/audio/spherical mirror 1.wav",
+  2: "/audio/spherical mirror 2.wav",
+  3: "/audio/spherical mirror 3.wav",
+  4: "/audio/spherical mirror 4.wav",
+  5: "/audio/spherical mirror 5.wav",
+  6: "/audio/spherical mirror 6.wav",
+  7: "/audio/spherical mirror 7.wav",
+  8: "/audio/spherical mirror 8.wav",
 };
 
 const STEP_ORDER = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -338,7 +338,7 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
-      {({ progress }) => {
+      {({ progress, playing, hasStarted }) => {
         let step = 11;
         for (const candidateStep of STEP_ORDER) {
           if (progress < stepRanges[candidateStep].end) {
@@ -347,7 +347,12 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
           }
         }
 
-        playStepAudio(step);
+        if (hasStarted) {
+          playStepAudio(step);
+          if (!playing && audioRef.current) {
+            audioRef.current.pause();
+          }
+        }
 
         const concaveReflectingArc = rightHemisphere(concave.center.x, concave.center.y, concave.radius);
         const convexReflectingArc = leftHemisphere(convex.center.x, convex.center.y, convex.radius);

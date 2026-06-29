@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import AnimationPlayer from "../../../shared/AnimationPlayer";
+import React, { useMemo } from "react";
+import AudioAnimationPlayer from "../../../shared/AudioAnimationPlayer";
 import { clamp, lerp } from "../../../shared/PhysicsEngine";
 import { Label, PrincipalAxis, ObjectArrow, ImageArrow } from "../../../shared/SVGUtils";
 import { getMirrorCaseData } from "./MirrorPhysicsEngine";
@@ -28,32 +28,13 @@ const generateHatchPath = (poleX, mirrorType) => {
   return path;
 };
 
-const ImageFormationLesson = ({ caseId = "concave-beyond-c", onTryItClicked }) => {
-  const data = useMemo(() => getMirrorCaseData(caseId), [caseId]);
-  
-  const {
-    title, resultLines, mirrorType, poleX, AXIS_Y, F_X, C_X, objX, objTopY, h, v, imgX, imgTopY, imgHeight, isVirtualImage, u,
-    r1IncStart, r1Hit, r1RefEnd, r1VirtualEnd,
-    r2IncStart, r2Hit, r2RefEnd, r2VirtualEnd
-  } = data;
-
-const STEP_AUDIO_FILES = {
-  1: "/audio/setup_mirror.wav", // Fallback generated dummy files
-  2: "/audio/place_object.wav",
-  3: "/audio/ray1.wav",
-  4: "/audio/ray2.wav",
-  5: "/audio/image_forms.wav"
-};
-
-const STEP_ORDER = [1, 2, 3, 4, 5];
-const DEFAULT_STEP_DURATIONS_MS = {
-  1: 4000, // Show mirror, P, F, C
-  2: 3000, // Show object
-  3: 7000, // Draw Ray 1 (Inc -> Ref)
-  4: 7000, // Draw Ray 2 (Inc -> Ref)
-  5: 6000  // Show image and text box
-};
-const AUDIO_END_PADDING_MS = 200;
+const getAudioSteps = (title) => [
+  { progress: 0.20, text: `Let's draw the ray diagram for ${title.toLowerCase()}. First, we set up the mirror.` },
+  { progress: 0.40, text: "Next, we place the object at the specified position." },
+  { progress: 0.60, text: "We draw the first standard ray from the top of the object, which reflects according to the rules." },
+  { progress: 0.80, text: "We draw the second standard ray. The point where the reflected rays intersect is where the image forms." },
+  { progress: 1.0, text: "Finally, we determine the properties of the image based on its size, orientation, and position." }
+];
 
 const normalizeBetween = (value, start, end) => {
   if (end <= start) return 0;
@@ -74,72 +55,73 @@ const DefinitionCard = ({ title, lines }) => {
   );
 };
 
-  const [stepDurationsMs, setStepDurationsMs] = useState(DEFAULT_STEP_DURATIONS_MS);
+const ImageFormationLesson = ({ caseId = "concave-beyond-c", onTryItClicked }) => {
+  const data = useMemo(() => getMirrorCaseData(caseId), [caseId]);
+  
+  const {
+    title, resultLines, mirrorType, poleX, AXIS_Y, F_X, C_X, objX, objTopY, h, v, imgX, imgTopY, imgHeight, isVirtualImage, u,
+    r1IncStart, r1Hit, r1RefEnd, r1VirtualEnd,
+    r2IncStart, r2Hit, r2RefEnd, r2VirtualEnd
+  } = data;
 
-  const totalDurationMs = useMemo(() => {
-    return STEP_ORDER.reduce((acc, step) => acc + (stepDurationsMs[step] || 0), 0);
-  }, [stepDurationsMs]);
-
-  const stepRanges = useMemo(() => {
-    let elapsed = 0;
-    const ranges = {};
-    STEP_ORDER.forEach((step) => {
-      const stepDuration = stepDurationsMs[step];
-      const start = elapsed / totalDurationMs;
-      elapsed += stepDuration;
-      const end = elapsed / totalDurationMs;
-      ranges[step] = { start, end };
-    });
-    return ranges;
-  }, [stepDurationsMs, totalDurationMs]);
+  const audioSteps = useMemo(() => getAudioSteps(title), [title]);
 
   return (
-    <AnimationPlayer
-      duration={totalDurationMs}
-      title="Watch: Image Formation (Case 1: Beyond C)"
+    <AudioAnimationPlayer
+      audioSteps={audioSteps}
+      title={`Watch: Image Formation (${title})`}
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
       {({ progress }) => {
         let step = 5;
-        for (const candidateStep of STEP_ORDER) {
-          if (progress < stepRanges[candidateStep].end) {
-            step = candidateStep;
-            break;
-          }
-        }
+        if (progress < 0.20) step = 1;
+        else if (progress < 0.40) step = 2;
+        else if (progress < 0.60) step = 3;
+        else if (progress < 0.80) step = 4;
+        else step = 5;
 
-        const setupPhase = normalizeBetween(progress, stepRanges[1].start, stepRanges[1].end);
-        const objectPhase = normalizeBetween(progress, stepRanges[2].start, stepRanges[2].end);
+        const setupPhase = normalizeBetween(progress, 0, 0.20);
+        const objectPhase = normalizeBetween(progress, 0.20, 0.40);
         
-        const ray1Total = normalizeBetween(progress, stepRanges[3].start, stepRanges[3].end);
-        const ray1Inc = clamp(ray1Total * 2, 0, 1);
-        const ray1Ref = clamp((ray1Total - 0.5) * 2, 0, 1);
+        const r1Total = normalizeBetween(progress, 0.40, 0.60);
+        const r1Inc = clamp(r1Total * 2, 0, 1);
+        const r1Ref = clamp((r1Total - 0.5) * 2, 0, 1);
 
-        const ray2Total = normalizeBetween(progress, stepRanges[4].start, stepRanges[4].end);
-        const ray2Inc = clamp(ray2Total * 2, 0, 1);
-        const ray2Ref = clamp((ray2Total - 0.5) * 2, 0, 1);
+        const r2Total = normalizeBetween(progress, 0.60, 0.80);
+        const r2Inc = clamp(r2Total * 2, 0, 1);
+        const r2Ref = clamp((r2Total - 0.5) * 2, 0, 1);
 
-        const imagePhase = normalizeBetween(progress, stepRanges[5].start, stepRanges[5].end);
+        const imagePhase = normalizeBetween(progress, 0.80, 1.0);
 
         // Interpolations
         const currR1Inc = {
-          x: lerp(r1IncStart.x, r1IncStart.y, r1Hit.x, r1Hit.y, ray1Inc).x,
-          y: lerp(r1IncStart.x, r1IncStart.y, r1Hit.x, r1Hit.y, ray1Inc).y
+          x: lerp(r1IncStart.x, r1IncStart.y, r1Hit.x, r1Hit.y, r1Inc).x,
+          y: lerp(r1IncStart.x, r1IncStart.y, r1Hit.x, r1Hit.y, r1Inc).y
         };
         const currR1Ref = {
-          x: lerp(r1Hit.x, r1Hit.y, r1RefEnd.x, r1RefEnd.y, ray1Ref).x,
-          y: lerp(r1Hit.x, r1Hit.y, r1RefEnd.x, r1RefEnd.y, ray1Ref).y
+          x: lerp(r1Hit.x, r1Hit.y, r1RefEnd.x, r1RefEnd.y, r1Ref).x,
+          y: lerp(r1Hit.x, r1Hit.y, r1RefEnd.x, r1RefEnd.y, r1Ref).y
         };
 
         const currR2Inc = {
-          x: lerp(r2IncStart.x, r2IncStart.y, r2Hit.x, r2Hit.y, ray2Inc).x,
-          y: lerp(r2IncStart.x, r2IncStart.y, r2Hit.x, r2Hit.y, ray2Inc).y
+          x: lerp(r2IncStart.x, r2IncStart.y, r2Hit.x, r2Hit.y, r2Inc).x,
+          y: lerp(r2IncStart.x, r2IncStart.y, r2Hit.x, r2Hit.y, r2Inc).y
         };
         const currR2Ref = {
-          x: lerp(r2Hit.x, r2Hit.y, r2RefEnd.x, r2RefEnd.y, ray2Ref).x,
-          y: lerp(r2Hit.x, r2Hit.y, r2RefEnd.x, r2RefEnd.y, ray2Ref).y
+          x: lerp(r2Hit.x, r2Hit.y, r2RefEnd.x, r2RefEnd.y, r2Ref).x,
+          y: lerp(r2Hit.x, r2Hit.y, r2RefEnd.x, r2RefEnd.y, r2Ref).y
         };
+
+        const currR1Virt = isVirtualImage ? {
+          x: lerp(r1Hit.x, r1Hit.y, r1VirtualEnd.x, r1VirtualEnd.y, r1Ref).x,
+          y: lerp(r1Hit.x, r1Hit.y, r1VirtualEnd.x, r1VirtualEnd.y, r1Ref).y
+        } : null;
+
+        const currR2Virt = isVirtualImage ? {
+          x: lerp(r2Hit.x, r2Hit.y, r2VirtualEnd.x, r2VirtualEnd.y, r2Ref).x,
+          y: lerp(r2Hit.x, r2Hit.y, r2VirtualEnd.x, r2VirtualEnd.y, r2Ref).y
+        } : null;
 
         return (
           <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ display: "block", background: "#F8FAFF" }}>
@@ -190,25 +172,25 @@ const DefinitionCard = ({ title, lines }) => {
             )}
 
             {/* Step 3: Ray 1 */}
-            {ray1Inc > 0 && (
+            {r1Inc > 0 && (
               <line x1={r1IncStart.x} y1={r1IncStart.y} x2={currR1Inc.x} y2={currR1Inc.y} stroke="#F59E0B" strokeWidth="2.5" markerEnd="url(#inc-arrow)" />
             )}
-            {ray1Ref > 0 && (
+            {r1Ref > 0 && (
               <line x1={r1Hit.x} y1={r1Hit.y} x2={currR1Ref.x} y2={currR1Ref.y} stroke="#EF4444" strokeWidth="2.5" markerEnd="url(#ref-arrow)" />
             )}
-            {ray1Ref === 1 && r1VirtualEnd && (
-              <line x1={r1Hit.x} y1={r1Hit.y} x2={r1VirtualEnd.x} y2={r1VirtualEnd.y} stroke="#EF4444" strokeWidth="2" strokeDasharray="5,5" />
+            {r1Ref === 1 && r1VirtualEnd && (
+              <line x1={r1Hit.x} y1={r1Hit.y} x2={currR1Virt.x} y2={currR1Virt.y} stroke="#EF4444" strokeWidth="2" strokeDasharray="5,5" />
             )}
 
             {/* Step 4: Ray 2 */}
-            {ray2Inc > 0 && (
+            {r2Inc > 0 && (
               <line x1={r2IncStart.x} y1={r2IncStart.y} x2={currR2Inc.x} y2={currR2Inc.y} stroke="#F59E0B" strokeWidth="2.5" markerEnd="url(#inc-arrow)" />
             )}
-            {ray2Ref > 0 && (
+            {r2Ref > 0 && (
               <line x1={r2Hit.x} y1={r2Hit.y} x2={currR2Ref.x} y2={currR2Ref.y} stroke="#EF4444" strokeWidth="2.5" markerEnd="url(#ref-arrow)" />
             )}
-            {ray2Ref === 1 && r2VirtualEnd && (
-              <line x1={r2Hit.x} y1={r2Hit.y} x2={r2VirtualEnd.x} y2={r2VirtualEnd.y} stroke="#EF4444" strokeWidth="2" strokeDasharray="5,5" />
+            {r2Ref === 1 && r2VirtualEnd && (
+              <line x1={r2Hit.x} y1={r2Hit.y} x2={currR2Virt.x} y2={currR2Virt.y} stroke="#EF4444" strokeWidth="2" strokeDasharray="5,5" />
             )}
 
             {/* Dynamic Explanations Box */}
@@ -240,7 +222,7 @@ const DefinitionCard = ({ title, lines }) => {
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 

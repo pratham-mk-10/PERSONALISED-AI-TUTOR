@@ -31,10 +31,16 @@ const AnimationPlayer = ({
 }) => {
 
   const [progress, setProgress]     = useState(0);
-  const [playing,  setPlaying]      = useState(true);
+  const [playing,  setPlaying]      = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const [done,     setDone]         = useState(false);
   const [showTry,  setShowTry]      = useState(false);
   const completeTimerRef = useRef(null);
+
+  const handleStart = useCallback(() => {
+    setHasStarted(true);
+    setPlaying(true);
+  }, []);
 
   const finishAnimation = useCallback(() => {
     setPlaying(false);
@@ -120,8 +126,21 @@ const AnimationPlayer = ({
       {title && <p style={styles.title}>{title}</p>}
 
       {/* SVG content via render prop */}
-      <div style={styles.svgWrapper}>
-        {children({ progress })}
+      <div style={{ ...styles.svgWrapper, position: "relative" }}>
+        {children({ progress, playing, hasStarted })}
+        
+        {!hasStarted && (
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(11, 15, 25, 0.7)",
+            display: "flex", justifyContent: "center", alignItems: "center",
+            zIndex: 10
+          }}>
+            <button onClick={handleStart} style={{...styles.btnPrimary, fontSize: "18px", padding: "12px 24px", boxShadow: "0 4px 12px rgba(0,0,0,0.5)"}}>
+              ▶ Start Lesson
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Progress bar */}

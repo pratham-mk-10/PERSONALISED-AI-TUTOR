@@ -7,6 +7,7 @@ import Case5BetweenPF from "./sandbox-tests/Case_5_Between_P_and_F";
 import RayTracingRulesLesson from "./svg-engine/reflection/spherical-mirrors/animations/RayTracingRulesLesson";
 import ImageFormationLesson from "./svg-engine/reflection/spherical-mirrors/animations/ImageFormationLesson";
 import DynamicMirrorFeedback from "./components/quiz/DynamicMirrorFeedback";
+import AudioSpeechSandbox from "./sandbox-tests/AudioSpeechSandbox";
 
 const Sandbox = () => {
   const [concaveModel, setConcaveModel] = useState("B");
@@ -51,8 +52,10 @@ const Sandbox = () => {
   ];
 
   return (
-    <div style={{ padding: "20px", background: "#F3F4F6", minHeight: "100vh" }}>
-      <h1 style={{ textAlign: "center", marginBottom: "20px", color: "#1F2937" }}>Animation Sandbox</h1>
+    <div style={{ padding: "20px", background: "#0B0F19", minHeight: "100vh", color: "white" }}>
+      <h1 style={{ textAlign: "center", marginBottom: "20px", color: "#60A5FA" }}>Animation Sandbox</h1>
+      
+      <AudioSpeechSandbox />
       
       <h2 style={{ textAlign: "center", marginTop: "20px", color: "#DC2626", fontWeight: "bold" }}>Interactive Misconception Quiz Simulator</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: "40px", alignItems: "center", marginBottom: "60px", width: "100%", maxWidth: "900px", margin: "0 auto" }}>

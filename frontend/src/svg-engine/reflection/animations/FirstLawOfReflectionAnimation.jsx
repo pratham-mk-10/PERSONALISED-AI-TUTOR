@@ -87,7 +87,7 @@ const FirstLawOfReflectionAnimation = ({ onTryItClicked }) => {
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
-      {({ progress }) => {
+      {({ progress, playing, hasStarted }) => {
         let step = 0;
 
         if (progress < 0.10) step = 0;
@@ -98,8 +98,12 @@ const FirstLawOfReflectionAnimation = ({ onTryItClicked }) => {
         else if (progress < 0.94) step = 5;
         else step = 6;
 
-        // Play audio for current step
-        playAudio(step);
+        if (hasStarted) {
+          playAudio(step);
+          if (!playing && audioRef.current) {
+            audioRef.current.pause();
+          }
+        }
 
         // ── PHASES ──
         const mirrorOpacity = clamp(progress / 0.10, 0, 1);

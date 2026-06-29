@@ -80,7 +80,7 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
       onTryItClicked={onTryItClicked}
       showTryIt={true}
     >
-      {({ progress }) => {
+      {({ progress, playing, hasStarted }) => {
         // ── STEP LOGIC ──
         let step = 0;
 
@@ -93,7 +93,12 @@ const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
         else if (progress < 0.88) step = 6; // All in same plane (emphasis)
         else step = 7;                       // Law statement
 
-        playAudio(step);
+        if (hasStarted) {
+          playAudio(step);
+          if (!playing && audioRef.current) {
+            audioRef.current.pause();
+          }
+        }
 
         // ── FADE-INS ──
         const mirrorOpacity = clamp(progress / 0.18, 0, 1);

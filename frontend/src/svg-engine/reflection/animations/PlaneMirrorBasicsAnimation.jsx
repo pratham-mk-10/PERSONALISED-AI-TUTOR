@@ -1,5 +1,5 @@
 import React from "react";
-import AnimationPlayer from "../../shared/AnimationPlayer";
+import AudioAnimationPlayer from "../../shared/AudioAnimationPlayer";
 import {
   incidentRayStart,
   reflectedRayEnd,
@@ -22,13 +22,25 @@ const RAY_LEN = 165;
 const ANGLE = 35;
 const ARC_R = 44;
 
+const AUDIO_STEPS = [
+  { progress: 0.1, text: "First, what is a mirror? A mirror is a smooth, flat reflecting surface that redirects light rays." },
+  { progress: 0.2, text: "The exact point where a light ray touches the mirror is called the point of incidence, represented by P." },
+  { progress: 0.32, text: "Next, we draw a dotted line perpendicular, or at ninety degrees, to the mirror at the point of incidence. This line is called the Normal." },
+  { progress: 0.44, text: "The incoming light ray travelling toward the mirror is called the Incident Ray." },
+  { progress: 0.56, text: "The outgoing light ray that bounces away from the mirror at the point of incidence is called the Reflected Ray." },
+  { progress: 0.68, text: "The angle made by the incident ray with the normal is called the Angle of Incidence, represented by i. Remember, always measure this angle from the normal, not from the mirror surface." },
+  { progress: 0.8, text: "The angle made by the reflected ray with the normal is the Angle of Reflection, represented by r. This is where light bounces back from the mirror." },
+  { progress: 0.9, text: "This is how we represent the setup in diagrams, showing the mirror, normal, incident ray, reflected ray, and the angles i and r." },
+  { progress: 1.0, text: "The plane mirror basics are complete. Next, we will learn the rules of reflection, where the angle of incidence equals the angle of reflection, and all rays lie in the same plane." }
+];
+
 const PlaneMirrorBasicsAnimation = ({ onContinue }) => {
   const incStart = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
   const refEnd = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
 
   return (
-    <AnimationPlayer
-      duration={52000}
+    <AudioAnimationPlayer
+      audioSteps={AUDIO_STEPS}
       title="Watch: Plane Mirror Basics"
       onTryItClicked={onContinue}
       showTryIt={true}
@@ -330,7 +342,7 @@ const PlaneMirrorBasicsAnimation = ({ onContinue }) => {
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 

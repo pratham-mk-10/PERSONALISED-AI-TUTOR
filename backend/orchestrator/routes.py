@@ -2,6 +2,7 @@ from collections import Counter
 import importlib.util
 from pathlib import Path
 from typing import Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -413,10 +414,8 @@ def submit_answers(data: SubmitAnswersRequest):
 
     explanations_by_tag: dict[str, str] = {}
     if use_llm_feedback:
-        for entry in wrong_entries:
+        def _fetch_explanation(entry):
             tag = entry["tag"]
-            if tag in explanations_by_tag:
-                continue
             try:
                 sel_opt = entry.get("selected")
                 corr_opt = entry.get("correct")
@@ -442,44 +441,45 @@ def submit_answers(data: SubmitAnswersRequest):
                     student_answer=sel_text or (str(sel_opt) if sel_opt is not None else None),
                     correct_answer=corr_text or (str(corr_opt) if corr_opt is not None else None),
                 )
-                explanations_by_tag[tag] = explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
+                return tag, explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
             except Exception:
-                explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
+                return tag, _get_misconception_explanation(tag) or "Review this concept carefully."
+
+        unique_entries = {e["tag"]: e for e in wrong_entries}.values()
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_tag = {executor.submit(_fetch_explanation, entry): entry["tag"] for entry in unique_entries}
+            for future in as_completed(future_to_tag):
+                tag = future_to_tag[future]
+                try:
+                    result_tag, exp = future.result()
+                    explanations_by_tag[result_tag] = exp
+                except Exception:
+                    explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
 
     explanation = None
     visual_payload = None
     if main_misconception != "none":
-        try:
+        explanation = explanations_by_tag.get(main_misconception)
+        if not explanation:
             if use_llm_feedback:
-                explanation = explanations_by_tag.get(main_misconception)
-                if not explanation:
+                try:
                     explanation_data = content_agent.generate(
                         subtopic=topic,
                         misconception_tag=main_misconception,
                         attempt=2,
                     )
                     explanation = explanation_data.get("explanation")
-                    visual_payload = explanation_data
+                except Exception:
+                    explanation = _get_misconception_explanation(main_misconception)
             else:
-                explanation_data = content_agent.generate(
-                    subtopic=topic,
-                    misconception_tag=main_misconception,
-                    attempt=2,
-                )
-                explanation = explanation_data.get("explanation")
-                visual_payload = explanation_data
-        except Exception:
-            explanation = _get_misconception_explanation(main_misconception)
-
-    if visual_payload is None and main_misconception != "none":
-        try:
-            visual_payload = content_agent.generate(
-                subtopic=topic,
-                misconception_tag=main_misconception,
-                attempt=2,
-            )
-        except Exception:
-            visual_payload = {}
+                explanation = _get_misconception_explanation(main_misconception)
+                
+        # We can construct visual payload locally without hitting LLM again!
+        visual_payload = {
+            "svg_component": pick_svg_template(topic, main_misconception),
+            "svg_variant": pick_svg_variant(main_misconception)
+        }
 
     level = "beginner"
     acc = correct / total if total else 0
@@ -680,3 +680,24 @@ def misconception_reason(req: MisconceptionReasonRequest):
         "reason": _trim_feedback(reasoning.get("reason", "Review the concept carefully.")),
         "focus_area": reasoning.get("focus_area", req.misconception_tag),
     }
+
+
+import edge_tts
+from fastapi.responses import StreamingResponse
+
+@router.get("/api/tts")
+async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    try:
+        communicate = edge_tts.Communicate(text, voice)
+        
+        async def audio_stream():
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+
+        return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))

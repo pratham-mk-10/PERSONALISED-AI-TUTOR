@@ -1,5 +1,5 @@
 import React from "react";
-import AnimationPlayer from "../../../../shared/AnimationPlayer";
+import AudioAnimationPlayer from "../../../../shared/AudioAnimationPlayer";
 import { clamp, lerp } from "../../../../shared/PhysicsEngine";
 
 const SVG_W = 760;
@@ -402,9 +402,49 @@ const SphericalMirrorMisconceptionFeedback = ({ misconceptionTag }) => {
     activeDefinition = DEFINITIONS.focus_definition_wrong;
   }
 
+  const AUDIO_MAPPING = {
+    pole_confusion: [
+      { progress: 0.33, text: "Wait, the pole is not at the center of the sphere." },
+      { progress: 0.66, text: "The center of the sphere is called the Center of Curvature." },
+      { progress: 1.0, text: "The Pole is actually located exactly on the surface of the mirror, right in the middle." }
+    ],
+    center_of_curvature_confusion: [
+      { progress: 0.33, text: "Wait, the Center of Curvature is not located on the mirror's surface." },
+      { progress: 0.66, text: "Remember, the mirror is part of a large hollow sphere." },
+      { progress: 1.0, text: "The Center of Curvature is the exact geometric center of that sphere, out in empty space." }
+    ],
+    radius_focal_relation_wrong: [
+      { progress: 0.33, text: "Let's review the relationship between focal length and radius of curvature." },
+      { progress: 0.66, text: "The focus is not located anywhere random." },
+      { progress: 1.0, text: "For spherical mirrors, the radius of curvature is exactly twice the focal length. R equals 2 f." }
+    ],
+    concave_convex_confusion: [
+      { progress: 0.33, text: "Wait, let's make sure we don't mix up concave and convex mirrors." },
+      { progress: 0.66, text: "A concave mirror curves inwards, like a cave. The outer bulging side is painted." },
+      { progress: 1.0, text: "A convex mirror curves outwards. The inner side is painted, and reflection happens on the bulge." }
+    ],
+    principal_axis_confusion: [
+      { progress: 0.33, text: "Wait, the principal axis is not just a random line segment." },
+      { progress: 0.66, text: "It must pass perfectly through both the pole and the center of curvature." },
+      { progress: 1.0, text: "The principal axis is an imaginary straight line extending infinitely in both directions." }
+    ],
+    focus_definition_wrong: [
+      { progress: 0.33, text: "Let's clarify what the principal focus really is." },
+      { progress: 0.66, text: "When parallel light rays hit a concave mirror, they all converge to a single point." },
+      { progress: 1.0, text: "That specific point where they meet on the principal axis is called the Principal Focus." }
+    ],
+    general: [
+      { progress: 0.33, text: "Let's review the basic concept of a spherical mirror." },
+      { progress: 0.66, text: "Imagine a large hollow sphere made entirely of glass." },
+      { progress: 1.0, text: "A spherical mirror is just a piece cut out from that sphere, with one side painted." }
+    ]
+  };
+
+  const audioSteps = AUDIO_MAPPING[tag] || AUDIO_MAPPING.general;
+
   // Passing showTryIt={false} so the try it yourself button is hidden
   return (
-    <AnimationPlayer duration={9000} title="Spherical mirror visual correction" showTryIt={false}>
+    <AudioAnimationPlayer audioSteps={audioSteps} title="Spherical mirror visual correction" showTryIt={false}>
       {({ progress }) => {
         const phase = progress < 0.33 ? 0 : progress < 0.66 ? 1 : 2;
 
@@ -422,7 +462,7 @@ const SphericalMirrorMisconceptionFeedback = ({ misconceptionTag }) => {
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 
