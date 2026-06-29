@@ -683,7 +683,7 @@ def misconception_reason(req: MisconceptionReasonRequest):
 
 
 import edge_tts
-from fastapi.responses import StreamingResponse
+from fastapi import Response
 
 @router.get("/api/tts")
 async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
@@ -691,13 +691,16 @@ async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
         raise HTTPException(status_code=400, detail="Text is required")
     
     try:
+        print("TTS Request received for text:", text)
         communicate = edge_tts.Communicate(text, voice)
         
-        async def audio_stream():
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    yield chunk["data"]
+        audio_data = bytearray()
+        print("Starting stream...")
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data.extend(chunk["data"])
+        print("Finished stream, total bytes:", len(audio_data))
 
-        return StreamingResponse(audio_stream(), media_type="audio/mpeg")
+        return Response(content=bytes(audio_data), media_type="audio/mpeg")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
