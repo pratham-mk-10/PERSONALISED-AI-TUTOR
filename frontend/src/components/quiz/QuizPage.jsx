@@ -5,6 +5,8 @@ import {
   getGeneratedQuestions,
   getMisconceptionQuiz,
   submitAnswers,
+  getDescriptiveQuestions,
+  evaluateDescriptiveAnswer,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
 import QuizVisualCorrection from "./QuizVisualCorrection";
@@ -258,19 +260,45 @@ const QuizPage = () => {
   const [report, setReport] = useState(null);
   const [activeVisualByQuestion, setActiveVisualByQuestion] = useState({});
   const [quizMode, setQuizMode] = useState("regular");
+  const [quizType, setQuizType] = useState("mcq"); // 'mcq' or 'descriptive'
+  const requestRef = React.useRef(0);
  
   // 🔹 Load questions
   useEffect(() => {
     loadQuestions();
   }, []);
  
-  const loadQuestions = async () => {
+  const loadQuestions = async (type = quizType) => {
+    const requestId = ++requestRef.current;
     setLoading(true);
     setError("");
     setReport(null);
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
     setQuizMode("regular");
+    setAnswers({});
+ 
+    if (type === "descriptive") {
+      try {
+        const data = await getDescriptiveQuestions(currentTopicId);
+        if (requestId !== requestRef.current) return;
+        const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        const nextQuestions = rawQuestions.map((q, idx) => ({
+          ...q,
+          _key: `desc-${q.id || idx}`,
+        }));
+        setQuestions(nextQuestions);
+      } catch (err) {
+        if (requestId !== requestRef.current) return;
+        setQuestions([]);
+        setError(err?.message || "Unable to load descriptive questions");
+      } finally {
+        if (requestId === requestRef.current) {
+          setLoading(false);
+        }
+      }
+      return;
+    }
  
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
@@ -292,7 +320,9 @@ const QuizPage = () => {
         untaughtConcepts: quizTopicContext.untaughtConcepts,
         lessonContent,
       });
-
+ 
+      if (requestId !== requestRef.current) return;
+ 
       const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
       const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
         ...q,
@@ -300,18 +330,19 @@ const QuizPage = () => {
         _key: questionKey(q, idx),
       }));
       setQuestions(nextQuestions);
-
+ 
       const nextIds = [
         ...new Set([...seenIds, ...nextQuestions.map(q => q.id).filter((id) => id !== undefined && id !== null)])
       ].slice(-50);
       saveQuestionHistory(nextIds);
-
-      setAnswers({});
     } catch (err) {
+      if (requestId !== requestRef.current) return;
       setQuestions([]);
       setError(err?.message || "Unable to load questions");
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -439,6 +470,49 @@ const QuizPage = () => {
     }
   };
 
+  const handleSubmitDescriptive = async () => {
+    setError("");
+    const unanswered = questions.filter(q => !answers[q._key] || !answers[q._key].trim());
+    if (unanswered.length > 0) {
+      setError("Please write answers for all questions before submitting.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const studentId = user?.id || user?.name || "guest-student";
+      const evaluationPromises = questions.map(async (q) => {
+        const res = await evaluateDescriptiveAnswer({
+          studentId,
+          questionId: q.id,
+          studentAnswer: answers[q._key],
+        });
+        return {
+          questionId: q.id,
+          questionText: q.question_text,
+          studentAnswer: answers[q._key],
+          evaluation: res.evaluation,
+          weightedScore: res.weighted_score,
+          isCorrect: res.is_correct,
+        };
+      });
+
+      const results = await Promise.all(evaluationPromises);
+      const totalQuestions = results.length;
+      const averageScore = results.reduce((sum, r) => sum + r.weightedScore, 0) / totalQuestions;
+
+      setReport({
+        type: "descriptive",
+        averageScore,
+        results,
+      });
+    } catch (err) {
+      setError(err?.message || "Failed to evaluate answers. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(prev => prev + 1);
@@ -521,6 +595,160 @@ const QuizPage = () => {
   };
 
   if (loading) return <h2>Loading questions...</h2>;
+
+  if (report && report.type === "descriptive") {
+    return (
+      <div style={{ padding: "20px" }}>
+        <h1>Descriptive Quiz Report</h1>
+        <div style={{
+          marginTop: "16px",
+          padding: "20px",
+          borderRadius: "12px",
+          background: "linear-gradient(135deg, #e0e7ff 0%, #eef2ff 100%)",
+          border: "1px solid #c7d2fe",
+          boxShadow: "0 4px 10px rgba(79, 70, 229, 0.05)",
+          textAlign: "center"
+        }}>
+          <h2 style={{ margin: 0, fontSize: "16px", color: "#3730a3" }}>Overall Physics Competency Score</h2>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "baseline", marginTop: "10px" }}>
+            <span style={{ fontSize: "48px", fontWeight: "bold", color: "#4f46e5" }}>
+              {report.averageScore.toFixed(1)}
+            </span>
+            <span style={{ fontSize: "20px", color: "#6366f1", marginLeft: "4px" }}>/ 10</span>
+          </div>
+          <p style={{ margin: "8px 0 0", fontSize: "13px", color: "#4f46e5", fontWeight: 600 }}>
+            {report.averageScore >= 8.0 ? "🎉 Advanced understanding of Class 10 Physics!" :
+             report.averageScore >= 5.0 ? "👍 Intermediate grasp. Solid base!" :
+             "💡 Beginner level. Review the lesson details below to address core misconceptions."}
+          </p>
+        </div>
+
+        <div style={{ marginTop: "24px" }}>
+          <h2 style={{ fontSize: "18px", color: "#111827", marginBottom: "16px" }}>Detailed AI Evaluation</h2>
+          
+          {report.results.map((item, idx) => {
+            const conceptual = item.evaluation?.scores?.conceptual ?? 0;
+            const completeness = item.evaluation?.scores?.completeness ?? 0;
+            const terminology = item.evaluation?.scores?.terminology ?? 0;
+            const feedback = item.evaluation?.feedback || item.evaluation?.constructive_feedback || "";
+            const tag = item.evaluation?.misconception_tag;
+            const reasoningTrace = item.evaluation?.reasoning_trace || [];
+
+            return (
+              <div
+                key={`desc-res-${idx}`}
+                style={{
+                  padding: "20px",
+                  borderRadius: "12px",
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
+                  marginBottom: "16px",
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.01)"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", color: "#111827", fontWeight: 700 }}>
+                    Question {idx + 1}: {item.questionText}
+                  </h3>
+                  <span style={{
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    color: item.isCorrect ? "#166534" : "#991b1b",
+                    background: item.isCorrect ? "#dcfce7" : "#fee2e2",
+                    padding: "4px 10px",
+                    borderRadius: "999px",
+                    whiteSpace: "nowrap"
+                  }}>
+                    {item.isCorrect ? "Correct" : "Incorrect"} ({item.weightedScore.toFixed(1)}/10)
+                  </span>
+                </div>
+
+                <div style={{ background: "#f9fafb", padding: "12px 14px", borderRadius: "8px", marginBottom: "16px", borderLeft: "4px solid #d1d5db" }}>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#4b5563", fontWeight: 600 }}>Your Answer:</p>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#111827", fontStyle: "italic", lineHeight: "1.5" }}>
+                    "{item.studentAnswer}"
+                  </p>
+                </div>
+
+                {/* Score meters */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+                  <div style={{ background: "#eff6ff", padding: "10px", borderRadius: "8px", border: "1px solid #dbeafe" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "bold", color: "#1e40af", marginBottom: "4px" }}>
+                      <span>Conceptual</span>
+                      <span>{conceptual}/10</span>
+                    </div>
+                    <div style={{ height: "6px", background: "#dbeafe", borderRadius: "999px", overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#3b82f6", width: `${conceptual * 10}%`, borderRadius: "999px" }} />
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#ecfdf5", padding: "10px", borderRadius: "8px", border: "1px solid #d1fae5" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "bold", color: "#065f46", marginBottom: "4px" }}>
+                      <span>Completeness</span>
+                      <span>{completeness}/10</span>
+                    </div>
+                    <div style={{ height: "6px", background: "#d1fae5", borderRadius: "999px", overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#10b981", width: `${completeness * 10}%`, borderRadius: "999px" }} />
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#fcf5ff", padding: "10px", borderRadius: "8px", border: "1px solid #f3e8ff" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "bold", color: "#6b21a8", marginBottom: "4px" }}>
+                      <span>Terminology</span>
+                      <span>{terminology}/10</span>
+                    </div>
+                    <div style={{ height: "6px", background: "#f3e8ff", borderRadius: "999px", overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: "#a855f7", width: `${terminology * 10}%`, borderRadius: "999px" }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 14px", borderRadius: "8px", marginBottom: "16px" }}>
+                  <p style={{ margin: 0, fontSize: "13px", color: "#166534", lineHeight: "1.5" }}>
+                    <strong>Pedagogical Feedback:</strong> {feedback}
+                  </p>
+                </div>
+
+                {tag && tag !== "none" && (
+                  <div style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: "10px 12px", borderRadius: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "14px" }}>⚠️</span>
+                    <span style={{ fontSize: "12px", color: "#92400e" }}>
+                      <strong>Misconception Detected:</strong> <code>{tag}</code>
+                    </span>
+                  </div>
+                )}
+
+                {/* Expandable Chain of Thought */}
+                {reasoningTrace && reasoningTrace.length > 0 && (
+                  <details style={{ cursor: "pointer" }}>
+                    <summary style={{ fontSize: "12px", color: "#6b7280", fontWeight: "bold", outline: "none", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span>🔍 View AI Chain of Thought Trace</span>
+                    </summary>
+                    <div style={{ marginTop: "10px", background: "#f9fafb", padding: "12px", borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "12px", color: "#374151" }}>
+                      {reasoningTrace.map((step, stepIdx) => (
+                        <p key={stepIdx} style={{ margin: "0 0 6px", lineHeight: "1.5" }}>
+                          {step}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
+          <button onClick={restartSameQuiz} style={{ padding: "10px 16px", cursor: "pointer", borderRadius: "8px", border: "1px solid #d1d5db", background: "#ffffff", fontWeight: 600 }}>
+            Retry Quiz
+          </button>
+          <button onClick={() => loadQuestions("descriptive")} style={{ padding: "10px 16px", cursor: "pointer", borderRadius: "8px", border: "none", background: "#4f46e5", color: "#ffffff", fontWeight: 600 }}>
+            Load New Descriptive Quiz
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (report) {
     return (
@@ -724,13 +952,49 @@ const QuizPage = () => {
   if (!questions.length) {
     return (
       <div style={{ padding: "20px" }}>
-        <h1>AI Tutor Quiz</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h1>AI Tutor Quiz</h1>
+          <div style={{ display: "flex", background: "#f3f4f6", padding: "4px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+            <button
+              onClick={() => { setQuizType("mcq"); loadQuestions("mcq"); }}
+              style={{
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                background: quizType === "mcq" ? "#ffffff" : "transparent",
+                color: quizType === "mcq" ? "#4f46e5" : "#4b5563",
+                fontWeight: quizType === "mcq" ? 700 : 500,
+                cursor: "pointer",
+                boxShadow: quizType === "mcq" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              Multiple Choice
+            </button>
+            <button
+              onClick={() => { setQuizType("descriptive"); loadQuestions("descriptive"); }}
+              style={{
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                background: quizType === "descriptive" ? "#ffffff" : "transparent",
+                color: quizType === "descriptive" ? "#4f46e5" : "#4b5563",
+                fontWeight: quizType === "descriptive" ? 700 : 500,
+                cursor: "pointer",
+                boxShadow: quizType === "descriptive" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              Descriptive Text
+            </button>
+          </div>
+        </div>
         {error ? (
           <p style={{ color: "#b00020", fontWeight: 600 }}>{error}</p>
         ) : (
           <p>No questions available right now.</p>
         )}
-        <button onClick={loadQuestions} style={{ padding: "10px 16px", cursor: "pointer" }}>
+        <button onClick={() => loadQuestions()} style={{ padding: "10px 16px", cursor: "pointer" }}>
           Reload Questions
         </button>
       </div>
@@ -743,30 +1007,115 @@ const QuizPage = () => {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h1>{quizMode === "misconception" ? "🎯 Misconception Quiz" : "🧠 AI Tutor Quiz"}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h1>{quizMode === "misconception" ? "🎯 Misconception Quiz" : "🧠 AI Tutor Quiz"}</h1>
+        {quizMode !== "misconception" && (
+          <div style={{ display: "flex", background: "#f3f4f6", padding: "4px", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+            <button
+              onClick={() => { setQuizType("mcq"); loadQuestions("mcq"); }}
+              style={{
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                background: quizType === "mcq" ? "#ffffff" : "transparent",
+                color: quizType === "mcq" ? "#4f46e5" : "#4b5563",
+                fontWeight: quizType === "mcq" ? 700 : 500,
+                cursor: "pointer",
+                boxShadow: quizType === "mcq" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              Multiple Choice
+            </button>
+            <button
+              onClick={() => { setQuizType("descriptive"); loadQuestions("descriptive"); }}
+              style={{
+                padding: "6px 12px",
+                border: "none",
+                borderRadius: "6px",
+                background: quizType === "descriptive" ? "#ffffff" : "transparent",
+                color: quizType === "descriptive" ? "#4f46e5" : "#4b5563",
+                fontWeight: quizType === "descriptive" ? 700 : 500,
+                cursor: "pointer",
+                boxShadow: quizType === "descriptive" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                transition: "all 0.2s"
+              }}
+            >
+              Descriptive Text
+            </button>
+          </div>
+        )}
+      </div>
+
       {quizMode === "misconception" && (
-        <p style={{ marginTop: "4px", color: "#374151", fontWeight: 600 }}>
+        <p style={{ marginTop: "4px", color: "#374151", fontWeight: 600, marginBottom: "16px" }}>
           This round targets only the misconceptions from your previous attempt.
         </p>
       )}
-      <p style={{ color: "#4b587c", fontWeight: 600 }}>
+      
+      <p style={{ color: "#4b587c", fontWeight: 600, marginBottom: "16px" }}>
         Question {currentIndex + 1} of {questions.length}
       </p>
 
       {error && (
-        <p style={{ color: "#b00020", fontWeight: 600 }}>
+        <p style={{ color: "#b00020", fontWeight: 600, marginBottom: "16px" }}>
           {error}
         </p>
       )}
 
-      <QuizCard
-        key={currentQuestion._key}
-        question={currentQuestion}
-        index={currentIndex}
-        questionKey={currentQuestion._key}
-        selected={selectedForCurrent}
-        onSelect={handleSelect}
-      />
+      {quizType === "descriptive" ? (
+        <div style={{ marginTop: "16px", marginBottom: "20px", background: "#ffffff", padding: "24px", borderRadius: "12px", border: "1px solid #e5e7eb" }}>
+          <h2 style={{ fontSize: "18px", color: "#111827", marginBottom: "12px", lineHeight: "1.5" }}>
+            {currentQuestion.question_text}
+          </h2>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+            <span style={{ fontSize: "11px", fontWeight: "bold", background: "#e0f2fe", color: "#0369a1", padding: "4px 8px", borderRadius: "999px" }}>
+              Class 10 Physics
+            </span>
+            <span style={{ fontSize: "11px", fontWeight: "bold", background: "#fef3c7", color: "#d97706", padding: "4px 8px", borderRadius: "999px" }}>
+              Descriptive response
+            </span>
+          </div>
+          <p style={{ fontSize: "13px", color: "#4b5563", marginBottom: "8px", fontWeight: "600" }}>
+            Type your explanation below (minimum 4 words, try to explain the physics concepts clearly):
+          </p>
+          <textarea
+            placeholder="Explain the concepts in your own words..."
+            value={answers[currentQuestion._key] || ""}
+            onChange={(e) => setAnswers(prev => ({ ...prev, [currentQuestion._key]: e.target.value }))}
+            style={{
+              width: "100%",
+              minHeight: "150px",
+              padding: "14px",
+              borderRadius: "8px",
+              border: "1.5px solid #d1d5db",
+              fontSize: "14px",
+              lineHeight: "1.6",
+              fontFamily: "inherit",
+              resize: "vertical",
+              outline: "none",
+              transition: "border-color 0.2s",
+              boxSizing: "border-box"
+            }}
+            onFocus={(e) => e.target.style.borderColor = "#4f46e5"}
+            onBlur={(e) => e.target.style.borderColor = "#d1d5db"}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+            <span style={{ fontSize: "12px", color: (answers[currentQuestion._key] || "").trim().split(/\s+/).filter(Boolean).length < 4 ? "#dc2626" : "#059669" }}>
+              {(answers[currentQuestion._key] || "").trim().split(/\s+/).filter(Boolean).length} words
+            </span>
+          </div>
+        </div>
+      ) : (
+        <QuizCard
+          key={currentQuestion._key}
+          question={currentQuestion}
+          index={currentIndex}
+          questionKey={currentQuestion._key}
+          selected={selectedForCurrent}
+          onSelect={handleSelect}
+        />
+      )}
 
       <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
         <button
@@ -778,6 +1127,7 @@ const QuizPage = () => {
             borderRadius: "999px",
             border: "1px solid #e5e7eb",
             background: currentIndex === 0 ? "#f3f4f6" : "#ffffff",
+            color: currentIndex === 0 ? "#9ca3af" : "#374151",
             fontWeight: 600,
           }}
         >
@@ -787,17 +1137,36 @@ const QuizPage = () => {
         {!isLast ? (
           <button
             onClick={handleNext}
-            disabled={selectedForCurrent === undefined}
+            disabled={quizType === "descriptive" ? !(answers[currentQuestion._key] || "").trim() : selectedForCurrent === undefined}
             style={{
               padding: "10px 16px",
-              cursor: selectedForCurrent === undefined ? "not-allowed" : "pointer",
+              cursor: (quizType === "descriptive" ? !(answers[currentQuestion._key] || "").trim() : selectedForCurrent === undefined) ? "not-allowed" : "pointer",
               borderRadius: "999px",
               border: "1px solid #e5e7eb",
-              background: selectedForCurrent === undefined ? "#f3f4f6" : "#eef2ff",
+              background: (quizType === "descriptive" ? !(answers[currentQuestion._key] || "").trim() : selectedForCurrent === undefined) ? "#f3f4f6" : "#eef2ff",
+              color: (quizType === "descriptive" ? !(answers[currentQuestion._key] || "").trim() : selectedForCurrent === undefined) ? "#9ca3af" : "#4f46e5",
               fontWeight: 600,
             }}
           >
             Next
+          </button>
+        ) : quizType === "descriptive" ? (
+          <button
+            onClick={handleSubmitDescriptive}
+            disabled={!(answers[currentQuestion._key] || "").trim() || submitting}
+            style={{
+              padding: "10px 20px",
+              cursor: !(answers[currentQuestion._key] || "").trim() || submitting ? "not-allowed" : "pointer",
+              borderRadius: "999px",
+              border: "none",
+              fontWeight: 700,
+              color: "#ffffff",
+              background: !(answers[currentQuestion._key] || "").trim() ? "#9ca3af" : submitting ? "linear-gradient(90deg, #4b5563, #6b7280)" : "linear-gradient(90deg, #4f46e5, #6366f1)",
+              boxShadow: !(answers[currentQuestion._key] || "").trim() || submitting ? "0 4px 10px rgba(156, 163, 175, 0.3)" : "0 8px 16px rgba(79, 70, 229, 0.3)",
+              transition: "all 0.2s"
+            }}
+          >
+            {submitting ? "Evaluating answers..." : "Finish Descriptive Quiz"}
           </button>
         ) : (
           <button
@@ -805,24 +1174,13 @@ const QuizPage = () => {
             disabled={selectedForCurrent === undefined || submitting}
             style={{
               padding: "10px 20px",
-              cursor:
-                selectedForCurrent === undefined || submitting
-                  ? "not-allowed"
-                  : "pointer",
+              cursor: selectedForCurrent === undefined || submitting ? "not-allowed" : "pointer",
               borderRadius: "999px",
               border: "none",
               fontWeight: 700,
               color: "#ffffff",
-              background:
-                selectedForCurrent === undefined
-                  ? "#9ca3af"
-                  : submitting
-                    ? "linear-gradient(90deg, #4b5563, #6b7280)"
-                    : "linear-gradient(90deg, #4f46e5, #6366f1)",
-              boxShadow:
-                selectedForCurrent === undefined || submitting
-                  ? "0 4px 10px rgba(156, 163, 175, 0.5)"
-                  : "0 10px 20px rgba(79, 70, 229, 0.4)",
+              background: selectedForCurrent === undefined ? "#9ca3af" : submitting ? "linear-gradient(90deg, #4b5563, #6b7280)" : "linear-gradient(90deg, #4f46e5, #6366f1)",
+              boxShadow: selectedForCurrent === undefined || submitting ? "0 4px 10px rgba(156, 163, 175, 0.5)" : "0 10px 20px rgba(79, 70, 229, 0.4)",
               transform: submitting ? "scale(0.97)" : "scale(1)",
               transition: "all 0.18s ease-out",
             }}

@@ -160,3 +160,31 @@ export const getMisconceptionReason = async (misconceptionTag, topic = "reflecti
 
   return res.json();
 };
+
+export const getDescriptiveQuestions = async (topic) => {
+  const res = await fetch(`${BASE_URL}/descriptive-questions/${topic}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to fetch descriptive questions (${res.status}): ${text}`);
+  }
+  return res.json();
+};
+
+export const evaluateDescriptiveAnswer = async ({ studentId, questionId, studentAnswer }) => {
+  const res = await fetch(`${BASE_URL}/eval/descriptive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      student_id: studentId,
+      question_id: questionId,
+      student_answer: studentAnswer,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to evaluate descriptive answer (${res.status}): ${text}`);
+  }
+  return res.json();
+};

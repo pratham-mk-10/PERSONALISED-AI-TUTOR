@@ -181,11 +181,13 @@ export function ConcaveLens({ cx = 300, cy = 200, h = 120 }) {
 /**
  * Draw the principal axis (horizontal dashed line)
  */
-export function PrincipalAxis({ y = 200, width = 600 }) {
+export function PrincipalAxis({ startX = 0, endX, y = 200, width = 600 }) {
+  const x1 = startX;
+  const x2 = endX !== undefined ? endX : width;
   return (
     <line
-      x1={0} y1={y} x2={width} y2={y}
-      stroke="#999" strokeWidth="1" strokeDasharray="6,4"
+      x1={x1} y1={y} x2={x2} y2={y}
+      stroke="#999" strokeWidth="1.5" strokeDasharray="6,4"
     />
   );
 }
@@ -339,6 +341,222 @@ export function MediaBoundary({ boundaryY = 200, width = 500, height = 400, topL
         fill="#1E40AF" fontFamily="Arial">{topLabel}</text>
       <text x={10} y={boundaryY + 20} fontSize="13"
         fill="#1E3A8A" fontFamily="Arial">{bottomLabel}</text>
+    </g>
+  );
+}
+
+// ─── ADDED COMPONENTS FOR SPHERICAL MIRROR ANIMATIONS ──────────
+
+/**
+ * Draw a high-quality Concave Mirror Arc
+ * Vertex is at (centerX, centerY). Center of curvature is to the left at distance (radius * SCALE).
+ */
+export function ConcaveMirrorArc({ centerX, centerY, radius, color = "#3B82F6", strokeWidth = 4 }) {
+  const scale = 2;
+  const r = radius * scale; // 160
+  const cx = centerX - r; // center of curvature x
+  const cy = centerY;
+  
+  const ySpan = 95;
+  const xOffset = Math.sqrt(r * r - ySpan * ySpan);
+  const xStart = cx + xOffset;
+  const yStart = cy - ySpan;
+  const yEnd = cy + ySpan;
+  
+  const d = `M ${xStart} ${yStart} A ${r} ${r} 0 0 0 ${xStart} ${yEnd}`;
+  
+  const hatches = [];
+  const hatchCount = 12;
+  for (let i = 0; i <= hatchCount; i++) {
+    const t = i / hatchCount;
+    const y = yStart + t * (2 * ySpan);
+    const x = cx + Math.sqrt(r * r - (y - cy) * (y - cy));
+    const nx = (x - cx) / r;
+    const ny = (y - cy) / r;
+    const hatchLength = 8;
+    const hx1 = x;
+    const hy1 = y;
+    const hx2 = x + nx * hatchLength - ny * 3;
+    const hy2 = y + ny * hatchLength + nx * 3;
+    hatches.push(
+      <line key={i} x1={hx1} y1={hy1} x2={hx2} y2={hy2} stroke="#9CA3AF" strokeWidth="1" />
+    );
+  }
+  
+  return (
+    <g>
+      <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} />
+      {hatches}
+    </g>
+  );
+}
+
+/**
+ * Draw a single focal point marker (F)
+ */
+export function FocalPoint({ x, y, label = "F" }) {
+  return (
+    <g>
+      <circle cx={x} cy={y} r={4} fill="#DC2626" />
+      <text x={x} y={y + 20} textAnchor="middle" fontSize="13" fill="#DC2626" fontFamily="Arial" fontWeight="bold">{label}</text>
+    </g>
+  );
+}
+
+/**
+ * Draw a single Centre of Curvature marker (C)
+ */
+export function CentreOfCurvature({ x, y, label = "C" }) {
+  return (
+    <g>
+      <circle cx={x} cy={y} r={4} fill="#4B5563" />
+      <text x={x} y={y + 20} textAnchor="middle" fontSize="13" fill="#4B5563" fontFamily="Arial" fontWeight="bold">{label}</text>
+    </g>
+  );
+}
+
+/**
+ * Draw the Pole marker (P)
+ */
+export function Pole({ x, y }) {
+  return (
+    <g>
+      <circle cx={x} cy={y} r={4} fill="#1F2937" />
+      <text x={x + 10} y={y + 5} fontSize="13" fontWeight="bold" fill="#1F2937" fontFamily="Arial">P</text>
+    </g>
+  );
+}
+
+/**
+ * Draw a generic Arrow component (used for Object and Image arrows)
+ */
+export function Arrow({ x, y, height, color = "#EF4444", label = "", direction = "up" }) {
+  const tipY = direction === "up" ? y - height : y + height;
+  const arrowPoints = direction === "up"
+    ? `${x},${tipY} ${x - 6},${tipY + 12} ${x + 6},${tipY + 12}`
+    : `${x},${tipY} ${x - 6},${tipY - 12} ${x + 6},${tipY - 12}`;
+  return (
+    <g>
+      <line x1={x} y1={y} x2={x} y2={tipY} stroke={color} strokeWidth="2.5" />
+      <polygon points={arrowPoints} fill={color} />
+      {label && (
+        <text x={x} y={y + (direction === "up" ? 18 : -8)} textAnchor="middle"
+          fontSize="12" fill={color} fontFamily="Arial" fontWeight="bold">{label}</text>
+      )}
+    </g>
+  );
+}
+
+/**
+ * Draw a RayLine with arrowhead indicating direction and an optional label
+ */
+export function RayLine({ x1, y1, x2, y2, color = "#2563EB", strokeWidth = 2, label = "", id = "rayline" }) {
+  const markerId = `arrowhead-${id}-${Math.random().toString(36).substr(2, 9)}`;
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+  
+  return (
+    <g>
+      <defs>
+        <marker
+          id={markerId}
+          markerWidth="6"
+          markerHeight="6"
+          refX="3"
+          refY="3"
+          orient="auto"
+        >
+          <path d="M0,0 L0,6 L6,3 z" fill={color} />
+        </marker>
+      </defs>
+      <line
+        x1={x1} y1={y1}
+        x2={x2} y2={y2}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        markerEnd={`url(#${markerId})`}
+      />
+      {label && (
+        <text x={midX} y={midY - 8} fill={color} fontSize="12" fontFamily="Arial" fontWeight="bold" textAnchor="middle">
+          {label}
+        </text>
+      )}
+    </g>
+  );
+}
+
+/**
+ * Draw a DataBox inside the SVG canvas displaying real-time physics variables
+ */
+export function DataBox({ x = 550, y = 120, u, v, f, m, isReal, isEnlarged, isErect }) {
+  const width = 150;
+  const height = 155;
+  
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      <rect
+        width={width}
+        height={height}
+        fill="#FFFFFF"
+        stroke="#E5E7EB"
+        strokeWidth="1.5"
+        rx="8"
+      />
+      <text x="12" y="22" fontSize="12" fontWeight="bold" fill="#374151" fontFamily="Arial">
+        Live Values
+      </text>
+      <line x1="12" y1="30" x2={width - 12} y2="30" stroke="#E5E7EB" strokeWidth="1" />
+      
+      <text x="12" y="48" fontSize="11" fill="#6B7280" fontFamily="Arial">u (obj dist):</text>
+      <text x={width - 12} y="48" fontSize="11" fontWeight="bold" fill="#111827" fontFamily="Arial" textAnchor="end">
+        {u ? u.toFixed(1) : "N/A"}
+      </text>
+
+      <text x="12" y="66" fontSize="11" fill="#6B7280" fontFamily="Arial">v (img dist):</text>
+      <text x={width - 12} y="66" fontSize="11" fontWeight="bold" fill="#111827" fontFamily="Arial" textAnchor="end">
+        {Math.abs(v) > 300 ? "∞" : v ? v.toFixed(1) : "N/A"}
+      </text>
+
+      <text x="12" y="84" fontSize="11" fill="#6B7280" fontFamily="Arial">f (focal len):</text>
+      <text x={width - 12} y="84" fontSize="11" fontWeight="bold" fill="#111827" fontFamily="Arial" textAnchor="end">
+        {f ? f.toFixed(0) : "N/A"}
+      </text>
+
+      <text x="12" y="102" fontSize="11" fill="#6B7280" fontFamily="Arial">m (mag):</text>
+      <text x={width - 12} y="102" fontSize="11" fontWeight="bold" fill="#111827" fontFamily="Arial" textAnchor="end">
+        {m ? m.toFixed(2) : "N/A"}
+      </text>
+
+      <text x="12" y="124" fontSize="10" fill="#3B82F6" fontWeight="bold" fontFamily="Arial">
+        {isReal ? "Real & Inverted" : "Virtual & Erect"}
+      </text>
+      <text x="12" y="138" fontSize="10" fill="#10B981" fontWeight="bold" fontFamily="Arial">
+        {isEnlarged ? "Diminished" : "Enlarged"}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Draw the MirrorFormula box showing the equation and custom focal length relation
+ */
+export function MirrorFormula({ x = 550, y = 50, text = "" }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      <rect
+        width="150"
+        height="55"
+        fill="#EFF6FF"
+        stroke="#BFDBFE"
+        strokeWidth="1"
+        rx="6"
+      />
+      <text x="75" y="20" fontSize="12" fontWeight="bold" fill="#1E40AF" fontFamily="Arial" textAnchor="middle">
+        1/f = 1/v + 1/u
+      </text>
+      <text x="75" y="40" fontSize="11" fill="#1E40AF" fontFamily="Arial" textAnchor="middle">
+        {text}
+      </text>
     </g>
   );
 }

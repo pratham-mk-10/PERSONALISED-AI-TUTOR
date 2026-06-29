@@ -261,3 +261,37 @@ def fetch_misconception_for_answer(question_id, selected_option):
     conn.close()
 
     return row[0] if row else None
+
+
+def fetch_descriptive_questions_by_topic(topic):
+    # Map frontend topic key to database topic key if needed
+    db_topic = topic.replace("-", "_")
+    if db_topic == "refraction_intro":
+        db_topic = "refraction"
+    elif db_topic == "laws_reflection":
+        db_topic = "laws_of_reflection"
+    elif db_topic == "spherical_mirror_basics":
+        db_topic = "spherical_mirrors"
+        
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, topic, question_text, rubric_items, required_keywords
+        FROM descriptive_questions
+        WHERE topic = %s
+        """,
+        (db_topic,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r[0],
+            "topic": r[1],
+            "question_text": r[2],
+            "rubric_items": r[3],
+            "required_keywords": r[4],
+        }
+        for r in rows
+    ]

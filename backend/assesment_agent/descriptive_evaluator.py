@@ -5,16 +5,25 @@ from pathlib import Path
 
 # Add backend to path to import llm_service
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(BACKEND_ROOT))
+sys.path.append(str(BACKEND_ROOT / "content-agent"))
 
 # We import the existing llm service you already have so we don't break anything!
-from content_agent.llm_service import _post_chat_completion, _get_api_key
+from llm_service import _post_chat_completion, _get_api_key
 
 class DescriptiveEvaluator:
     def __init__(self):
         self.api_key = _get_api_key()
 
-    def evaluate_answer(self, question, student_answer, rubric_items, known_misconceptions):
+    def evaluate_answer(
+        self,
+        question: str,
+        student_answer: str,
+        rubric_items: list,
+        known_misconceptions: list,
+        student_id: str = None,
+        question_id: int = None,
+        required_keywords: list = None
+    ):
         system_instruction = """You are an expert Class 10 Physics examiner grading a student's descriptive answer.
 You MUST prioritize conceptual understanding (semantic meaning) over exact keyword matching.
 You will evaluate the answer across 4 dimensions:
@@ -30,14 +39,14 @@ Output your evaluation strictly as a JSON object with the following structure. D
     "Step 2: Cross-reference their semantic meaning with the required rubric items.",
     "Step 3: Check for explicit contradictions or physics violations."
   ],
-  "parameter_scores": {
+  "scores": {
     "conceptual": 0-10,
     "completeness": 0-10,
     "terminology": 0-10
   },
   "final_score": 0-10,
   "misconception_tag": "TAG_NAME" or null,
-  "constructive_feedback": "Your text here. If they had great concepts but bad vocabulary, praise the concept and gently correct the vocabulary."
+  "feedback": "Your text here. If they had great concepts but bad vocabulary, praise the concept and gently correct the vocabulary."
 }"""
 
         prompt = f"""
@@ -57,19 +66,48 @@ Execute the Chain of Thought grading process and output the JSON.
         response_text = _post_chat_completion(self.api_key, system_instruction, prompt)
         
         # Clean potential markdown formatting just in case the LLM disobeys the raw JSON rule
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        elif response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
+        cleaned = response_text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
             
         try:
-            return json.loads(response_text.strip())
+            parsed = json.loads(cleaned)
+            # Ensure both scores and parameter_scores exist
+            if "scores" in parsed:
+                parsed["parameter_scores"] = parsed["scores"]
+            elif "parameter_scores" in parsed:
+                parsed["scores"] = parsed["parameter_scores"]
+            else:
+                parsed["scores"] = {"conceptual": 0, "completeness": 0, "terminology": 0}
+                parsed["parameter_scores"] = parsed["scores"]
+            
+            # Ensure both feedback and constructive_feedback exist
+            if "feedback" in parsed:
+                parsed["constructive_feedback"] = parsed["feedback"]
+            elif "constructive_feedback" in parsed:
+                parsed["feedback"] = parsed["constructive_feedback"]
+            else:
+                parsed["feedback"] = "Review the concepts and try again."
+                parsed["constructive_feedback"] = parsed["feedback"]
+                
+            return parsed
         except json.JSONDecodeError:
             print("Failed to decode JSON from LLM:")
             print(response_text)
-            return None
+            return {
+                "reasoning_trace": ["Failed to decode JSON response from LLM."],
+                "scores": {"conceptual": 0, "completeness": 0, "terminology": 0},
+                "parameter_scores": {"conceptual": 0, "completeness": 0, "terminology": 0},
+                "final_score": 0,
+                "misconception_tag": "NOVEL_UNTAGGED_ERROR",
+                "feedback": "Could not evaluate this response due to JSON format issues.",
+                "constructive_feedback": "Could not evaluate this response due to JSON format issues."
+            }
 
 # Quick local test to prove it works
 if __name__ == "__main__":

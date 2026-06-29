@@ -14,7 +14,10 @@ try:
         set_student_current_topic,
         update_student_level,
         update_student_topic_resolution,
+        get_descriptive_question,
+        log_flagged_evaluation,
     )
+    from database.queries import fetch_descriptive_questions_by_topic
     from database.connection import get_connection
     from database.misconception_catalog import (
         coerce_misconception_tag,
@@ -24,6 +27,8 @@ try:
     )
     from assesment_agent.evaluator import Evaluator
     from assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
+    from assesment_agent.descriptive_evaluator import DescriptiveEvaluator
+    from assesment_agent.descriptive_generator import DescriptiveGenerator
 except ImportError:
     from backend.database.models import (
         get_student as get_student_record,
@@ -32,7 +37,10 @@ except ImportError:
         set_student_current_topic,
         update_student_level,
         update_student_topic_resolution,
+        get_descriptive_question,
+        log_flagged_evaluation,
     )
+    from backend.database.queries import fetch_descriptive_questions_by_topic
     from backend.database.connection import get_connection
     from backend.database.misconception_catalog import (
         coerce_misconception_tag,
@@ -42,6 +50,8 @@ except ImportError:
     )
     from backend.assesment_agent.evaluator import Evaluator
     from backend.assesment_agent.question_gen import SYLLABUS_SCOPE, generate_questions
+    from backend.assesment_agent.descriptive_evaluator import DescriptiveEvaluator
+    from backend.assesment_agent.descriptive_generator import DescriptiveGenerator
 
 
 def _load_module(module_name: str, file_path: Path):
@@ -98,6 +108,8 @@ def _allowed_misconceptions_for_topic(topic: str | None) -> list[str]:
 
 router = APIRouter()
 evaluator = Evaluator()
+descriptive_evaluator = DescriptiveEvaluator()
+descriptive_generator = DescriptiveGenerator()
 _content_agent_module = _load_content_agent_class()
 ContentAgent = _content_agent_module.ContentAgent
 get_template_quiz_scope = getattr(_content_agent_module, "get_template_quiz_scope", lambda _template: {"taught_concepts": [], "untaught_concepts": []})
@@ -146,6 +158,12 @@ class EvaluationRequest(BaseModel):
     selected_option: str
     correct_option: str
     misconception_map: dict[str, str]
+
+
+class DescriptiveEvaluationRequest(BaseModel):
+    student_id: str
+    question_id: int
+    student_answer: str
 
 
 class MisconceptionReasonRequest(BaseModel):
@@ -543,6 +561,104 @@ def evaluate_answer(req: EvaluationRequest):
         misconception_map=req.misconception_map,
         topic=req.topic,
     )
+
+
+def _map_frontend_topic(topic: str | None) -> str:
+    t = str(topic or "").strip().lower()
+    if t in {"laws-reflection", "laws_of_reflection", "laws of reflection"}:
+        return "laws_of_reflection"
+    if t in {"plane-mirror", "plane_mirror", "plane mirror"}:
+        return "plane_mirror"
+    if t in {"spherical-mirror-basics", "spherical_mirrors", "spherical mirrors", "spherical-mirrors"}:
+        return "spherical_mirrors"
+    if t in {"refraction-intro", "refraction", "refraction of light", "refraction_intro"}:
+        return "refraction"
+    return t
+
+
+@router.get("/descriptive-questions/{topic}")
+def get_descriptive_questions_route(topic: str):
+    try:
+        mapped_topic = _map_frontend_topic(topic)
+        generated = descriptive_generator.generate_descriptive_questions(mapped_topic, count=3)
+        questions = descriptive_generator.save_questions_to_db(mapped_topic, generated)
+        
+        if not questions:
+            questions = fetch_descriptive_questions_by_topic(mapped_topic)
+            
+        return {"questions": questions}
+    except Exception as exc:
+        try:
+            mapped_topic = _map_frontend_topic(topic)
+            questions = fetch_descriptive_questions_by_topic(mapped_topic)
+            if questions:
+                return {"questions": questions}
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+
+@router.post("/eval/descriptive")
+def evaluate_descriptive_route(req: DescriptiveEvaluationRequest):
+    q = get_descriptive_question(req.question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    known_misconceptions = _allowed_misconceptions_for_topic(q["topic"])
+    
+    try:
+        evaluation = descriptive_evaluator.evaluate_answer(
+            question=q["question_text"],
+            student_answer=req.student_answer,
+            rubric_items=q["rubric_items"],
+            known_misconceptions=known_misconceptions,
+            student_id=req.student_id,
+            question_id=req.question_id,
+            required_keywords=q["required_keywords"],
+        )
+        
+        final_score = float(evaluation.get("final_score", 0))
+        is_correct = final_score >= 5.0
+        
+        try:
+            log_student_behavior(
+                student_id=req.student_id or "guest-student",
+                topic=q["topic"],
+                selected_option=req.student_answer[:255] if req.student_answer else "",
+                correct_option="DESCRIPTIVE_RUBRIC",
+                is_correct=is_correct,
+                misconception_tag=evaluation.get("misconception_tag") or None
+            )
+            level = "beginner"
+            if final_score >= 8.0:
+                level = "advanced"
+            elif final_score >= 5.0:
+                level = "intermediate"
+            set_student_current_topic(req.student_id, q["topic"])
+            update_student_level(req.student_id, level)
+            update_student_topic_resolution(req.student_id, q["topic"], evaluation.get("misconception_tag") or "none")
+        except Exception as log_err:
+            print(f"Failed to log student behavior: {log_err}")
+            
+        return {
+            "evaluation": evaluation,
+            "weighted_score": final_score,
+            "is_correct": is_correct
+        }
+    except Exception as exc:
+        try:
+            log_flagged_evaluation(
+                student_id=req.student_id or "guest-student",
+                question_id=req.question_id,
+                student_answer=req.student_answer,
+                raw_response=None,
+                error_message=str(exc)
+            )
+        except Exception as log_exc:
+            print(f"Failed to log flagged evaluation: {log_exc}")
+            
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/student/{student_id}")

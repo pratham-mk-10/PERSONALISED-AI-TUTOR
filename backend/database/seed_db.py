@@ -3,8 +3,10 @@ import json
 
 try:
 	from database.connection import get_connection
+	from database.models import ensure_descriptive_tables
 except ImportError:
 	from backend.database.connection import get_connection
+	from backend.database.models import ensure_descriptive_tables
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,12 +124,87 @@ def seed_data(cur):
 			(topic, tag, title, expl, focus)
 		)
 
+	# Seed descriptive questions
+	descriptive_questions = [
+		(
+			"laws_of_reflection",
+			"State the two laws of reflection of light.",
+			json.dumps([
+				"The angle of incidence is equal to the angle of reflection (i = r).",
+				"The incident ray, the normal to the mirror at the point of incidence, and the reflected ray all lie in the same plane."
+			]),
+			["incidence", "reflection", "equal", "ray", "normal", "plane", "mirror"]
+		),
+		(
+			"plane_mirror",
+			"What are the characteristics of the image formed by a plane mirror?",
+			json.dumps([
+				"The image is virtual and erect.",
+				"The size of the image is equal to that of the object.",
+				"The image is laterally inverted.",
+				"The image is formed as far behind the mirror as the object is in front of it."
+			]),
+			["virtual", "erect", "equal", "size", "laterally", "inverted", "behind", "mirror", "object"]
+		),
+		(
+			"spherical_mirrors",
+			"Why does a concave mirror form a real, inverted image when the object is placed beyond its focus, but forms a virtual, erect image when the object is placed between the pole and the focus?",
+			json.dumps([
+				"Beyond the focus, reflected rays physically converge and intersect in front of the mirror (forming a real, inverted image).",
+				"Between the pole and focus, reflected rays diverge and only appear to intersect behind the mirror when produced backwards (forming a virtual, erect image)."
+			]),
+			["concave", "focus", "pole", "converge", "diverge", "real", "virtual", "erect", "inverted", "intersect"]
+		),
+		(
+			"refraction",
+			"Explain why a ray of light bends towards the normal when it enters a glass slab from air, and bends away from the normal when it exits the glass slab back into the air.",
+			json.dumps([
+				"Air is optically rarer and glass is optically denser.",
+				"Light travels slower in a denser medium (glass), causing the ray to bend towards the normal.",
+				"Light travels faster in a rarer medium (air), causing the ray to bend away from the normal."
+			]),
+			["refraction", "glass", "air", "denser", "rarer", "slower", "faster", "normal", "bend", "speed"]
+		),
+		(
+			"spherical_mirrors",
+			"What is the relation between the radius of curvature and focal length of a spherical mirror? If a spherical mirror has a radius of curvature of 30 cm, what is its focal length?",
+			json.dumps([
+				"The radius of curvature is twice the focal length (R = 2f or f = R/2).",
+				"Given R = 30 cm, the focal length f is 30/2 = 15 cm."
+			]),
+			["radius", "curvature", "focal", "length", "twice", "f = r/2", "r = 2f", "15", "15cm", "cm"]
+		),
+		(
+			"refraction",
+			"State Snell's law of refraction and define what is meant by the refractive index of a medium.",
+			json.dumps([
+				"The ratio of the sine of the angle of incidence to the sine of the angle of refraction is constant for a given pair of media.",
+				"This constant is called the refractive index of the second medium with respect to the first (sin i / sin r = constant)."
+			]),
+			["sine", "sin", "incidence", "refraction", "constant", "ratio", "refractive", "index"]
+		)
+	]
+
+	for topic, question, rubric, keywords in descriptive_questions:
+		cur.execute(
+			"""
+			INSERT INTO descriptive_questions (topic, question_text, rubric_items, required_keywords)
+			VALUES (%s, %s, %s, %s)
+			ON CONFLICT (question_text) DO UPDATE SET
+			topic = EXCLUDED.topic,
+			rubric_items = EXCLUDED.rubric_items,
+			required_keywords = EXCLUDED.required_keywords;
+			""",
+			(topic, question, rubric, keywords)
+		)
+
 
 def seed():
 	conn = get_connection()
 	cur = conn.cursor()
 
 	ensure_schema(cur)
+	ensure_descriptive_tables()
 	seed_data(cur)
 
 	conn.commit()
