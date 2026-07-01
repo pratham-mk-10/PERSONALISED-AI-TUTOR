@@ -160,3 +160,32 @@ export const getMisconceptionReason = async (misconceptionTag, topic = "reflecti
 
   return res.json();
 };
+
+export const getDescriptiveQuestions = async (topic = null) => {
+  const url = topic ? `${BASE_URL}/descriptive-questions/${encodeURIComponent(topic)}` : `${BASE_URL}/descriptive-questions/all`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to load descriptive questions (${res.status}): ${text}`);
+  }
+  return res.json();
+};
+
+export const evalDescriptiveAnswer = async ({ studentId, questionId, studentAnswer }) => {
+  const res = await fetch(`${BASE_URL}/eval/descriptive`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      student_id: studentId,
+      question_id: questionId,
+      student_answer: studentAnswer
+    })
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Evaluation failed (${res.status}): ${text}`);
+  }
+  return res.json();
+};

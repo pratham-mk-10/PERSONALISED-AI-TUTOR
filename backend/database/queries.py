@@ -266,13 +266,26 @@ def fetch_misconception_for_answer(question_id, selected_option):
 def fetch_descriptive_questions_by_topic(topic):
     conn = get_connection()
     cur = conn.cursor()
+    
+    # Normalize input topic: lowercase and convert dash/underscore
+    normalized = str(topic).strip().lower().replace("-", "_")
+    if "laws" in normalized and "reflection" in normalized:
+        normalized = "laws_of_reflection"
+    elif "spherical" in normalized:
+        normalized = "spherical_mirrors"
+    elif "plane" in normalized:
+        normalized = "plane_mirror"
+    elif "refraction" in normalized:
+        normalized = "refraction"
+
     cur.execute(
         """
         SELECT id, topic, question_text, rubric_items, required_keywords
         FROM descriptive_questions
-        WHERE topic = %s
+        WHERE LOWER(REPLACE(topic, '-', '_')) = %s
+           OR LOWER(REPLACE(topic, '-', '_')) LIKE %s
         """,
-        (topic,),
+        (normalized, f"%{normalized}%"),
     )
     rows = cur.fetchall()
     conn.close()
@@ -287,4 +300,5 @@ def fetch_descriptive_questions_by_topic(topic):
         }
         for r in rows
     ]
+
 

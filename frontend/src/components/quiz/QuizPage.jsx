@@ -5,6 +5,8 @@ import {
   getGeneratedQuestions,
   getMisconceptionQuiz,
   submitAnswers,
+  getDescriptiveQuestions,
+  evalDescriptiveAnswer,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
 import QuizVisualCorrection from "./QuizVisualCorrection";
@@ -206,7 +208,6 @@ const resolveVisualTemplateByTag = (tag) => {
   return TAG_TO_VISUAL_TEMPLATE[key] || null;
 };
 
-
 const loadQuestionHistory = () => {
   try {
     const raw = sessionStorage.getItem(QUESTION_HISTORY_KEY);
@@ -217,7 +218,6 @@ const loadQuestionHistory = () => {
   }
 };
 
-
 const saveQuestionHistory = (ids) => {
   try {
     sessionStorage.setItem(QUESTION_HISTORY_KEY, JSON.stringify(ids));
@@ -225,7 +225,6 @@ const saveQuestionHistory = (ids) => {
     // ignore storage errors
   }
 };
-
 
 const shuffle = (items) => {
   const arr = [...items];
@@ -279,7 +278,7 @@ const renderFormattedText = (text) => {
   const parts = String(text).split(/(\*\*.*?\*\*)/g);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
+      return <strong key={index} style={{ color: "#F8FAFC" }}>{part.slice(2, -2)}</strong>;
     }
     return part;
   });
@@ -310,6 +309,8 @@ const QuizPage = () => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
   const progress = useSessionStore((s) => s.progress);
+
+  const [quizType, setQuizType] = useState("mcq"); // "mcq" | "descriptive"
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -322,6 +323,7 @@ const QuizPage = () => {
   const [quizMode, setQuizMode] = useState("regular");
   const [currentPlayingKey, setCurrentPlayingKey] = useState(null);
   const [loadingTts, setLoadingTts] = useState(null);
+  const [openTraceIndex, setOpenTraceIndex] = useState(null);
   const audioInstanceRef = useRef(null);
 
   // Clean up audio on unmount or report change
@@ -332,6 +334,11 @@ const QuizPage = () => {
       }
     };
   }, [report]);
+
+  // Reload questions if topic or quizType changes
+  useEffect(() => {
+    loadQuestions();
+  }, [currentTopicId, quizType]);
 
   const handlePlaySpeech = (text, key) => {
     if (audioInstanceRef.current) {
@@ -375,11 +382,6 @@ const QuizPage = () => {
     };
   };
 
-  // 🔹 Load questions
-  useEffect(() => {
-    loadQuestions();
-  }, []);
- 
   const loadQuestions = async () => {
     setLoading(true);
     setError("");
@@ -387,7 +389,7 @@ const QuizPage = () => {
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
     setQuizMode("regular");
- 
+
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
     const personalization = getPersonalization(currentTopicId, progress);
@@ -396,31 +398,45 @@ const QuizPage = () => {
       .filter(Boolean)
       .join(" ");
     const lessonContent = LESSON_TEXTS[currentTopicId] || "";
- 
+
     try {
-      const data = await getGeneratedQuestions({
-        topic: quizTopicContext.title,
-        difficulty: personalization.difficulty,
-        syllabusScope: quizTopicContext.syllabusScope,
-        tutorContext,
-        videoTemplate: quizTopicContext.videoTemplate,
-        taughtConcepts: quizTopicContext.taughtConcepts,
-        untaughtConcepts: quizTopicContext.untaughtConcepts,
-        lessonContent,
-      });
+      if (quizType === "descriptive") {
+        const data = await getDescriptiveQuestions(currentTopicId);
+        const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        if (!rawQuestions.length) {
+          throw new Error("No descriptive questions found in the database for this topic. Switch to MCQ mode.");
+        }
+        const nextQuestions = rawQuestions.map((q, idx) => ({
+          ...q,
+          _key: `desc-${q.id ?? idx}`,
+          isDescriptive: true,
+        }));
+        setQuestions(nextQuestions);
+      } else {
+        const data = await getGeneratedQuestions({
+          topic: quizTopicContext.title,
+          difficulty: personalization.difficulty,
+          syllabusScope: quizTopicContext.syllabusScope,
+          tutorContext,
+          videoTemplate: quizTopicContext.videoTemplate,
+          taughtConcepts: quizTopicContext.taughtConcepts,
+          untaughtConcepts: quizTopicContext.untaughtConcepts,
+          lessonContent,
+        });
 
-      const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
-      const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
-        ...q,
-        options: Array.isArray(q?.options) ? q.options : [],
-        _key: questionKey(q, idx),
-      }));
-      setQuestions(nextQuestions);
+        const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
+          ...q,
+          options: Array.isArray(q?.options) ? q.options : [],
+          _key: questionKey(q, idx),
+        }));
+        setQuestions(nextQuestions);
 
-      const nextIds = [
-        ...new Set([...seenIds, ...nextQuestions.map(q => q.id).filter((id) => id !== undefined && id !== null)])
-      ].slice(-50);
-      saveQuestionHistory(nextIds);
+        const nextIds = [
+          ...new Set([...seenIds, ...nextQuestions.map(q => q.id).filter((id) => id !== undefined && id !== null)])
+        ].slice(-50);
+        saveQuestionHistory(nextIds);
+      }
 
       setAnswers({});
     } catch (err) {
@@ -431,7 +447,6 @@ const QuizPage = () => {
     }
   };
 
-  // 🔹 Select answer
   const handleSelect = (qid, optionIndex) => {
     setAnswers(prev => ({
       ...prev,
@@ -439,8 +454,19 @@ const QuizPage = () => {
     }));
   };
 
-  // 🔹 Submit answers
+  const handleChangeText = (qid, text) => {
+    setAnswers(prev => ({
+      ...prev,
+      [qid]: text
+    }));
+  };
+
   const handleSubmit = async () => {
+    if (quizType === "descriptive") {
+      await handleSubmitDescriptive();
+      return;
+    }
+
     setError("");
     const unanswered = questions.filter(q => answers[q._key] === undefined);
     if (unanswered.length > 0) {
@@ -534,6 +560,7 @@ const QuizPage = () => {
       });
 
       setReport({
+        type: "mcq",
         total,
         correctCount,
         wrongCount: total - correctCount,
@@ -550,6 +577,117 @@ const QuizPage = () => {
       });
     } catch (err) {
       setError(err?.message || "Unable to process quiz results");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitDescriptive = async () => {
+    setError("");
+    const unanswered = questions.filter(q => !answers[q._key] || !answers[q._key].trim());
+    if (unanswered.length > 0) {
+      setError("Please write answers for all questions before submitting.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const studentId = user?.id || user?.name || "guest-student";
+      const topicContext = getQuizTopicContext(currentTopicId);
+
+      const evaluationPromises = questions.map(async (q) => {
+        const studentAnswer = answers[q._key];
+        const res = await evalDescriptiveAnswer({
+          studentId,
+          questionId: q.id,
+          studentAnswer,
+        });
+        return {
+          questionId: q.id,
+          questionText: q.question_text,
+          studentAnswer,
+          rubricItems: q.rubric_items || [],
+          evaluation: res.evaluation || res,
+        };
+      });
+
+      const results = await Promise.all(evaluationPromises);
+
+      // Summarize scores (Understanding, Completeness, Keywords, Weighted)
+      let totalUnderstanding = 0;
+      let totalCompleteness = 0;
+      let totalKeywords = 0;
+      let totalWeighted = 0;
+      let tagCounts = {};
+
+      results.forEach(r => {
+        const scores = r.evaluation.scores || {};
+        const und = scores.understanding ?? 0;
+        const comp = scores.completeness ?? 0;
+        const kw = scores.keywords ?? 0;
+
+        totalUnderstanding += und;
+        totalCompleteness += comp;
+        totalKeywords += kw;
+
+        const weighted = (und * 0.70) + (comp * 0.25) + (kw * 0.05);
+        totalWeighted += weighted;
+
+        const tag = r.evaluation.misconception_tag;
+        if (tag && tag !== "none" && tag !== "NOVEL_UNTAGGED_ERROR") {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        }
+      });
+
+      const avgUnderstanding = Math.round((totalUnderstanding / questions.length) * 10) / 10;
+      const avgCompleteness = Math.round((totalCompleteness / questions.length) * 10) / 10;
+      const avgKeywords = Math.round((totalKeywords / questions.length) * 10) / 10;
+      const avgWeighted = Math.round((totalWeighted / questions.length) * 10) / 10;
+
+      // Detect main misconception tag
+      let mainMisconception = "none";
+      let maxCount = 0;
+      Object.entries(tagCounts).forEach(([tag, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mainMisconception = tag;
+        }
+      });
+
+      let misconceptionExplanation = null;
+      if (mainMisconception !== "none") {
+        try {
+          const conceptReason = await getMisconceptionReason(mainMisconception, topicContext.title);
+          misconceptionExplanation = conceptReason.reason;
+        } catch {
+          misconceptionExplanation = `Identified misconception: ${mainMisconception}`;
+        }
+      }
+
+      setReport({
+        type: "descriptive",
+        total: questions.length,
+        avgUnderstanding,
+        avgCompleteness,
+        avgKeywords,
+        avgWeighted,
+        mainMisconception,
+        misconceptionExplanation,
+        detailedResults: results.map((r, idx) => ({
+          index: idx + 1,
+          questionText: r.questionText,
+          studentAnswer: r.studentAnswer,
+          rubricItems: r.rubricItems,
+          scores: r.evaluation.scores || {},
+          feedback: r.evaluation.feedback || "Good effort.",
+          reasoningTrace: r.evaluation.reasoning_trace || [],
+          contradictedSpan: r.evaluation.contradicted_span,
+          misconceptionTag: r.evaluation.misconception_tag,
+        })),
+      });
+
+    } catch (err) {
+      setError(err?.message || "Unable to evaluate descriptive answers");
     } finally {
       setSubmitting(false);
     }
@@ -573,6 +711,7 @@ const QuizPage = () => {
     setReport(null);
     setError("");
     setActiveVisualByQuestion({});
+    setOpenTraceIndex(null);
   };
 
   const startMisconceptionQuiz = async () => {
@@ -623,6 +762,7 @@ const QuizPage = () => {
         return;
       }
 
+      setQuizType("mcq"); // Force back to MCQ for remedial
       setQuestions(nextQuestions);
       setAnswers({});
       setCurrentIndex(0);
@@ -636,13 +776,14 @@ const QuizPage = () => {
     }
   };
 
+  // --- Rendering Helpers ---
   if (loading) {
     return (
       <div style={{ padding: "60px 20px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <h2 style={{ color: "#60A5FA", marginBottom: "20px" }}>Generating your Personalized Quiz...</h2>
+        <h2 style={{ color: "#60A5FA", marginBottom: "20px" }}>Loading Quiz Questions...</h2>
         <div style={{ width: "48px", height: "48px", border: "4px solid rgba(59, 130, 246, 0.2)", borderTop: "4px solid #3B82F6", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
         <p style={{ marginTop: "24px", color: "#9CA3AF", maxWidth: "450px", lineHeight: "1.6" }}>
-          Our AI tutor is analyzing your progress and crafting the perfect conceptual questions just for you. Hang tight!
+          Retrieving conceptual questions for {getQuizTopicContext(currentTopicId).title}. Hang tight!
         </p>
         <style>
           {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
@@ -651,7 +792,233 @@ const QuizPage = () => {
     );
   }
 
+  // --- REPORT RENDERING ---
   if (report) {
+    if (report.type === "descriptive") {
+      return (
+        <div style={{ padding: "20px" }}>
+          <h1 style={{ color: "#F8FAFC", marginBottom: "4px" }}>Descriptive Practice Evaluation</h1>
+          <p style={{ color: "#9CA3AF", marginTop: 0 }}>Gemini 3.5 Flash CoT Evaluation Pipeline</p>
+
+          {/* Core score meters */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            marginTop: "24px",
+            marginBottom: "24px"
+          }}>
+            <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <span style={{ color: "#9CA3AF", fontSize: "14px" }}>Weighted Final Score</span>
+              <h2 style={{ fontSize: "28px", color: "#10B981", margin: "8px 0" }}>{report.avgWeighted} <span style={{ fontSize: "16px", color: "#9CA3AF" }}>/ 10</span></h2>
+              <div style={{ height: "6px", width: "100%", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${report.avgWeighted * 10}%`, background: "#10B981" }}></div>
+              </div>
+            </div>
+
+            <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <span style={{ color: "#9CA3AF", fontSize: "14px" }}>Understanding & Correctness (70%)</span>
+              <h2 style={{ fontSize: "24px", color: "#60A5FA", margin: "8px 0" }}>{report.avgUnderstanding} <span style={{ fontSize: "14px", color: "#9CA3AF" }}>/ 10</span></h2>
+              <div style={{ height: "6px", width: "100%", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${report.avgUnderstanding * 10}%`, background: "#60A5FA" }}></div>
+              </div>
+            </div>
+
+            <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <span style={{ color: "#9CA3AF", fontSize: "14px" }}>Completeness & Rubric (25%)</span>
+              <h2 style={{ fontSize: "24px", color: "#A78BFA", margin: "8px 0" }}>{report.avgCompleteness} <span style={{ fontSize: "14px", color: "#9CA3AF" }}>/ 10</span></h2>
+              <div style={{ height: "6px", width: "100%", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${report.avgCompleteness * 10}%`, background: "#A78BFA" }}></div>
+              </div>
+            </div>
+
+            <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(30, 41, 59, 0.5)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <span style={{ color: "#9CA3AF", fontSize: "14px" }}>Terminology & Keywords (5%)</span>
+              <h2 style={{ fontSize: "24px", color: "#FBBF24", margin: "8px 0" }}>{report.avgKeywords} <span style={{ fontSize: "14px", color: "#9CA3AF" }}>/ 10</span></h2>
+              <div style={{ height: "6px", width: "100%", borderRadius: "3px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${report.avgKeywords * 10}%`, background: "#FBBF24" }}></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Misconception remediation visual */}
+          {report.misconceptionExplanation && (
+            <div style={{
+              marginTop: "16px",
+              padding: "16px",
+              borderRadius: "12px",
+              background: "rgba(16, 185, 129, 0.05)",
+              border: "1px solid rgba(16, 185, 129, 0.2)",
+              marginBottom: "24px"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <h3 style={{ marginTop: 0, color: "#34D399" }}>Concept Summary Nudge</h3>
+                <button
+                  onClick={() => handlePlaySpeech(report.misconceptionExplanation, "misconception")}
+                  style={currentPlayingKey === "misconception" ? styles.audioBtnActive : loadingTts === "misconception" ? styles.audioBtnLoading : styles.audioBtn}
+                  disabled={loadingTts !== null && loadingTts !== "misconception"}
+                >
+                  {currentPlayingKey === "misconception" ? "⏸ Stop Audio" : loadingTts === "misconception" ? "⏳ Loading..." : "🔊 Listen Feedback"}
+                </button>
+              </div>
+              <p style={{ margin: 0, color: "#D1D5DB", lineHeight: 1.6 }}>{renderFormattedText(report.misconceptionExplanation)}</p>
+            </div>
+          )}
+
+          {report.mainMisconception && report.mainMisconception !== "none" && (
+            <QuizVisualCorrection
+              svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception) || "SphericalMirrorMisconceptionFeedback"}
+              svgVariant={report.svgVariant || report.mainMisconception}
+              misconceptionTag={report.mainMisconception}
+              explanation={report.misconceptionExplanation || "Let's review this concept."}
+            />
+          )}
+
+          {/* Detailed Question Review */}
+          <div style={{ marginTop: "24px", padding: "24px", borderRadius: "16px", background: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255,255,255,0.02)" }}>
+            <h3 style={{ marginTop: 0, color: "#F8FAFC", marginBottom: "20px" }}>Detailed Responses Review</h3>
+
+            {report.detailedResults.map((item, idx) => {
+              const itemWeighted = Math.round(((item.scores.understanding * 0.70) + (item.scores.completeness * 0.25) + (item.scores.keywords * 0.05)) * 10) / 10;
+              const isTraceOpen = openTraceIndex === idx;
+
+              return (
+                <div key={idx} style={{
+                  padding: "20px",
+                  borderRadius: "12px",
+                  background: "rgba(30, 41, 59, 0.3)",
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  marginBottom: "16px"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <span style={{ color: "#60A5FA", fontWeight: 700, fontSize: "14px" }}>Question {item.index}</span>
+                      <h4 style={{ color: "#F8FAFC", margin: "6px 0 12px 0", fontSize: "16px" }}>{item.questionText}</h4>
+                    </div>
+                    <div style={{ padding: "6px 12px", borderRadius: "8px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                      <span style={{ color: "#34D399", fontWeight: "bold" }}>Score: {itemWeighted} / 10</span>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: "16px" }}>
+                    <strong style={{ color: "#9CA3AF", fontSize: "13px" }}>Your Written Answer:</strong>
+                    <p style={{
+                      margin: "6px 0",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      background: "rgba(0,0,0,0.2)",
+                      color: "#E5E7EB",
+                      fontSize: "14px",
+                      lineHeight: "1.6",
+                      borderLeft: "4px solid #3B82F6"
+                    }}>
+                      "{item.studentAnswer}"
+                    </p>
+                  </div>
+
+                  {item.contradictedSpan && (
+                    <div style={{
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.2)",
+                      color: "#FCA5A5",
+                      fontSize: "13px",
+                      marginBottom: "16px"
+                    }}>
+                      <strong>Flagged Concept Error:</strong> "{item.contradictedSpan}"
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong style={{ color: "#9CA3AF", fontSize: "13px" }}>AI Tutor Feedback:</strong>
+                      <button
+                        onClick={() => handlePlaySpeech(item.feedback, `feedback-${idx}`)}
+                        style={currentPlayingKey === `feedback-${idx}` ? styles.audioBtnActive : loadingTts === `feedback-${idx}` ? styles.audioBtnLoading : styles.audioBtn}
+                        disabled={loadingTts !== null && loadingTts !== `feedback-${idx}`}
+                      >
+                        {currentPlayingKey === `feedback-${idx}` ? "⏸ Stop Audio" : loadingTts === `feedback-${idx}` ? "⏳ Loading..." : "🔊 Play"}
+                      </button>
+                    </div>
+                    <p style={{ margin: "6px 0", color: "#D1D5DB", fontSize: "14px", lineHeight: "1.6" }}>
+                      {renderFormattedText(item.feedback)}
+                    </p>
+                  </div>
+
+                  {/* CoT reasoning trace dropdown */}
+                  {item.reasoningTrace && item.reasoningTrace.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setOpenTraceIndex(isTraceOpen ? null : idx)}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: "8px",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "#9CA3AF",
+                          border: "1px solid rgba(255,255,255,0.06)",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          transition: "all 0.2s"
+                        }}
+                      >
+                        {isTraceOpen ? "Hide AI Grading Steps" : "Show AI Grading Steps (CoT)"}
+                      </button>
+                      
+                      {isTraceOpen && (
+                        <div style={{
+                          marginTop: "12px",
+                          padding: "14px",
+                          borderRadius: "8px",
+                          background: "rgba(15, 23, 42, 0.4)",
+                          border: "1px solid rgba(255,255,255,0.02)"
+                        }}>
+                          <h5 style={{ margin: "0 0 8px 0", color: "#60A5FA", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Chain of Thought Trace</h5>
+                          <ul style={{ margin: 0, paddingLeft: "18px", color: "#9CA3AF", fontSize: "13px", lineHeight: "1.6" }}>
+                            {item.reasoningTrace.map((step, sIdx) => (
+                              <li key={sIdx} style={{ marginBottom: "6px" }}>{step}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ marginTop: "24px", display: "flex", gap: "12px" }}>
+            <button onClick={restartSameQuiz} style={{
+              padding: "12px 24px",
+              borderRadius: "999px",
+              border: "none",
+              background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+              color: "#FFFFFF",
+              fontWeight: "bold",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(59, 130, 246, 0.4)"
+            }}>
+              Practice Again
+            </button>
+            <button onClick={loadQuestions} style={{
+              padding: "12px 24px",
+              borderRadius: "999px",
+              border: "1px solid rgba(255,255,255,0.1)",
+              background: "transparent",
+              color: "#D1D5DB",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}>
+              Load New Questions
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // MCQ report
     return (
       <div style={{ padding: "20px" }}>
         <h1>Quiz Report</h1>
@@ -681,14 +1048,14 @@ const QuizPage = () => {
                 {currentPlayingKey === "misconception" ? "⏸ Stop Audio" : loadingTts === "misconception" ? "⏳ Loading..." : "🔊 Listen Feedback"}
               </button>
             </div>
-            <p style={{ margin: 0 }}>{renderFormattedText(report.misconceptionExplanation)}</p>
+            <p style={{ margin: 0, color: "#1E293B" }}>{renderFormattedText(report.misconceptionExplanation)}</p>
           </div>
         )}
 
         {report.mainMisconception && report.mainMisconception !== "none" && (
           <QuizVisualCorrection
-            svgComponent={report.svgComponent}
-            svgVariant={report.svgVariant}
+            svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception) || "ReflectionMisconceptionFeedback"}
+            svgVariant={report.svgVariant || report.mainMisconception}
             misconceptionTag={report.mainMisconception}
             explanation={report.misconceptionExplanation || report.reason}
           />
@@ -748,56 +1115,50 @@ const QuizPage = () => {
                     let color = "#94A3B8";
 
                     if (isCorrectOption) {
-                      background = "rgba(16, 185, 129, 0.1)"; // emerald
+                      background = "rgba(16, 185, 129, 0.15)";
                       border = "1px solid #10B981";
                       color = "#34D399";
-                    }
-
-                    if (isSelected && !isCorrectOption) {
-                      background = "rgba(239, 68, 68, 0.1)"; // red
+                    } else if (isSelected) {
+                      background = "rgba(239, 68, 68, 0.15)";
                       border = "1px solid #EF4444";
-                      color = "#F87171";
+                      color = "#FCA5A5";
                     }
 
                     return (
                       <div
-                        key={`opt-${item.index}-${optionIdx}`}
+                        key={optionIdx}
                         style={{
-                          padding: "14px 16px",
-                          borderRadius: "10px",
-                          border,
+                          padding: "12px 16px",
+                          borderRadius: "8px",
                           background,
+                          border,
                           color,
+                          fontSize: "14px",
                           fontWeight: isSelected || isCorrectOption ? 600 : 400,
                         }}
                       >
-                        <span style={{ marginRight: "12px", opacity: 0.7, fontWeight: "bold" }}>
+                        <span style={{ marginRight: "10px", fontWeight: "bold" }}>
                           {String.fromCharCode(65 + optionIdx)}.
                         </span>
                         {opt}
-                        {isSelected && !isCorrectOption ? " ✗" : ""}
-                        {isCorrectOption ? " ✓" : ""}
                       </div>
                     );
                   })}
                 </div>
 
-                {!item.isCorrect && (
-                  <div style={{ marginTop: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <strong style={{ color: "#F8FAFC" }}>Why wrong:</strong>
-                      <button
-                        onClick={() => handlePlaySpeech(item.reason, `reason-${item.index}`)}
-                        style={currentPlayingKey === `reason-${item.index}` ? styles.audioBtnActive : loadingTts === `reason-${item.index}` ? styles.audioBtnLoading : styles.audioBtn}
-                        disabled={loadingTts !== null && loadingTts !== `reason-${item.index}`}
-                      >
-                        {currentPlayingKey === `reason-${item.index}` ? "⏸ Stop Audio" : loadingTts === `reason-${item.index}` ? "⏳ Loading..." : "🔊 Listen"}
-                      </button>
-                    </div>
-                    <p style={{ margin: "0 0 12px", color: "#CBD5E1", lineHeight: 1.5 }}>
-                      {renderFormattedText(item.reason)}
-                      {item.focusArea ? <span style={{ color: "#94A3B8", display: "block", marginTop: "4px" }}> Focus: {item.focusArea}</span> : ""}
+                <div style={{ marginTop: "12px", padding: "12px", background: "rgba(30, 41, 59, 0.4)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.02)" }}>
+                  <p style={{ margin: 0, color: "#CBD5E1", fontSize: "14px", lineHeight: 1.5 }}>
+                    <strong>Feedback:</strong> {renderFormattedText(item.reason)}
+                  </p>
+                  {item.focusArea && item.focusArea !== "none" && (
+                    <p style={{ margin: "6px 0 0 0", color: "#9CA3AF", fontSize: "13px" }}>
+                      <strong>Concept Tag:</strong> {item.focusArea}
                     </p>
+                  )}
+                </div>
+
+                {item.focusArea && item.focusArea !== "none" && (
+                  <div style={{ marginTop: "10px" }}>
                     <button
                       onClick={() => {
                         setActiveVisualByQuestion((prev) => ({
@@ -842,42 +1203,29 @@ const QuizPage = () => {
           </div>
         )}
 
-        {!!report.questionFeedback?.length && (
-          <div style={{ marginTop: "24px", padding: "24px", border: "1px solid rgba(255,255,255,0.02)", borderRadius: "16px", background: "rgba(15, 23, 42, 0.6)" }}>
-            <h3 style={{ marginTop: 0, color: "#F8FAFC" }}>Per-Question Feedback</h3>
-            {report.questionFeedback.map((item, idx) => (
-              <div key={`${item.question_id || "q"}-${idx}`} style={{ marginTop: idx === 0 ? 0 : "16px", paddingTop: idx === 0 ? 0 : "16px", borderTop: idx === 0 ? "none" : "1px solid rgba(255,255,255,0.02)" }}>
-                <p style={{ margin: "0 0 8px", color: "#60A5FA", fontWeight: 700 }}>Question {idx + 1}</p>
-                <p style={{ margin: "0 0 8px", color: "#F8FAFC" }}>{item.question_text}</p>
-                <p style={{ margin: "0 0 8px", color: "#CBD5E1" }}>{renderFormattedText(item.reason)}</p>
-                <p style={{ margin: 0, color: "#9CA3AF" }}><strong>Focus:</strong> {item.focus_area}</p>
-              </div>
-            ))}
+        {report.mainMisconception && report.mainMisconception !== "none" && (
+          <div style={{ marginTop: "24px", display: "flex", gap: "10px" }}>
+            <button
+              onClick={startMisconceptionQuiz}
+              disabled={loadingRemedial}
+              style={{
+                padding: "12px 24px",
+                cursor: loadingRemedial ? "not-allowed" : "pointer",
+                borderRadius: "999px",
+                border: "none",
+                background: "linear-gradient(135deg, #10B981, #059669)",
+                color: "#FFFFFF",
+                fontWeight: "bold",
+                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+              }}
+            >
+              {loadingRemedial ? "Generating remedial round..." : "🎯 Start Targeted Misconception Round"}
+            </button>
           </div>
         )}
 
         <div style={{ marginTop: "20px", display: "flex", gap: "10px" }}>
           <button onClick={restartSameQuiz} style={{ padding: "10px 16px", cursor: "pointer" }}>
-            Retry Same Quiz
-          </button>
-          {report.wrongCount > 0 && (
-            <button
-              onClick={startMisconceptionQuiz}
-              disabled={loadingRemedial}
-              style={{
-                padding: "10px 16px",
-                cursor: loadingRemedial ? "not-allowed" : "pointer",
-                border: "1px solid #c7d2fe",
-                borderRadius: "8px",
-                background: loadingRemedial ? "#e5e7eb" : "#eef2ff",
-                color: "#3730a3",
-                fontWeight: 700,
-              }}
-            >
-              {loadingRemedial ? "Preparing Misconception Quiz..." : "Take Misconception Quiz"}
-            </button>
-          )}
-          <button onClick={loadQuestions} style={{ padding: "10px 16px", cursor: "pointer" }}>
             Start New Quiz
           </button>
         </div>
@@ -885,27 +1233,13 @@ const QuizPage = () => {
     );
   }
 
-  if (!questions.length) {
-    return (
-      <div style={{ padding: "20px" }}>
-        <h1>AI Tutor Quiz</h1>
-        {error ? (
-          <p style={{ color: "#b00020", fontWeight: 600 }}>{error}</p>
-        ) : (
-          <p>No questions available right now.</p>
-        )}
-        <button onClick={loadQuestions} style={{ padding: "10px 16px", cursor: "pointer" }}>
-          Reload Questions
-        </button>
-      </div>
-    );
-  }
-
-  const currentQuestion = questions[currentIndex];
-  const selectedForCurrent = answers[currentQuestion._key];
-  const isLast = currentIndex === questions.length - 1;
+  // --- QUIZ QUESTIONS RENDERING ---
+  const currentQuestion = questions[currentIndex] || null;
+  const selectedForCurrent = currentQuestion ? answers[currentQuestion._key] : undefined;
+  const isLast = questions.length > 0 ? currentIndex === questions.length - 1 : false;
 
   return (
+
     <div style={{ padding: "20px", position: "relative", minHeight: "300px" }}>
       {submitting && (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(11, 15, 25, 0.8)", zIndex: 100, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: "12px", backdropFilter: "blur(6px)" }}>
@@ -916,99 +1250,164 @@ const QuizPage = () => {
           </p>
         </div>
       )}
+
+      {/* Mode Selector Tabs */}
+      {quizMode !== "misconception" && (
+        <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
+          <button
+            onClick={() => setQuizType("mcq")}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: quizType === "mcq" ? "1px solid #3B82F6" : "1px solid rgba(255,255,255,0.05)",
+              background: quizType === "mcq" ? "rgba(59, 130, 246, 0.15)" : "rgba(30, 41, 59, 0.4)",
+              color: quizType === "mcq" ? "#60A5FA" : "#9CA3AF",
+              cursor: "pointer",
+              fontWeight: 600,
+              transition: "all 0.2s"
+            }}
+          >
+            Multiple Choice (MCQ)
+          </button>
+          <button
+            onClick={() => setQuizType("descriptive")}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: quizType === "descriptive" ? "1px solid #10B981" : "1px solid rgba(255,255,255,0.05)",
+              background: quizType === "descriptive" ? "rgba(16, 185, 129, 0.15)" : "rgba(30, 41, 59, 0.4)",
+              color: quizType === "descriptive" ? "#34D399" : "#9CA3AF",
+              cursor: "pointer",
+              fontWeight: 600,
+              transition: "all 0.2s"
+            }}
+          >
+            Descriptive Practice (CoT Grading)
+          </button>
+        </div>
+      )}
+
       <h1>{quizMode === "misconception" ? "🎯 Misconception Quiz" : "🧠 AI Tutor Quiz"}</h1>
       {quizMode === "misconception" && (
         <p style={{ marginTop: "4px", color: "#374151", fontWeight: 600 }}>
           This round targets only the misconceptions from your previous attempt.
         </p>
       )}
-      <p style={{ color: "#4b587c", fontWeight: 600 }}>
-        Question {currentIndex + 1} of {questions.length}
-      </p>
 
-      {error && (
-        <p style={{ color: "#b00020", fontWeight: 600 }}>
-          {error}
-        </p>
+      {!questions.length ? (
+        <div style={{ padding: "40px 0" }}>
+          <p style={{ color: "#9CA3AF" }}>No questions loaded for this topic yet.</p>
+          <button onClick={loadQuestions} style={{ padding: "10px 16px", cursor: "pointer", borderRadius: "8px", border: "none", background: "#3B82F6", color: "#fff", fontWeight: "bold" }}>
+            Try Loading Questions
+          </button>
+        </div>
+      ) : (
+        <>
+          <p style={{ color: "#4b587c", fontWeight: 600 }}>
+            Question {currentIndex + 1} of {questions.length}
+          </p>
+
+          {error && (
+            <p style={{ color: "#ef4444", fontWeight: 600 }}>
+              {error}
+            </p>
+          )}
+
+          {quizType === "descriptive" ? (
+            <QuizCard
+              key={currentQuestion._key}
+              question={currentQuestion}
+              index={currentIndex}
+              questionKey={currentQuestion._key}
+              isDescriptive={true}
+              textValue={answers[currentQuestion._key] || ""}
+              onChangeText={handleChangeText}
+            />
+          ) : (
+            <QuizCard
+              key={currentQuestion._key}
+              question={currentQuestion}
+              index={currentIndex}
+              questionKey={currentQuestion._key}
+              selected={selectedForCurrent}
+              onSelect={handleSelect}
+            />
+          )}
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+            <button
+              onClick={handlePrevious}
+              disabled={currentIndex === 0}
+              style={{
+                padding: "12px 24px",
+                cursor: currentIndex === 0 ? "not-allowed" : "pointer",
+                borderRadius: "999px",
+                border: "1px solid rgba(255,255,255,0.02)",
+                background: currentIndex === 0 ? "rgba(255,255,255,0.02)" : "rgba(30, 41, 59, 0.8)",
+                color: currentIndex === 0 ? "#6B7280" : "#F8FAFC",
+                fontWeight: 600,
+                transition: "all 0.2s"
+              }}
+            >
+              Previous
+            </button>
+
+            {!isLast ? (
+              <button
+                onClick={handleNext}
+                disabled={selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())}
+                style={{
+                  padding: "12px 24px",
+                  cursor: (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) ? "not-allowed" : "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+                  color: (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) ? "#6B7280" : "#FFFFFF",
+                  fontWeight: 600,
+                  boxShadow: (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) ? "none" : "0 4px 14px rgba(59, 130, 246, 0.3)",
+                  transition: "all 0.2s"
+                }}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={(selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) || submitting}
+                style={{
+                  padding: "12px 24px",
+                  cursor:
+                    (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) || submitting
+                      ? "not-allowed"
+                      : "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  fontWeight: 700,
+                  color: "#ffffff",
+                  background:
+                    (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim()))
+                      ? "#4b5563"
+                      : submitting
+                        ? "linear-gradient(90deg, #4b5563, #6b7280)"
+                        : quizType === "descriptive"
+                          ? "linear-gradient(90deg, #10B981, #059669)"
+                          : "linear-gradient(90deg, #4f46e5, #6366f1)",
+                  boxShadow:
+                    (selectedForCurrent === undefined || (quizType === "descriptive" && !String(selectedForCurrent).trim())) || submitting
+                      ? "none"
+                      : quizType === "descriptive"
+                        ? "0 10px 20px rgba(16, 185, 129, 0.3)"
+                        : "0 10px 20px rgba(79, 70, 229, 0.4)",
+                  transform: submitting ? "scale(0.97)" : "scale(1)",
+                  transition: "all 0.18s ease-out",
+                }}
+              >
+                {submitting ? "Evaluating..." : "Finish Quiz"}
+              </button>
+            )}
+          </div>
+        </>
       )}
-
-      <QuizCard
-        key={currentQuestion._key}
-        question={currentQuestion}
-        index={currentIndex}
-        questionKey={currentQuestion._key}
-        selected={selectedForCurrent}
-        onSelect={handleSelect}
-      />
-
-      <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-        <button
-          onClick={handlePrevious}
-          disabled={currentIndex === 0}
-          style={{
-            padding: "12px 24px",
-            cursor: currentIndex === 0 ? "not-allowed" : "pointer",
-            borderRadius: "999px",
-            border: "1px solid rgba(255,255,255,0.02)",
-            background: currentIndex === 0 ? "rgba(255,255,255,0.02)" : "rgba(30, 41, 59, 0.8)",
-            color: currentIndex === 0 ? "#6B7280" : "#F8FAFC",
-            fontWeight: 600,
-            transition: "all 0.2s"
-          }}
-        >
-          Previous
-        </button>
-
-        {!isLast ? (
-          <button
-            onClick={handleNext}
-            disabled={selectedForCurrent === undefined}
-            style={{
-              padding: "12px 24px",
-              cursor: selectedForCurrent === undefined ? "not-allowed" : "pointer",
-              borderRadius: "999px",
-              border: selectedForCurrent === undefined ? "1px solid rgba(255,255,255,0.02)" : "none",
-              background: selectedForCurrent === undefined ? "rgba(255,255,255,0.05)" : "linear-gradient(135deg, #3B82F6, #1D4ED8)",
-              color: selectedForCurrent === undefined ? "#6B7280" : "#FFFFFF",
-              fontWeight: 600,
-              boxShadow: selectedForCurrent === undefined ? "none" : "0 4px 14px rgba(59, 130, 246, 0.3)",
-              transition: "all 0.2s"
-            }}
-          >
-            Next
-          </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            disabled={selectedForCurrent === undefined || submitting}
-            style={{
-              padding: "10px 20px",
-              cursor:
-                selectedForCurrent === undefined || submitting
-                  ? "not-allowed"
-                  : "pointer",
-              borderRadius: "999px",
-              border: "none",
-              fontWeight: 700,
-              color: "#ffffff",
-              background:
-                selectedForCurrent === undefined
-                  ? "#9ca3af"
-                  : submitting
-                    ? "linear-gradient(90deg, #4b5563, #6b7280)"
-                    : "linear-gradient(90deg, #4f46e5, #6366f1)",
-              boxShadow:
-                selectedForCurrent === undefined || submitting
-                  ? "0 4px 10px rgba(156, 163, 175, 0.5)"
-                  : "0 10px 20px rgba(79, 70, 229, 0.4)",
-              transform: submitting ? "scale(0.97)" : "scale(1)",
-              transition: "all 0.18s ease-out",
-            }}
-          >
-            {submitting ? "Checking answers..." : "Finish Quiz"}
-          </button>
-        )}
-      </div>
     </div>
   );
 };

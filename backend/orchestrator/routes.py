@@ -589,19 +589,18 @@ def evaluate_descriptive_answer_route(req: DescriptiveEvaluationRequest):
         required_keywords=question["required_keywords"]
     )
 
-    # 4. Extract scores and calculate weighted final score
+    # 4. Extract scores and calculate weighted final score (70% Understanding, 25% Completeness, 5% Keywords)
     scores = result.get("scores", {})
-    conceptual = scores.get("conceptual", 0)
+    understanding = scores.get("understanding", 0)
     completeness = scores.get("completeness", 0)
-    terminology = scores.get("terminology", 0)
+    keywords = scores.get("keywords", 0)
     
-    # Calculate weighted score (Conceptual * 0.6 + Completeness * 0.4)
-    weighted_score = (conceptual * 0.6) + (completeness * 0.4)
+    weighted_score = (understanding * 0.70) + (completeness * 0.25) + (keywords * 0.05)
 
     # 5. Log behavior event
     tag = result.get("misconception_tag")
-    # Mark is_correct = True if conceptual score >= 8
-    is_correct = conceptual >= 8
+    is_correct = understanding >= 8
+
     
     try:
         log_student_behavior(
@@ -682,8 +681,7 @@ def misconception_reason(req: MisconceptionReasonRequest):
     }
 
 
-import edge_tts
-from fastapi import Response
+from fastapi.responses import StreamingResponse
 
 @router.get("/api/tts")
 async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
@@ -691,7 +689,11 @@ async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
         raise HTTPException(status_code=400, detail="Text is required")
     
     try:
-        print("TTS Request received for text:", text)
+        import edge_tts
+    except ImportError:
+        raise HTTPException(status_code=500, detail="edge-tts package is not installed. Please run 'pip install edge-tts'.")
+
+    try:
         communicate = edge_tts.Communicate(text, voice)
         
         audio_data = bytearray()
@@ -704,3 +706,4 @@ async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
         return Response(content=bytes(audio_data), media_type="audio/mpeg")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
