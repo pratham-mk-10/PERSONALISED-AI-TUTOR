@@ -90,7 +90,6 @@ def topic_keys_for(topic: str | None) -> list[str]:
             "reflection_of_light",
             "laws_of_reflection",
             "plane_mirror",
-            "spherical_mirrors",
         ]
     return [topic_key]
 
