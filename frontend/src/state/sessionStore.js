@@ -39,12 +39,14 @@ export const useSessionStore = create((set, get) => ({
 		set({ currentChapterId: chapterId, currentTopicId: null }),
 	selectTopic: (topicId) => set({ currentTopicId: topicId }),
 
-	recordResult: (topicId, score) => {
+	recordResult: (topicId, score, misconception) => {
 		const { progress } = get();
-		const prev = progress[topicId] || { attempts: 0, bestScore: 0 };
+		const prev = progress[topicId] || { attempts: 0, bestScore: 0, mastery: 0, misconception: null };
 		const updated = {
 			attempts: prev.attempts + 1,
 			bestScore: Math.max(prev.bestScore, score),
+			mastery: score,
+			misconception: (misconception && misconception !== "none") ? misconception : prev.misconception,
 		};
 		set({ progress: { ...progress, [topicId]: updated } });
 	},

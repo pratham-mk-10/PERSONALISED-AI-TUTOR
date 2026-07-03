@@ -7,6 +7,7 @@ import {
   submitAnswers,
   getDescriptiveQuestions,
   evalDescriptiveAnswer,
+  BASE_URL,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
 import QuizVisualCorrection from "./QuizVisualCorrection";
@@ -305,12 +306,14 @@ Key points include:
 - Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).`
 };
 
-const QuizPage = () => {
+const QuizPage = ({ onGoBackToLesson = null }) => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
   const progress = useSessionStore((s) => s.progress);
+  const recordResult = useSessionStore((s) => s.recordResult);
 
   const [quizType, setQuizType] = useState("mcq"); // "mcq" | "descriptive"
+  const [attemptNumber, setAttemptNumber] = useState(1);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -357,7 +360,7 @@ const QuizPage = () => {
       .trim();
 
     setLoadingTts(key);
-    const url = `http://localhost:8000/api/tts?text=${encodeURIComponent(cleanText)}`;
+    const url = `${BASE_URL}/api/tts?text=${encodeURIComponent(cleanText)}`;
     const audio = new Audio(url);
     audioInstanceRef.current = audio;
 
@@ -389,6 +392,7 @@ const QuizPage = () => {
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
     setQuizMode("regular");
+    setAttemptNumber(1);
 
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
@@ -503,7 +507,7 @@ const QuizPage = () => {
       let dbSyncWarning = null;
 
       try {
-        res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId });
+        res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId, attemptNumber });
         reason = {
           reason: res.reason,
           focus_area: res.focus_area,
@@ -514,6 +518,10 @@ const QuizPage = () => {
             res.main_misconception,
             quizTopicContext.title
           );
+        }
+
+        if (res?.attempt_number) {
+            setAttemptNumber(res.attempt_number);
         }
       } catch (submitErr) {
         dbSyncWarning = submitErr?.message || "Could not submit this attempt right now.";
@@ -559,12 +567,15 @@ const QuizPage = () => {
         };
       });
 
+      const accuracy = Math.round((correctCount / total) * 100);
+      recordResult(currentTopicId, accuracy, mainMisconception);
+
       setReport({
         type: "mcq",
         total,
         correctCount,
         wrongCount: total - correctCount,
-        accuracy: Math.round((correctCount / total) * 100),
+        accuracy,
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
         mainMisconception,
@@ -574,6 +585,9 @@ const QuizPage = () => {
         questionFeedback,
         detailedResults,
         dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
+        shouldRedirectToLesson: res?.should_redirect_to_lesson || false,
+        followUpStrategy: res?.follow_up_strategy || "visual_only",
+        serverAttemptNumber: res?.attempt_number || attemptNumber,
       });
     } catch (err) {
       setError(err?.message || "Unable to process quiz results");
@@ -712,6 +726,7 @@ const QuizPage = () => {
     setError("");
     setActiveVisualByQuestion({});
     setOpenTraceIndex(null);
+    setAttemptNumber(1);
   };
 
   const startMisconceptionQuiz = async () => {
@@ -769,6 +784,7 @@ const QuizPage = () => {
       setReport(null);
       setActiveVisualByQuestion({});
       setQuizMode("misconception");
+      setAttemptNumber(prev => prev + 1);
     } catch (err) {
       setError(err?.message || "Unable to start misconception quiz");
     } finally {
@@ -1021,7 +1037,20 @@ const QuizPage = () => {
     // MCQ report
     return (
       <div style={{ padding: "20px" }}>
-        <h1>Quiz Report</h1>
+        <h1>
+            {report.serverAttemptNumber >= 3
+                ? "Round 3 — Let's slow down"
+                : report.serverAttemptNumber === 2
+                ? "Round 2 — Targeted Practice"
+                : "Quiz Report"}
+        </h1>
+        {report.serverAttemptNumber >= 2 && (
+            <p style={{ color: "#F59E0B", marginTop: 4, fontWeight: 600 }}>
+                {report.serverAttemptNumber >= 3
+                    ? "You've attempted this 3 times. A different approach and a lesson revisit should help."
+                    : "This was a targeted round focusing on your specific misconceptions."}
+            </p>
+        )}
         <p style={{ fontWeight: 700, marginTop: "10px" }}>
           Score: {report.correctCount}/{report.total} ({report.accuracy}%)
         </p>
@@ -1204,23 +1233,43 @@ const QuizPage = () => {
         )}
 
         {report.mainMisconception && report.mainMisconception !== "none" && (
-          <div style={{ marginTop: "24px", display: "flex", gap: "10px" }}>
-            <button
-              onClick={startMisconceptionQuiz}
-              disabled={loadingRemedial}
-              style={{
-                padding: "12px 24px",
-                cursor: loadingRemedial ? "not-allowed" : "pointer",
-                borderRadius: "999px",
-                border: "none",
-                background: "linear-gradient(135deg, #10B981, #059669)",
-                color: "#FFFFFF",
-                fontWeight: "bold",
-                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
-              }}
-            >
-              {loadingRemedial ? "Generating remedial round..." : "🎯 Start Targeted Misconception Round"}
-            </button>
+          <div style={{ marginTop: "24px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {report.shouldRedirectToLesson && onGoBackToLesson ? (
+              <button
+                onClick={() => {
+                  onGoBackToLesson();
+                }}
+                style={{
+                  padding: "12px 24px",
+                  cursor: "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                  color: "#FFFFFF",
+                  fontWeight: "bold",
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+                }}
+              >
+                📚 Revisit Lesson — then try again
+              </button>
+            ) : (
+              <button
+                onClick={startMisconceptionQuiz}
+                disabled={loadingRemedial}
+                style={{
+                  padding: "12px 24px",
+                  cursor: loadingRemedial ? "not-allowed" : "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #10B981, #059669)",
+                  color: "#FFFFFF",
+                  fontWeight: "bold",
+                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+                }}
+              >
+                {loadingRemedial ? "Generating remedial round..." : "🎯 Start Targeted Misconception Round"}
+              </button>
+            )}
           </div>
         )}
 

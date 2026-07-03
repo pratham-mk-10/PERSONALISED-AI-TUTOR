@@ -5,6 +5,7 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 try:
@@ -16,6 +17,8 @@ try:
         update_student_level,
         update_student_topic_resolution,
         get_descriptive_question,
+        increment_topic_attempt,
+        reset_topic_attempt,
     )
     from database.queries import fetch_descriptive_questions_by_topic
     from database.connection import get_connection
@@ -37,6 +40,8 @@ except ImportError:
         update_student_level,
         update_student_topic_resolution,
         get_descriptive_question,
+        increment_topic_attempt,
+        reset_topic_attempt,
     )
     from backend.database.queries import fetch_descriptive_questions_by_topic
     from backend.database.connection import get_connection
@@ -77,6 +82,18 @@ def _load_content_agent_class():
         backend_root / "content-agent" / "content_agent.py",
     )
     return module
+
+
+def _load_adaptation_agent():
+    backend_root = Path(__file__).resolve().parents[1]
+    return _load_module(
+        "adaptation_agent_module",
+        backend_root / "adaptataion-agent" / "adaptation_agent.py",
+    )
+
+
+_adaptation_module = _load_adaptation_agent()
+adapt_after_submission = _adaptation_module.adapt_after_submission
 
 
 _adaptation_feedback = _load_adaptation_feedback_module()
@@ -148,6 +165,7 @@ class SubmitAnswersRequest(BaseModel):
     student_id: str | None = None
     topic: str | None = None
     answers: list[dict[str, Any]]
+    attempt_number: int | None = 1
 
 
 class EvaluationRequest(BaseModel):
@@ -332,8 +350,9 @@ def submit_answers(data: SubmitAnswersRequest):
     total = 0
     correct = 0
     db_sync_warning = None
+    refined_tags: dict[int, str] = {}
 
-    for ans in data.answers:
+    for idx, ans in enumerate(data.answers):
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
         if selected_raw is None or correct_raw is None:
@@ -386,6 +405,7 @@ def submit_answers(data: SubmitAnswersRequest):
                     tag = auto_tag.strip()
 
             tag = coerce_misconception_tag(tag, topic)
+            refined_tags[idx] = tag
             tags.append(tag)
             wrong_entries.append(
                 {
@@ -412,6 +432,24 @@ def submit_answers(data: SubmitAnswersRequest):
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
+    # Increment server-side attempt count; get verified attempt number
+    server_attempt = data.attempt_number or 1
+    try:
+        server_attempt = increment_topic_attempt(student_id, topic_key)
+    except Exception:
+        server_attempt = data.attempt_number or 1
+
+    # Get adaptation strategy
+    adaptation = adapt_after_submission(
+        main_misconception=main_misconception,
+        topic=topic,
+        attempt_number=server_attempt,
+        exclude_ids=[a.get("question_id") for a in data.answers if a.get("question_id")],
+        limit=5,
+    )
+    follow_up_strategy = adaptation.get("strategy", "visual_only")
+    should_redirect_to_lesson = adaptation.get("should_redirect_to_lesson", False)
+
     explanations_by_tag: dict[str, str] = {}
     if use_llm_feedback:
         def _fetch_explanation(entry):
@@ -436,7 +474,7 @@ def submit_answers(data: SubmitAnswersRequest):
                 explanation_data = content_agent.generate(
                     subtopic=topic,
                     misconception_tag=tag,
-                    attempt=2,
+                    attempt=data.attempt_number or 1,
                     question_text=entry.get("question_text") or None,
                     student_answer=sel_text or (str(sel_opt) if sel_opt is not None else None),
                     correct_answer=corr_text or (str(corr_opt) if corr_opt is not None else None),
@@ -452,7 +490,7 @@ def submit_answers(data: SubmitAnswersRequest):
             for future in as_completed(future_to_tag):
                 tag = future_to_tag[future]
                 try:
-                    result_tag, exp = future.result()
+                    result_tag, exp = future.result(timeout=30)
                     explanations_by_tag[result_tag] = exp
                 except Exception:
                     explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
@@ -467,7 +505,7 @@ def submit_answers(data: SubmitAnswersRequest):
                     explanation_data = content_agent.generate(
                         subtopic=topic,
                         misconception_tag=main_misconception,
-                        attempt=2,
+                        attempt=data.attempt_number or 1,
                     )
                     explanation = explanation_data.get("explanation")
                 except Exception:
@@ -499,20 +537,19 @@ def submit_answers(data: SubmitAnswersRequest):
     follow_up = []
 
     question_feedback = []
-    for ans in data.answers:
+    for idx, ans in enumerate(data.answers):
         selected = ans.get("selected")
         correct_ans = ans.get("correct")
         if str(selected) == str(correct_ans):
             continue
 
-        mapping = ans.get("misconception_map") or ans.get("misconception_tags") or {}
-        tag = (
-            mapping.get(selected)
-            or mapping.get(str(selected))
+        tag = refined_tags.get(idx) or coerce_misconception_tag(
+            (ans.get("misconception_map") or ans.get("misconception_tags") or {}).get(selected)
+            or (ans.get("misconception_map") or ans.get("misconception_tags") or {}).get(str(selected))
             or ans.get("misconception_tag")
-            or "general_concept_gap"
+            or "general_concept_gap",
+            topic,
         )
-        tag = coerce_misconception_tag(tag, topic)
         reason_text = explanations_by_tag.get(tag) if use_llm_feedback else _get_misconception_explanation(tag)
         if not reason_text:
             reason_text = _get_misconception_explanation(tag)
@@ -540,6 +577,9 @@ def submit_answers(data: SubmitAnswersRequest):
         "question_feedback": question_feedback,
         "db_sync_warning": db_sync_warning,
         "questions": follow_up,
+        "follow_up_strategy": follow_up_strategy,
+        "should_redirect_to_lesson": should_redirect_to_lesson,
+        "attempt_number": server_attempt,
     }
 
 
@@ -680,8 +720,6 @@ def misconception_reason(req: MisconceptionReasonRequest):
         "focus_area": reasoning.get("focus_area", req.misconception_tag),
     }
 
-
-from fastapi.responses import StreamingResponse
 
 @router.get("/api/tts")
 async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):

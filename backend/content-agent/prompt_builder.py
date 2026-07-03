@@ -87,11 +87,24 @@ def build_explanation_prompt(subtopic, misconception_tag, attempt, question_text
     if correct_answer is not None:
         context_lines.append(f"Correct answer: {correct_answer}")
 
-    pace_instruction = (
-        "Give a concise explanation in 2-3 short paragraphs, then end with one quick reminder sentence."
-        if attempt == 2
-        else "Explain step by step like an encouraging teacher in simple NCERT language, then end with one quick reminder sentence."
-    )
+    if attempt == 2:
+        pace_instruction = (
+            "Give a direct, targeted explanation in 2–3 paragraphs. "
+            "Focus on WHY the student's specific wrong belief is incorrect. "
+            "Use their exact wrong answer as a starting point."
+        )
+    elif attempt >= 3:
+        pace_instruction = (
+            "The student has struggled with this concept multiple times. "
+            "Use a completely different analogy from a real-world scenario they can visualize. "
+            "Avoid physics jargon. Be encouraging and extremely simple. "
+            "End with one concrete memorable sentence they can recall during a test."
+        )
+    else:
+        pace_instruction = (
+            "Explain step by step like an encouraging teacher. "
+            "Build from what they already know."
+        )
 
     return f"""
 You are an NCERT Class 10 physics teacher.

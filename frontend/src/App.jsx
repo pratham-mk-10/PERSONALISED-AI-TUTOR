@@ -51,6 +51,22 @@ function App() {
   ];
   const currentIndex = stages.indexOf(stage);
 
+  const handleGoBackToLesson = () => {
+    if (currentTopicId === "spherical-mirror-basics") {
+      setStage("smTell");
+    } else if (currentTopicId === "spherical-mirror-rules") {
+      setStage("smRulesTell");
+    } else if (currentTopicId === "spherical-mirror-image-formation") {
+      setStage("smFormationTell");
+    } else if (currentTopicId === "laws-reflection") {
+      setStage("tell1");
+    } else if (currentTopicId === "plane-mirror") {
+      setStage("pmTell");
+    } else {
+      setStage("pmTell"); // Fallback
+    }
+  };
+
   const renderSession = () => (
     <div style={styles.sessionPage}>
       <button style={styles.backBtn} onClick={() => setView("dashboard")}>
@@ -243,9 +259,9 @@ function App() {
               { id: "concave-infinity", label: "Concave: Obj At Infinity" },
               { id: "concave-beyond-c", label: "Concave: Obj Beyond C" },
               { id: "concave-at-c", label: "Concave: Obj At C" },
-              { id: "concave-between-c-and-f", label: "Concave: Obj Between C & F" },
+              { id: "concave-between-c-f", label: "Concave: Obj Between C & F" },
               { id: "concave-at-f", label: "Concave: Obj At F" },
-              { id: "concave-between-f-and-p", label: "Concave: Obj Between F & P" },
+              { id: "concave-between-p-f", label: "Concave: Obj Between F & P" },
               { id: "convex-infinity", label: "Convex: Obj At Infinity" },
               { id: "convex-finite", label: "Convex: Obj Finite Distance" },
             ].map(c => (
@@ -279,7 +295,7 @@ function App() {
       {/* SPHERICAL MIRROR QUIZ */}
       {stage === "smQuiz" && (
         <div style={styles.card}>
-          <QuizPage />
+          <QuizPage onGoBackToLesson={handleGoBackToLesson} />
         </div>
       )}
 
@@ -395,7 +411,7 @@ function App() {
       {/* TEST - BOTH LAWS */}
       {stage === "test" && (
         <div style={styles.card}>
-          <QuizPage />
+          <QuizPage onGoBackToLesson={handleGoBackToLesson} />
         </div>
       )}
 

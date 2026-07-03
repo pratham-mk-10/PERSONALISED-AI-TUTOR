@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8000";
+export const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const getQuestions = async ({ askedQuestionIds = [], limit = 5, topic = null, studentId = null } = {}) => {
   const res = await fetch(`${BASE_URL}/get-questions`, {
@@ -79,13 +79,13 @@ export const getGeneratedQuestions = async ({
   return res.json();
 };
 
-export const submitAnswers = async ({ answers, topic = null, studentId = null }) => {
+export const submitAnswers = async ({ answers, topic = null, studentId = null, attemptNumber = 1 }) => {
   const res = await fetch(`${BASE_URL}/submit-answers`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ answers, topic, student_id: studentId })
+    body: JSON.stringify({ answers, topic, student_id: studentId, attempt_number: attemptNumber })
   });
 
   if (!res.ok) {
