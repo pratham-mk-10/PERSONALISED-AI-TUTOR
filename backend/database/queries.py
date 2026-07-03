@@ -272,7 +272,14 @@ def fetch_descriptive_questions_by_topic(topic):
     if "laws" in normalized and "reflection" in normalized:
         normalized = "laws_of_reflection"
     elif "spherical" in normalized:
-        normalized = "spherical_mirrors"
+        if "basics" in normalized:
+            normalized = "spherical_mirror_basics"
+        elif "rules" in normalized:
+            normalized = "spherical_mirror_rules"
+        elif "image" in normalized or "formation" in normalized:
+            normalized = "spherical_mirror_image_formation"
+        else:
+            normalized = "spherical_mirrors"
     elif "plane" in normalized:
         normalized = "plane_mirror"
     elif "refraction" in normalized:
