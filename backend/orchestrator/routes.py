@@ -444,7 +444,7 @@ def submit_answers(data: SubmitAnswersRequest):
         main_misconception=main_misconception,
         topic=topic,
         attempt_number=server_attempt,
-        exclude_ids=[a.get("question_id") for a in data.answers if a.get("question_id")],
+        exclude_ids=[int(a.get("question_id")) for a in data.answers if a.get("question_id") is not None],
         limit=5,
     )
     follow_up_strategy = adaptation.get("strategy", "visual_only")
