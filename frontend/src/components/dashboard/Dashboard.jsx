@@ -20,7 +20,19 @@ const CHAPTERS = [
           { id: "mirror-formula", title: "d. Mirror Formula (Numerical Section)" },
         ],
       },
-      { id: "refraction-intro", title: "4. Introduction to Refraction", type: "topic" },
+      {
+        id: "refraction-umbrella",
+        title: "4. Refraction of Light",
+        type: "folder",
+        subtopics: [
+          { id: "refraction-intro",        title: "a. Introduction to Refraction  ✅" },
+          { id: "refraction-snells-law",   title: "b. Laws of Refraction (Snell's Law)  ✅" },
+          { id: "refraction-glass-slab",   title: "c. Refraction Through a Glass Slab  🔜" },
+          { id: "refraction-lenses",       title: "d. Spherical Lenses  🔜" },
+          { id: "refraction-lens-images",  title: "e. Image Formation by Lenses  🔜" },
+          { id: "refraction-lens-formula", title: "f. Lens Formula & Power  🔜" },
+        ],
+      },
     ],
   },
 ];
@@ -37,7 +49,7 @@ export default function Dashboard({ onStartTopic }) {
   } = useSessionStore();
 
   const activeChapter = CHAPTERS.find((c) => c.id === currentChapterId) || CHAPTERS[0];
-  const [expandedFolders, setExpandedFolders] = useState({ "spherical-mirrors-umbrella": true });
+  const [expandedFolders, setExpandedFolders] = useState({ "spherical-mirrors-umbrella": true, "refraction-umbrella": true });
 
   const toggleFolder = (folderId) => {
     setExpandedFolders((prev) => ({
