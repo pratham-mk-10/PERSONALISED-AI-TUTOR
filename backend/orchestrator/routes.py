@@ -681,10 +681,10 @@ def misconception_reason(req: MisconceptionReasonRequest):
     }
 
 
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 @router.get("/api/tts")
-async def text_to_speech(text: str, voice: str = "en-US-ChristopherNeural"):
+async def text_to_speech(text: str, voice: str = "en-IN-PrabhatNeural"):
     if not text:
         raise HTTPException(status_code=400, detail="Text is required")
     

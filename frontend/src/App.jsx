@@ -8,6 +8,8 @@ import PlaneMirrorBasicsAnimation from "./svg-engine/reflection/animations/Plane
 import SphericalMirrorDetailedAnimation from "./svg-engine/reflection/spherical-mirrors/animations/SphericalMirrorDetailedAnimation";
 import RayTracingRulesLesson from "./svg-engine/reflection/spherical-mirrors/animations/RayTracingRulesLesson";
 import ImageFormationLesson from "./svg-engine/reflection/spherical-mirrors/animations/ImageFormationLesson";
+import RefractionIntroAnimation from "./svg-engine/refraction/animations/RefractionIntroAnimation";
+import SnellsLawAnimation from "./svg-engine/refraction/animations/SnellsLawAnimation";
 import Dashboard from "./components/dashboard/Dashboard";
 import { useSessionStore } from "./state/sessionStore";
 import Sandbox from "./Sandbox";
@@ -48,6 +50,11 @@ function App() {
     "try2",
     "test",
     "mirrorFormulaComingSoon",
+    // ── REFRACTION ──
+    "rfIntroTell",
+    "rfIntroShow",
+    "rfSnellTell",
+    "rfSnellShow",
   ];
   const currentIndex = stages.indexOf(stage);
 
@@ -82,8 +89,14 @@ function App() {
             if (stage === "mirrorFormulaComingSoon") {
               return s === "mirrorFormulaComingSoon";
             }
+            if (currentTopicId === "refraction-intro" || stage === "rfIntroTell" || stage === "rfIntroShow") {
+              return s === "rfIntroTell" || s === "rfIntroShow";
+            }
+            if (currentTopicId === "refraction-snells-law" || stage === "rfSnellTell" || stage === "rfSnellShow") {
+              return s === "rfSnellTell" || s === "rfSnellShow";
+            }
             // Hide all prior stages when in Laws of Reflection
-            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz" && s !== "smRulesTell" && s !== "smRulesShow" && s !== "smFormationTell" && s !== "smFormationShow" && s !== "mirrorFormulaComingSoon";
+            return s !== "pmTell" && s !== "pmShow" && s !== "smTell" && s !== "smShow" && s !== "smQuiz" && s !== "smRulesTell" && s !== "smRulesShow" && s !== "smFormationTell" && s !== "smFormationShow" && s !== "mirrorFormulaComingSoon" && s !== "rfIntroTell" && s !== "rfIntroShow" && s !== "rfSnellTell" && s !== "rfSnellShow";
           })
           .map((s, i) => {
             const isActive = stage === s;
@@ -124,6 +137,10 @@ function App() {
                   try2: "6. Try",
                   test: "7. Quiz",
                   mirrorFormulaComingSoon: "Coming Soon",
+                  rfIntroTell: "1. Intro",
+                  rfIntroShow: "2. Watch",
+                  rfSnellTell: "1. Snell's Law",
+                  rfSnellShow: "2. Watch",
                 }[s]}
               </div>
             );
@@ -414,6 +431,242 @@ function App() {
           </button>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════
+          REFRACTION MODULE
+      ═══════════════════════════════════════════════════════ */}
+
+      {/* REFRACTION INTRO — TELL */}
+      {stage === "rfIntroTell" && (
+        <div style={{ ...styles.cardWide, maxWidth: "860px" }}>
+          <h2 style={styles.h2}>Introduction to Refraction</h2>
+
+          {/* ── TOP: two-column layout ── */}
+          <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap", marginBottom: "20px" }}>
+
+            {/* LEFT — static SVG diagram */}
+            <div style={{ flex: "0 0 auto" }}>
+              <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#94A3B8", textAlign: "center", fontStyle: "italic" }}>
+                Ray Diagram: Refraction at Air–Water boundary
+              </p>
+              <svg width="340" height="320" style={{ display: "block", borderRadius: "12px", border: "1px solid rgba(100,116,139,0.3)", background: "#0F172A" }}>
+                <defs>
+                  {/* Arrow markers */}
+                  <marker id="ti-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="#60A5FA" />
+                  </marker>
+                  <marker id="ti-teal" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="#2DD4BF" />
+                  </marker>
+                  {/* Medium gradients */}
+                  <linearGradient id="ti-air" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0%" stopColor="#1E3A5F" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="#0F1F38" stopOpacity="0.4" />
+                  </linearGradient>
+                  <linearGradient id="ti-water" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0C4A6E" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="#082f49" stopOpacity="1" />
+                  </linearGradient>
+                  <filter id="ti-glow">
+                    <feGaussianBlur stdDeviation="2.5" result="b"/>
+                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+
+                {/* AIR zone */}
+                <rect x="0" y="0" width="340" height="155" fill="url(#ti-air)" />
+                {/* WATER zone */}
+                <rect x="0" y="155" width="340" height="165" fill="url(#ti-water)" />
+                {/* Water ripples */}
+                {[20, 50, 80, 110].map(dy => (
+                  <path key={dy}
+                    d={`M0,${155+dy} Q85,${148+dy} 170,${155+dy} Q255,${162+dy} 340,${155+dy}`}
+                    fill="none" stroke="#38BDF8" strokeWidth="0.8" opacity="0.25" />
+                ))}
+
+                {/* Boundary line */}
+                <line x1="0" y1="155" x2="340" y2="155" stroke="#38BDF8" strokeWidth="2" opacity="0.8" />
+
+                {/* Medium labels */}
+                <text x="14" y="28" fill="#93C5FD" fontSize="13" fontWeight="700" fontFamily="Arial">AIR</text>
+                <text x="14" y="44" fill="#60A5FA" fontSize="11" fontFamily="Arial">n₁ = 1.00</text>
+                <text x="14" y="182" fill="#7DD3FC" fontSize="13" fontWeight="700" fontFamily="Arial">WATER</text>
+                <text x="14" y="198" fill="#38BDF8" fontSize="11" fontFamily="Arial">n₂ = 1.33</text>
+
+                {/* Normal (dashed vertical) — at x=170, from y=10 to y=310 */}
+                <line x1="170" y1="18" x2="170" y2="308" stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="7,5" />
+                <text x="176" y="30" fill="#94A3B8" fontSize="11" fontFamily="Arial" fontWeight="600">Normal (N)</text>
+
+                {/* INCIDENT RAY: from upper-left → (170,155) at 40° from normal */}
+                {/* 40° from vertical normal in air: dx = sin40° = 0.643, dy = -cos40° = -0.766 */}
+                {/* start = (170 - 0.643*130, 155 - 0.766*130) = (87, 55) */}
+                <line x1="87" y1="55" x2="170" y2="155"
+                  stroke="#60A5FA" strokeWidth="2.8" markerEnd="url(#ti-blue)" filter="url(#ti-glow)" />
+                {/* Incident ray label */}
+                <text x="72" y="50" fill="#60A5FA" fontSize="12" fontWeight="700" fontFamily="Arial" textAnchor="middle">Incident</text>
+                <text x="72" y="63" fill="#60A5FA" fontSize="12" fontWeight="700" fontFamily="Arial" textAnchor="middle">Ray</text>
+
+                {/* REFRACTED RAY: from (170,155) → lower-right at 29° from normal */}
+                {/* 29° from vertical normal in water: dx = sin29° = 0.485, dy = cos29° = 0.875 */}
+                {/* end = (170 + 0.485*135, 155 + 0.875*135) = (236, 273) */}
+                <line x1="170" y1="155" x2="236" y2="273"
+                  stroke="#2DD4BF" strokeWidth="2.8" markerEnd="url(#ti-teal)" filter="url(#ti-glow)" />
+                {/* Refracted ray label */}
+                <text x="258" y="262" fill="#2DD4BF" fontSize="12" fontWeight="700" fontFamily="Arial">Refracted</text>
+                <text x="258" y="275" fill="#2DD4BF" fontSize="12" fontWeight="700" fontFamily="Arial">Ray</text>
+
+                {/* Point of incidence dot */}
+                <circle cx="170" cy="155" r="5" fill="#FBBF24" stroke="#F59E0B" strokeWidth="1.5" />
+                <text x="178" y="152" fill="#FBBF24" fontSize="11" fontFamily="Arial" fontWeight="600">P</text>
+
+                {/* ANGLE i arc — upper left quadrant, from normal to incident ray */}
+                {/* Arc from -40° to 0° (above surface, measured from upward normal) */}
+                {/* r=44: from (170+44*sin(-40°), 155-44*cos(-40°)) to (170, 155-44) */}
+                {/* = (170-28.3, 155-33.7) to (170, 111) → (141.7,121.3) to (170,111) */}
+                <path d="M141.7,121.3 A44,44 0 0,1 170,111"
+                  fill="none" stroke="#FBBF24" strokeWidth="2" />
+                <path d="M141.7,121.3 A44,44 0 0,1 170,111 L170,155 Z"
+                  fill="#FBBF24" fillOpacity="0.12" />
+                <text x="143" y="109" fill="#FBBF24" fontSize="17" fontWeight="900" fontFamily="Arial" textAnchor="middle">i</text>
+                <text x="143" y="123" fill="#FBBF24" fontSize="10" fontFamily="Arial" textAnchor="middle">=40°</text>
+
+                {/* ANGLE r arc — lower right quadrant, from normal to refracted ray */}
+                {/* Arc from 0° to 29° (below surface, measured from downward normal) */}
+                {/* r=44: from (170, 155+44) to (170+44*sin29°, 155+44*cos29°) */}
+                {/* = (170,199) to (170+21.3,155+38.5) = (191.3,193.5) */}
+                <path d="M170,199 A44,44 0 0,0 191.3,193.5"
+                  fill="none" stroke="#34D399" strokeWidth="2" />
+                <path d="M170,199 A44,44 0 0,0 191.3,193.5 L170,155 Z"
+                  fill="#34D399" fillOpacity="0.12" />
+                <text x="197" y="189" fill="#34D399" fontSize="17" fontWeight="900" fontFamily="Arial">r</text>
+                <text x="197" y="202" fill="#34D399" fontSize="10" fontFamily="Arial">=29°</text>
+
+                {/* i > r callout badge */}
+                <rect x="60" y="265" width="120" height="36" rx="8" fill="#1E3A5F" stroke="#60A5FA" strokeWidth="1" />
+                <text x="120" y="279" fill="#93C5FD" fontSize="11" fontWeight="700" fontFamily="Arial" textAnchor="middle">i (40°) &gt; r (29°)</text>
+                <text x="120" y="293" fill="#2DD4BF" fontSize="10" fontFamily="Arial" textAnchor="middle">↑ bends TOWARD normal</text>
+
+                {/* Speed labels */}
+                <text x="310" y="85" fill="#93C5FD" fontSize="10" fontFamily="Arial" textAnchor="middle">faster</text>
+                <text x="310" y="97" fill="#93C5FD" fontSize="10" fontFamily="Arial" textAnchor="middle">⚡</text>
+                <text x="310" y="228" fill="#38BDF8" fontSize="10" fontFamily="Arial" textAnchor="middle">slower</text>
+                <text x="310" y="240" fill="#38BDF8" fontSize="10" fontFamily="Arial" textAnchor="middle">🐢</text>
+              </svg>
+            </div>
+
+            {/* RIGHT — explanation text */}
+            <div style={{ flex: "1 1 240px" }}>
+              <p style={{ margin: "0 0 14px", fontSize: "14px", color: "#D1D5DB", lineHeight: "1.7" }}>
+                <strong style={{ color: "#60A5FA" }}>Refraction</strong> is the <strong>bending of light</strong>{" "}
+                when it crosses the boundary between two transparent mediums (e.g., Air → Water).
+              </p>
+              <p style={{ margin: "0 0 14px", fontSize: "14px", color: "#D1D5DB", lineHeight: "1.7" }}>
+                Light slows down in water (denser), which makes it bend{" "}
+                <strong style={{ color: "#2DD4BF" }}>toward the Normal</strong>.
+              </p>
+
+              {/* Key terms as colour-coded pills */}
+              {[
+                { label: "Incident Ray", color: "#60A5FA", desc: "incoming ray of light" },
+                { label: "Normal (N)", color: "#94A3B8", desc: "⊥ line at point P" },
+                { label: "Refracted Ray", color: "#2DD4BF", desc: "bent ray after boundary" },
+                { label: "Angle i", color: "#FBBF24", desc: "in AIR from Normal = 40°" },
+                { label: "Angle r", color: "#34D399", desc: "in WATER from Normal = 29°" },
+              ].map(({ label, color, desc }) => (
+                <div key={label} style={{
+                  display: "flex", alignItems: "center", gap: "10px",
+                  marginBottom: "8px", padding: "7px 10px",
+                  background: "rgba(255,255,255,0.03)", borderRadius: "8px",
+                  border: `1px solid ${color}33`,
+                }}>
+                  <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: color, flexShrink: 0 }} />
+                  <span style={{ color, fontWeight: 700, fontSize: "13px", minWidth: "90px" }}>{label}</span>
+                  <span style={{ color: "#94A3B8", fontSize: "12px" }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── BOTTOM: Three fact cards ── */}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "22px" }}>
+            {[
+              {
+                icon: "🪣",
+                title: "Straw in Water",
+                text: "The straw looks bent because light from underwater bends away from the Normal when exiting to air.",
+                color: "#F59E0B",
+              },
+              {
+                icon: "📏",
+                title: "Snell's Law",
+                text: "n₁ sin i = n₂ sin r  — the ratio of sines is always equal to the ratio of refractive indices.",
+                color: "#818CF8",
+              },
+              {
+                icon: "🎯",
+                title: "Golden Rule",
+                text: "Rarer → Denser: r < i (toward normal).  Denser → Rarer: r > i (away from normal).",
+                color: "#2DD4BF",
+              },
+            ].map(({ icon, title, text, color }) => (
+              <div key={title} style={{
+                flex: "1 1 180px", padding: "14px",
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${color}44`,
+                borderRadius: "10px",
+              }}>
+                <p style={{ margin: "0 0 6px", fontSize: "22px" }}>{icon}</p>
+                <p style={{ margin: "0 0 6px", fontWeight: 700, color, fontSize: "13px" }}>{title}</p>
+                <p style={{ margin: 0, color: "#94A3B8", fontSize: "12px", lineHeight: "1.6" }}>{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <button style={styles.btnPrimary} onClick={() => setStage("rfIntroShow")}>
+            Watch the Animation with Audio →
+          </button>
+        </div>
+      )}
+
+      {/* REFRACTION INTRO — SHOW */}
+      {stage === "rfIntroShow" && (
+        <div style={styles.cardWide}>
+          <RefractionIntroAnimation onContinue={() => setStage("rfSnellTell")} />
+        </div>
+      )}
+
+      {/* REFRACTION — SNELL'S LAW TELL */}
+      {stage === "rfSnellTell" && (
+        <div style={{ ...styles.cardWide, maxWidth: "860px" }}>
+          <h2 style={styles.h2}>Laws of Refraction (Snell's Law)</h2>
+          <p style={styles.explanation}>
+            The laws of refraction relate the angle of incidence, angle of refraction,
+            and the refractive indices of the two mediums.
+          </p>
+          <div style={styles.lawBox}>
+            <p style={styles.lawText}>n₁ sin i = n₂ sin r</p>
+            <p style={{ ...styles.lawText, fontSize: 13, fontWeight: 500 }}>
+              Law 1: Incident ray, refracted ray, and normal are coplanar.<br />
+              Law 2: The ratio of sines equals the ratio of refractive indices.
+            </p>
+          </div>
+          <button style={styles.btnPrimary} onClick={() => setStage("rfSnellShow")}>
+            Watch Snell's Law Animation →
+          </button>
+        </div>
+      )}
+
+      {/* REFRACTION — SNELL'S LAW SHOW */}
+      {stage === "rfSnellShow" && (
+        <div style={styles.cardWide}>
+          <SnellsLawAnimation onContinue={() => setView("dashboard")} />
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }}>
+            <button style={styles.btnPrimary} onClick={() => setView("dashboard")}>
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -441,6 +694,10 @@ function App() {
             setStage("mirrorFormulaComingSoon");
           } else if (topicId === "laws-reflection") {
             setStage("tell1");
+          } else if (topicId === "refraction-intro") {
+            setStage("rfIntroTell");
+          } else if (topicId === "refraction-snells-law") {
+            setStage("rfSnellTell");
           } else {
             setStage("test");
           }

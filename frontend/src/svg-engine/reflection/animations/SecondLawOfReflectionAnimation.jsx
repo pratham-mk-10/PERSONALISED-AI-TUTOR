@@ -1,18 +1,20 @@
 // ============================================================
-// SecondLawOfReflectionAnimation.jsx (Reflection Rule)
-// The incident ray, reflected ray, and normal ALL lie in 
-// the SAME PLANE (perpendicular to the mirror surface)
+// SecondLawOfReflectionAnimation.jsx — 8-PART AUDIO-SYNCED VERSION
 //
-// Changes from the previous reflection step:
-// - Shows 3D representation (2D view of 3D space)
-// - Demonstrates ray + normal + mirror in same plane
-// - Shows what happens if ray goes out of plane (WRONG)
-// - Step-by-step: intro → mirror → normal → ray in plane → law
+// Part 1: Introduction to 2nd Law (coplanarity)
+// Part 2: Mirror surface
+// Part 3: Normal line
+// Part 4: Plane of incidence definition
+// Part 5: Incident ray in the plane
+// Part 6: Reflected ray in the plane
+// Part 7: All three in the SAME plane (emphasis)
+// Part 8: 2nd Law statement
+//
+// Physics: incident ray, reflected ray, and normal are coplanar
 // ============================================================
 
 import React from "react";
-import { useRef } from "react";
-import AnimationPlayer from "../../shared/AnimationPlayer";
+import AudioAnimationPlayer from "../../shared/AudioAnimationPlayer";
 import {
   incidentRayStart,
   reflectedRayEnd,
@@ -25,511 +27,241 @@ import {
   Label,
 } from "../../shared/SVGUtils";
 
-// ── CONSTANTS ────────────────────────────────────────────────
-const SVG_W    = 420;
-const SVG_H    = 320;
-const CX       = 210;
-const CY       = 200;
-const RAY_LEN  = 140;
-const ANGLE    = 35;
+const SVG_W = 420;
+const SVG_H = 320;
+const CX = 210;
+const CY = 200;
+const RAY_LEN = 140;
+const ANGLE = 35;
+
+const S = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0];
+
+function sp(progress, stepIndex) {
+  const start = S[stepIndex];
+  const end = S[stepIndex + 1];
+  return clamp((progress - start) / (end - start), 0, 1);
+}
+
+const AUDIO_STEPS = [
+  {
+    progress: S[1],
+    text:
+      "Welcome to the second law of reflection. " +
+      "The first law told us that angle i equals angle r. " +
+      "The second law tells us something equally important about geometry. " +
+      "It states that the incident ray, the reflected ray, and the normal " +
+      "all lie in the same flat plane. " +
+      "This property is called coplanarity. Let us understand this step by step.",
+  },
+  {
+    progress: S[2],
+    text:
+      "Here is our plane mirror — the smooth reflecting surface at the bottom. " +
+      "All reflection happens at this surface. " +
+      "The mirror defines one boundary of our diagram. " +
+      "Everything we draw must relate to this mirror surface.",
+  },
+  {
+    progress: S[3],
+    text:
+      "At the centre of the mirror, we draw the Normal — a dashed line perpendicular to the mirror. " +
+      "The normal makes exactly ninety degrees with the mirror surface. " +
+      "It is our reference line for measuring angles, just as in the first law.",
+  },
+  {
+    progress: S[4],
+    text:
+      "Now imagine an invisible flat sheet of paper standing upright on the mirror. " +
+      "This sheet contains both the mirror surface and the normal line. " +
+      "This flat surface is called the plane of incidence. " +
+      "It is perpendicular to the mirror — like a wall standing on the mirror floor. " +
+      "All rays of light in reflection must stay on this plane.",
+  },
+  {
+    progress: S[5],
+    text:
+      "Watch the blue incident ray draw in slowly. " +
+      "It travels toward the mirror from the upper left. " +
+      "Notice carefully: this ray lies entirely within the plane of incidence. " +
+      "It does not go above or below the plane — it stays flat on our imaginary sheet of paper.",
+  },
+  {
+    progress: S[6],
+    text:
+      "Now watch the red reflected ray appear. " +
+      "After striking the mirror, light bounces off as the reflected ray. " +
+      "The reflected ray also stays within the same plane of incidence. " +
+      "It does not pop out of the plane — it remains on the same flat surface as the incident ray and the normal.",
+  },
+  {
+    progress: S[7],
+    text:
+      "Look at all three elements together: the incident ray in blue, the reflected ray in red, and the normal in grey. " +
+      "All three lie in the exact same plane. " +
+      "They are coplanar — they share one flat two-dimensional surface. " +
+      "This is the key idea of the second law of reflection.",
+  },
+  {
+    progress: S[8],
+    text:
+      "To summarise the Second Law of Reflection: " +
+      "The incident ray, the reflected ray, and the normal at the point of incidence " +
+      "all lie in the same plane. " +
+      "This plane is perpendicular to the reflecting surface. " +
+      "Together with the first law — angle i equals angle r — " +
+      "these two laws completely describe how light reflects from a smooth surface.",
+  },
+];
 
 const SecondLawOfReflectionAnimation = ({ onTryItClicked }) => {
-  const audioRef = useRef(null);
-  const lastStepRef = useRef(-1);
-
-  const playAudio = (step) => {
-    if (step === lastStepRef.current) return;
-
-    lastStepRef.current = step;
-
-    const audioFiles = {
-      0: ["/audio/2nd_law_intro.wav"],
-      1: ["/audio/2nd_mirror.wav"],
-      2: ["/audio/2nd_normal.wav"],
-      3: ["/audio/2nd_plane_definition.wav"],
-      4: ["/audio/2nd_incident_plane.wav"],
-      5: ["/audio/2nd_reflected_plane.wav"],
-      6: ["/audio/2nd_all_same_plane.wav"],
-      7: ["/audio/2nd_law_statement.wav"],
-    };
-
-    const [audioFile, fallbackFile] = audioFiles[step] || [];
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    const audio = new Audio(audioFile);
-    audioRef.current = audio;
-
-    audio.onerror = () => {
-      if (!fallbackFile) return;
-
-      const fallbackAudio = new Audio(fallbackFile);
-      audioRef.current = fallbackAudio;
-      fallbackAudio.play().catch(() => {});
-    };
-
-    audio.play().catch(() => {});
-  };
+  const incStart = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
+  const refEnd = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
 
   return (
-    <AnimationPlayer
-      duration={48000}
-      title="2nd Law of Reflection"
+    <AudioAnimationPlayer
+      audioSteps={AUDIO_STEPS}
+      title="Watch: 2nd Law of Reflection — 8 Parts"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
+      tryButtonLabel="Try it yourself →"
     >
-      {({ progress, playing, hasStarted }) => {
-        // ── STEP LOGIC ──
-        let step = 0;
+      {({ progress }) => {
+        const part =
+          progress < S[1] ? 0 :
+          progress < S[2] ? 1 :
+          progress < S[3] ? 2 :
+          progress < S[4] ? 3 :
+          progress < S[5] ? 4 :
+          progress < S[6] ? 5 :
+          progress < S[7] ? 6 : 7;
 
-        if (progress < 0.08) step = 0;      // Intro
-        else if (progress < 0.18) step = 1; // Mirror appears
-        else if (progress < 0.30) step = 2; // Normal appears
-        else if (progress < 0.44) step = 3; // Plane definition
-        else if (progress < 0.58) step = 4; // Incident ray in plane
-        else if (progress < 0.72) step = 5; // Reflected ray in plane
-        else if (progress < 0.88) step = 6; // All in same plane (emphasis)
-        else step = 7;                       // Law statement
+        const mirrorOpacity = part >= 1 ? clamp(sp(progress, 1) / 0.55, 0, 1) : (part === 0 ? 0.3 : 0);
+        const normalOpacity = part >= 2 ? clamp(sp(progress, 2) / 0.55, 0, 1) : 0;
+        const planeOpacity = part >= 3 ? clamp(sp(progress, 3) / 0.5, 0, 1) : 0;
+        const incPhase = part >= 4 ? clamp(sp(progress, 4) / 0.7, 0, 1) : 0;
+        const refPhase = part >= 5 ? clamp(sp(progress, 5) / 0.7, 0, 1) : 0;
+        const emphasisOp = part >= 6 ? clamp(sp(progress, 6) / 0.45, 0, 1) : 0;
+        const lawOp = part >= 7 ? clamp(sp(progress, 7) / 0.45, 0, 1) : 0;
 
-        if (hasStarted) {
-          playAudio(step);
-          if (!playing && audioRef.current) {
-            audioRef.current.pause();
-          }
-        }
+        const incTip = lerp(incStart.x, incStart.y, CX, CY, incPhase);
+        const refTip = lerp(CX, CY, refEnd.x, refEnd.y, refPhase);
 
-        // ── FADE-INS ──
-        const mirrorOpacity = clamp(progress / 0.18, 0, 1);
-        const normalOpacity = clamp((progress - 0.18) / 0.12, 0, 1);
-        const planeOpacity = clamp((progress - 0.30) / 0.14, 0, 1);
-        const incPhase = clamp((progress - 0.44) / 0.14, 0, 1);
-        const refPhase = clamp((progress - 0.58) / 0.14, 0, 1);
-        const emphasisPhase = clamp((progress - 0.72) / 0.16, 0, 1);
-
-        // ── VISIBILITY FLAGS ──
-        const showPlaneBox = step >= 3;
-        const showIncRay = step >= 4;
-        const showRefRay = step >= 5;
-        const showEmphasis = step === 6;
-        const showLaw = step === 7;
-
-        // Move supporting labels away from the final law box in step 7.
+        const showLaw = part >= 7;
         const planeLabelX = showLaw ? 95 : 95;
         const planeLabelY = showLaw ? 232 : 95;
         const normalLabelX = showLaw ? CX + 18 : CX + 8;
         const normalLabelY = showLaw ? 156 : 75;
 
-        // ── RAY POSITIONS (animated along physically consistent paths) ──
-        const incStart = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
-        const refEnd = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
-
-        // Lerp incident ray from start toward mirror
-        const incTip = lerp(incStart.x, incStart.y, CX, CY, incPhase);
-
-        // Lerp reflected ray from mirror outward
-        const refTip = lerp(CX, CY, refEnd.x, refEnd.y, refPhase);
+        const CAPTIONS = [
+          { top: "Part 1 — 2nd Law Introduction", bot: "Incident ray, reflected ray, and normal are coplanar" },
+          { top: "Part 2 — The Mirror", bot: "Reflecting surface at the bottom" },
+          { top: "Part 3 — The Normal (N)", bot: "Perpendicular to mirror at 90°" },
+          { top: "Part 4 — Plane of Incidence", bot: "Flat sheet containing mirror + normal" },
+          { top: "Part 5 — Incident Ray in Plane", bot: "Blue ray stays on the plane of incidence" },
+          { top: "Part 6 — Reflected Ray in Plane", bot: "Red ray also stays on the same plane" },
+          { top: "Part 7 — All Three Coplanar", bot: "Incident + Reflected + Normal = SAME plane ✓" },
+          { top: "Part 8 — 2nd Law Statement", bot: "All three lie in one plane ⊥ to mirror" },
+        ];
+        const cap = CAPTIONS[part];
 
         return (
           <svg width={SVG_W} height={SVG_H} style={{ display: "block" }}>
-
-            {/* ── BACKGROUND ── */}
             <rect width={SVG_W} height={SVG_H} fill="#F8FAFF" />
 
-            {/* ── TITLE (STEP 0) ── */}
-            {step === 0 && (
-              <Label
-                x={CX}
-                y={50}
-                text="Reflection Rule"
-                color="#111827"
-                size={16}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {/* ── PLANE DEFINITION BOX ── */}
-            {showPlaneBox && (
+            {part >= 3 && (
               <g opacity={planeOpacity}>
-                {/* Subtle plane rectangle (represents the plane perpendicular to mirror) */}
-                <rect
-                  x={80}
-                  y={80}
-                  width={260}
-                  height={160}
-                  fill="none"
-                  stroke="#9CA3AF"
-                  strokeWidth="2"
-                  strokeDasharray="5,5"
-                  rx="4"
-                />
-                <Label
-                  x={planeLabelX}
-                  y={planeLabelY}
-                  text="Plane of Incidence"
-                  color="#6B7280"
-                  size={11}
-                  anchor="start"
-                  italic={true}
-                />
+                <rect x={80} y={80} width={260} height={160} fill="none" stroke="#9CA3AF" strokeWidth="2" strokeDasharray="5,5" rx="4" />
+                <Label x={planeLabelX} y={planeLabelY} text="Plane of Incidence" color="#6B7280" size={11} anchor="start" italic />
               </g>
             )}
 
-            {/* ── MIRROR ── */}
             <g opacity={mirrorOpacity}>
               <PlaneMirror x1={60} x2={360} y={CY} />
-
-              {/* Highlight mirror in step 1 */}
-              {step === 1 && (
-                <line
-                  x1={60}
-                  x2={360}
-                  y1={CY}
-                  y2={CY}
-                  stroke="#22C55E"
-                  strokeWidth="4"
-                  opacity="0.4"
-                />
+              {part === 1 && (
+                <line x1={60} x2={360} y1={CY} y2={CY} stroke="#22C55E" strokeWidth="4" opacity="0.4" />
               )}
             </g>
 
-            {/* ── NORMAL (perpendicular to mirror) ── */}
             {normalOpacity > 0 && (
               <g opacity={normalOpacity}>
                 <Normal x={CX} topY={60} bottomY={CY} />
-                <Label
-                  x={normalLabelX}
-                  y={normalLabelY}
-                  text="Normal (N)"
-                  color="#6B7280"
-                  size={12}
-                  anchor="start"
-                />
-
-                {/* Highlight normal in step 2 */}
-                {step === 2 && (
-                  <circle cx={CX} cy={130} r={3} fill="#6B7280" />
-                )}
+                <Label x={normalLabelX} y={normalLabelY} text="Normal (N)" color="#6B7280" size={12} anchor="start" />
+                {part === 2 && <circle cx={CX} cy={130} r={3} fill="#6B7280" />}
               </g>
             )}
 
-            {/* ── INCIDENT RAY ── */}
-            {showIncRay && incPhase > 0 && (
+            {incPhase > 0 && (
               <g>
                 <line
-                  x1={incStart.x}
-                  y1={incStart.y}
-                  x2={incTip.x}
-                  y2={incTip.y}
-                  stroke="#2563EB"
-                  strokeWidth="2.5"
-                  markerEnd="url(#arrow-blue)"
+                  x1={incStart.x} y1={incStart.y}
+                  x2={incTip.x} y2={incTip.y}
+                  stroke="#2563EB" strokeWidth="2.5"
+                  markerEnd={incPhase >= 0.98 ? "url(#slr-arrow-blue)" : undefined}
                 />
-
-                {/* Moving highlight dot */}
-                {progress >= 0.44 && progress < 0.70 && (
-                  <circle cx={incTip.x} cy={incTip.y} r={4} fill="#2563EB" />
-                )}
-
-                {/* Step 4 label */}
-                {step === 4 && (
-                  <Label
-                    x={incStart.x - 20}
-                    y={incStart.y - 15}
-                    text="Incident Ray"
-                    color="#2563EB"
-                    size={12}
-                    anchor="end"
-                    bold
-                  />
+                {incPhase < 0.98 && <circle cx={incTip.x} cy={incTip.y} r={4} fill="#2563EB" />}
+                {part === 4 && (
+                  <Label x={incStart.x - 20} y={incStart.y - 15} text="Incident Ray" color="#2563EB" size={12} anchor="end" bold />
                 )}
               </g>
             )}
 
-            {/* ── REFLECTED RAY ── */}
-            {showRefRay && refPhase > 0 && (
+            {refPhase > 0 && (
               <g>
                 <line
-                  x1={CX}
-                  y1={CY}
-                  x2={refTip.x}
-                  y2={refTip.y}
-                  stroke="#DC2626"
-                  strokeWidth="2.5"
-                  markerEnd="url(#arrow-red)"
+                  x1={CX} y1={CY}
+                  x2={refTip.x} y2={refTip.y}
+                  stroke="#DC2626" strokeWidth="2.5"
+                  markerEnd={refPhase >= 0.98 ? "url(#slr-arrow-red)" : undefined}
                 />
-
-                {/* Moving highlight dot */}
-                {progress >= 0.62 && progress < 0.85 && (
-                  <circle cx={refTip.x} cy={refTip.y} r={4} fill="#DC2626" />
-                )}
-
-                {/* Step 5 label */}
-                {step === 5 && (
-                  <Label
-                    x={refEnd.x + 20}
-                    y={refEnd.y - 15}
-                    text="Reflected Ray"
-                    color="#DC2626"
-                    size={12}
-                    anchor="start"
-                    bold
-                  />
+                {refPhase < 0.98 && <circle cx={refTip.x} cy={refTip.y} r={4} fill="#DC2626" />}
+                {part === 5 && (
+                  <Label x={refEnd.x + 20} y={refEnd.y - 15} text="Reflected Ray" color="#DC2626" size={12} anchor="start" bold />
                 )}
               </g>
             )}
 
-            {/* ── MARKERS (Arrow heads) ── */}
             <defs>
-              <marker
-                id="arrow-blue"
-                markerWidth="8"
-                markerHeight="8"
-                refX="6"
-                refY="3"
-                orient="auto"
-              >
+              <marker id="slr-arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#2563EB" />
               </marker>
-              <marker
-                id="arrow-red"
-                markerWidth="8"
-                markerHeight="8"
-                refX="6"
-                refY="3"
-                orient="auto"
-              >
+              <marker id="slr-arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#DC2626" />
               </marker>
             </defs>
 
-            {/* ── EMPHASIS BOX (Step 6) ── */}
-            {showEmphasis && emphasisPhase > 0.3 && (
-              <g opacity={clamp(emphasisPhase, 0, 1)}>
-                <rect
-                  x={70}
-                  y={130}
-                  width={280}
-                  height={90}
-                  fill="none"
-                  stroke="#22C55E"
-                  strokeWidth="3"
-                  rx="8"
-                  opacity="0.6"
-                />
-                <Label
-                  x={210}
-                  y={295}
-                  text="All three (incident ray, reflected ray, normal) lie in the SAME PLANE"
-                  color="#16A34A"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
+            {emphasisOp > 0 && (
+              <g opacity={emphasisOp}>
+                <rect x={70} y={130} width={280} height={90} fill="none" stroke="#22C55E" strokeWidth="3" rx="8" opacity="0.6" />
+                <Label x={210} y={295} text="All three lie in the SAME PLANE" color="#16A34A" size={12} anchor="middle" bold />
               </g>
             )}
 
-            {/* ── LAW STATEMENT (Step 7) ── */}
-            {showLaw && (
-              <g>
-                {/* Background box */}
-                <rect
-                  x={40}
-                  y={224}
-                  width={340}
-                  height={88}
-                  rx={8}
-                  fill="#EFF6FF"
-                  stroke="#BFDBFE"
-                  strokeWidth="2"
-                />
-
-                {/* Law statement */}
-                <Label
-                  x={210}
-                  y={246}
-                  text="2nd Law of Reflection:"
-                  color="#1E40AF"
-                  size={13}
-                  anchor="middle"
-                  bold
-                />
-
-                <Label
-                  x={210}
-                  y={266}
-                  text="The incident ray, reflected ray, and normal"
-                  color="#1E40AF"
-                  size={12}
-                  anchor="middle"
-                />
-
-                <Label
-                  x={210}
-                  y={284}
-                  text="ALL LIE IN THE SAME PLANE"
-                  color="#1E40AF"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-
-                <Label
-                  x={210}
-                  y={302}
-                  text="(perpendicular to the mirror surface)"
-                  color="#6B7280"
-                  size={11}
-                  anchor="middle"
-                  italic={true}
-                />
+            {lawOp > 0 && (
+              <g opacity={lawOp}>
+                <rect x={40} y={224} width={340} height={88} rx={8} fill="#EFF6FF" stroke="#BFDBFE" strokeWidth="2" />
+                <Label x={210} y={246} text="2nd Law of Reflection:" color="#1E40AF" size={13} anchor="middle" bold />
+                <Label x={210} y={266} text="Incident ray, reflected ray, and normal" color="#1E40AF" size={12} anchor="middle" />
+                <Label x={210} y={284} text="ALL LIE IN THE SAME PLANE" color="#1E40AF" size={12} anchor="middle" bold />
+                <Label x={210} y={302} text="(perpendicular to the mirror surface)" color="#6B7280" size={11} anchor="middle" italic />
               </g>
             )}
 
-            {/* ── TEACHER CAPTIONS (STEP-BY-STEP) ── */}
-            {step === 0 && (
-              <Label
-                x={210}
-                y={CY + 30}
-                text="Let's learn the 2nd law of reflection"
-                color="#111827"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 1 && (
-              <Label
-                x={210}
-                y={CY + 30}
-                text="We have a mirror (the reflecting surface)"
-                color="#111827"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 2 && (
-              <Label
-                x={210}
-                y={40}
-                text="Remember the Normal? It's perpendicular to the mirror."
-                color="#111827"
-                size={13}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 3 && (
-              <>
-                <Label
-                  x={210}
-                  y={35}
-                  text="There's an invisible PLANE that includes:"
-                  color="#111827"
-                  size={13}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={55}
-                  text="the mirror surface AND the normal line"
-                  color="#111827"
-                  size={13}
-                  anchor="middle"
-                />
-                <Label
-                  x={210}
-                  y={280}
-                  text="This plane is perpendicular to (standing upright from) the mirror"
-                  color="#6B7280"
-                  size={11}
-                  anchor="middle"
-                  italic={true}
-                />
-              </>
-            )}
-
-            {step === 4 && (
-              <>
-                <Label
-                  x={210}
-                  y={35}
-                  text="The incident ray (blue) travels towards the mirror"
-                  color="#2563EB"
-                  size={13}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={280}
-                  text="IMPORTANT: This ray must be in the same plane!"
-                  color="#2563EB"
-                  size={11}
-                  anchor="middle"
-                  italic={true}
-                />
-              </>
-            )}
-
-            {step === 5 && (
-              <>
-                <Label
-                  x={210}
-                  y={35}
-                  text="The reflected ray (red) bounces off the mirror"
-                  color="#DC2626"
-                  size={13}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={280}
-                  text="Notice: The reflected ray ALSO stays in the same plane!"
-                  color="#DC2626"
-                  size={11}
-                  anchor="middle"
-                  italic={true}
-                />
-              </>
-            )}
-
-            {step === 6 && (
-              <>
-                <Label
-                  x={210}
-                  y={25}
-                  text="This is the reflection rule:"
-                  color="#16A34A"
-                  size={14}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={270}
-                  text="The incident ray, reflected ray, and normal are ALWAYS in the SAME plane"
-                  color="#16A34A"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-              </>
-            )}
-
-            {/* The redundant text has been removed to prevent overlap */}
+            <rect x={0} y={SVG_H - 52} width={SVG_W} height={52} fill="#EEF2FF" opacity="0.95" />
+            <line x1={0} y1={SVG_H - 52} x2={SVG_W} y2={SVG_H - 52} stroke="#C7D2FE" strokeWidth="1.2" />
+            <rect x={10} y={SVG_H - 45} width={60} height={18} rx={9} fill="#4F46E5" opacity="0.85" />
+            <text x={40} y={SVG_H - 32} fill="#FFFFFF" fontSize="10" fontWeight="700" fontFamily="Arial" textAnchor="middle">
+              Part {part + 1} / 8
+            </text>
+            <text x={SVG_W / 2} y={SVG_H - 28} fill="#1D4ED8" fontSize="12" fontWeight="700" fontFamily="Arial" textAnchor="middle">
+              {cap.top}
+            </text>
+            <text x={SVG_W / 2} y={SVG_H - 12} fill="#4B5563" fontSize="10" fontFamily="Arial" textAnchor="middle">
+              {cap.bot}
+            </text>
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 

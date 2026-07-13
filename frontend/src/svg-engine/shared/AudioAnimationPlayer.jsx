@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 const AudioAnimationPlayer = ({
   children,
   audioSteps,       // Array: { progress: 0.1, text: "..." }
@@ -20,6 +22,7 @@ const AudioAnimationPlayer = ({
   const [done, setDone] = useState(false);
   const [showTry, setShowTry] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
+  const [audioError, setAudioError] = useState("");
   
   const [currentStep, setCurrentStep] = useState(0);
   const audioRef = useRef(null);
@@ -52,24 +55,39 @@ const AudioAnimationPlayer = ({
     let active = true;
 
     const fetchAudios = async () => {
+      let failed = 0;
       const audios = await Promise.all(audioSteps.map(async (step) => {
         if (!step.text) return null;
         try {
-          const url = `http://localhost:8000/api/tts?text=${encodeURIComponent(step.text)}`;
+          const url = `${BASE_URL}/api/tts?text=${encodeURIComponent(step.text)}`;
           const res = await fetch(url);
+          if (!res.ok) {
+            failed += 1;
+            console.error("TTS fetch failed:", res.status, await res.text());
+            return null;
+          }
           const blob = await res.blob();
+          if (!blob.type.startsWith("audio")) {
+            failed += 1;
+            console.error("TTS returned non-audio:", blob.type);
+            return null;
+          }
           const blobUrl = URL.createObjectURL(blob);
           const audio = new Audio();
           audio.preload = "auto";
-          // Wait for metadata to be loaded so duration is definitely known
-          await new Promise(resolve => {
+          await new Promise((resolve) => {
             audio.onloadedmetadata = resolve;
-            audio.onerror = resolve; // don't hang if it fails
+            audio.onerror = resolve;
             audio.src = blobUrl;
             audio.load();
           });
+          if (!audio.duration || audio.duration === Infinity) {
+            failed += 1;
+            return null;
+          }
           return audio;
         } catch (e) {
+          failed += 1;
           console.error("Failed to fetch TTS:", e);
           return null;
         }
@@ -77,6 +95,11 @@ const AudioAnimationPlayer = ({
 
       if (active) {
         audioElementsRef.current = audios;
+        if (failed > 0 && failed === audioSteps.filter((s) => s.text).length) {
+          setAudioError("Could not load audio. Make sure the backend is running on port 8000.");
+        } else {
+          setAudioError("");
+        }
         setAudioReady(true);
       }
     };
@@ -216,6 +239,7 @@ const AudioAnimationPlayer = ({
   return (
     <div style={styles.wrapper}>
       {title && <p style={styles.title}>{title}</p>}
+      {audioError && <p style={styles.error}>{audioError}</p>}
 
       <div style={{ ...styles.svgWrapper, position: "relative" }}>
         {children({ progress })}
@@ -264,6 +288,10 @@ const styles = {
   },
   title: {
     fontSize: "15px", color: "#374151", margin: 0, fontWeight: "600",
+  },
+  error: {
+    fontSize: "13px", color: "#B91C1C", margin: 0, textAlign: "center",
+    background: "#FEF2F2", padding: "8px 12px", borderRadius: 6, maxWidth: 400,
   },
   svgWrapper: {
     border: "1px solid #E5E7EB", borderRadius: "8px", overflow: "hidden",
