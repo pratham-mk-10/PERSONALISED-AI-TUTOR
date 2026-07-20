@@ -146,22 +146,84 @@ const TOPIC_CONTEXTS = {
   },
   "refraction-intro": {
     title: "Introduction to Refraction",
-    videoTemplate: "RefractionAnimation",
+    videoTemplate: "RefractionIntroAnimation",
     syllabusScope:
-      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to refraction, refractive index, optical density, Snell's law, and rectangular glass slab refraction.",
+      "NCERT Class 10 Science Chapter 9 refraction intro only: bending of light, incident/refracted ray, normal, angle i and r, optical density, air-water example. No lens formula or glass slab numericals.",
     taughtConcepts: [
       "light bends at boundary of two media",
-      "bending towards or away from normal based on optical density",
-      "basic meaning of refractive index",
-      "Snell law qualitative understanding",
-      "lateral displacement in rectangular glass slab",
+      "incident ray refracted ray and normal",
+      "angles measured from normal",
+      "bending toward normal entering denser medium",
+      "refractive index basic meaning",
     ],
-    untaughtConcepts: [
-      "lens formula",
-      "power of lens",
-      "advanced lens numericals",
-      "spherical mirror formula",
+    untaughtConcepts: ["Snell law derivation", "lens formula", "glass slab numericals", "power of lens"],
+  },
+  "refraction-snells-law": {
+    title: "Laws of Refraction (Snell's Law)",
+    videoTemplate: "SnellsLawAnimation",
+    syllabusScope:
+      "NCERT Class 10 Snell's law: n1 sin i = n2 sin r, coplanarity, verification with air-water, rarer to denser and denser to rarer rules.",
+    taughtConcepts: [
+      "Snell law formula n1 sin i = n2 sin r",
+      "incident refracted ray and normal coplanar",
+      "rarer to denser bends toward normal",
+      "denser to rarer bends away from normal",
     ],
+    untaughtConcepts: ["lens formula", "power of lens", "mirror formula", "complex numericals"],
+  },
+  "refraction-glass-slab": {
+    title: "Refraction Through a Glass Slab",
+    videoTemplate: "GlassSlabAnimation",
+    syllabusScope:
+      "NCERT Class 10 rectangular glass slab: refraction at entry and exit, emergent ray parallel to incident ray, lateral displacement.",
+    taughtConcepts: [
+      "double refraction at parallel faces of glass slab",
+      "emergent ray parallel to incident ray",
+      "lateral displacement definition",
+      "refraction toward normal entering glass",
+      "refraction away from normal exiting to air",
+    ],
+    untaughtConcepts: ["lens formula", "lens image formation", "mirror formula"],
+  },
+  "refraction-lenses": {
+    title: "Spherical Lenses",
+    videoTemplate: "SphericalLensesAnimation",
+    syllabusScope:
+      "NCERT Class 10 spherical lenses: convex and concave lenses, optical centre, principal axis, principal focus, focal length, converging vs diverging.",
+    taughtConcepts: [
+      "convex vs concave lens identification",
+      "converging and diverging behavior",
+      "optical centre pole principal axis focus",
+      "focal length sign convention for lenses",
+    ],
+    untaughtConcepts: ["lens formula numericals", "power numericals", "mirror formula"],
+  },
+  "refraction-lens-images": {
+    title: "Image Formation by Lenses",
+    videoTemplate: "LensImageFormationAnimation",
+    syllabusScope:
+      "NCERT Class 10 image formation by convex and concave lenses: ray rules, real vs virtual images, magnified diminished erect inverted cases.",
+    taughtConcepts: [
+      "ray through optical centre undeviated",
+      "parallel ray through focus rule for lenses",
+      "convex lens real and virtual image cases",
+      "concave lens always virtual erect diminished",
+    ],
+    untaughtConcepts: ["lens formula calculation", "power of lens", "mirror image formation"],
+  },
+  "refraction-lens-formula": {
+    title: "Lens Formula and Power",
+    videoTemplate: "LensFormulaAnimation",
+    syllabusScope:
+      "NCERT Class 10 lens formula 1/v - 1/u = 1/f, magnification m = v/u, power P = 1/f in dioptres, sign convention for lenses.",
+    taughtConcepts: [
+      "lens formula 1/v - 1/u = 1/f",
+      "magnification m = h'/h = v/u",
+      "power of lens P = 1/f in dioptre",
+      "sign convention for u v and f",
+      "combination of lenses in contact P = P1 + P2",
+    ],
+    untaughtConcepts: ["mirror formula", "spherical mirror image cases", "advanced derivations"],
   },
 };
 
@@ -201,6 +263,15 @@ const TAG_TO_VISUAL_TEMPLATE = {
   convex_real_image_myth: "SphericalMirrorMisconceptionFeedback",
   convex_size_confusion: "SphericalMirrorMisconceptionFeedback",
   rearview_reason_wrong: "SphericalMirrorMisconceptionFeedback",
+  refraction_bending_normal: "RefractionIntroAnimation",
+  snell_law_confusion: "SnellsLawAnimation",
+  glass_slab_parallel_confusion: "GlassSlabAnimation",
+  lateral_displacement_confusion: "GlassSlabAnimation",
+  convex_concave_lens_confusion: "SphericalLensesAnimation",
+  lens_focus_confusion: "SphericalLensesAnimation",
+  lens_image_nature_confusion: "LensImageFormationAnimation",
+  lens_formula_sign_error: "LensFormulaAnimation",
+  lens_power_confusion: "LensFormulaAnimation",
 };
 
 const resolveVisualTemplateByTag = (tag) => {
@@ -302,7 +373,31 @@ Key points include:
 - Radius of Curvature (R): The radius of the hollow sphere of which the mirror is a part.
 - Principal Axis: A straight line passing through the pole and the centre of curvature.
 - Principal Focus (F): The point where parallel rays converge (for concave mirror) or appear to diverge from (for convex mirror) after reflection.
-- Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).`
+- Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).`,
+
+  "refraction-intro": `Refraction is the bending of light when it crosses the boundary between two transparent mediums.
+Key terms: incident ray, refracted ray, normal at point P, angle of incidence i, angle of refraction r.
+When light goes from air to water (rarer to denser), it bends toward the Normal. Refractive index n measures optical density.`,
+
+  "refraction-snells-law": `Laws of Refraction (Snell's Law):
+Law 1: Incident ray, refracted ray, and normal are coplanar.
+Law 2: n1 sin i = n2 sin r.
+Rarer to denser: r < i (toward normal). Denser to rarer: r > i (away from normal).`,
+
+  "refraction-glass-slab": `Refraction through a rectangular glass slab:
+Light refracts toward normal entering glass, travels straight inside, then bends away from normal exiting to air.
+The emergent ray is parallel to the incident ray. Lateral displacement is the sideways shift between incident and emergent rays.`,
+
+  "refraction-lenses": `Spherical lenses: convex (converging, f positive) and concave (diverging, f negative).
+Optical centre O, principal axis, principal focus F, focal length f. Ray through O passes undeviated.`,
+
+  "refraction-lens-images": `Image formation by lenses using ray diagrams.
+Convex lens: real inverted image beyond 2F; virtual magnified image between F and O.
+Concave lens: always virtual, erect, diminished image on same side as object.`,
+
+  "refraction-lens-formula": `Lens formula: 1/v - 1/u = 1/f. Magnification m = v/u = h'/h.
+Power P = 1/f (f in metres), unit dioptre (D). Sign convention: u negative, convex f positive, concave f negative.
+Combined lenses in contact: P = P1 + P2.`,
 };
 
 const QuizPage = () => {

@@ -108,6 +108,57 @@ TEMPLATE_QUIZ_SCOPE = {
             "spherical mirror formula",
         ],
     },
+    "RefractionIntroAnimation": {
+        "taught_concepts": [
+            "light bends at boundary of two media",
+            "incident ray refracted ray and normal",
+            "angles measured from normal",
+            "bending toward normal entering denser medium",
+        ],
+        "untaught_concepts": ["Snell law derivation", "lens formula", "glass slab numericals"],
+    },
+    "SnellsLawAnimation": {
+        "taught_concepts": [
+            "Snell law formula",
+            "coplanarity of rays and normal",
+            "rarer to denser toward normal",
+            "denser to rarer away from normal",
+        ],
+        "untaught_concepts": ["lens formula", "mirror formula"],
+    },
+    "GlassSlabAnimation": {
+        "taught_concepts": [
+            "emergent ray parallel to incident ray",
+            "lateral displacement",
+            "double refraction at slab faces",
+        ],
+        "untaught_concepts": ["lens formula", "lens image formation"],
+    },
+    "SphericalLensesAnimation": {
+        "taught_concepts": [
+            "convex vs concave lens",
+            "optical centre and principal focus",
+            "converging vs diverging lenses",
+        ],
+        "untaught_concepts": ["lens formula numericals", "mirror formula"],
+    },
+    "LensImageFormationAnimation": {
+        "taught_concepts": [
+            "convex lens real and virtual images",
+            "concave lens virtual diminished image",
+            "lens ray tracing rules",
+        ],
+        "untaught_concepts": ["lens formula calculation", "mirror formula"],
+    },
+    "LensFormulaAnimation": {
+        "taught_concepts": [
+            "lens formula",
+            "magnification",
+            "power of lens in dioptre",
+            "sign convention for lenses",
+        ],
+        "untaught_concepts": ["mirror formula", "spherical mirror images"],
+    },
 }
 
 
