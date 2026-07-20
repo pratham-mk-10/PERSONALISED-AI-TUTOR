@@ -165,5 +165,59 @@
     "title": "Sign Convention Error",
     "explanation": "Confusing the sign of object distance (always negative), image distance, or focal length under Cartesian sign convention.",
     "focus_area": "Measure distances from the pole."
+  },
+  "refraction_bending_normal": {
+    "topic_key": "refraction",
+    "title": "Bending Direction Mistake",
+    "explanation": "Incorrectly predicting which way light bends when entering a new medium. Light bends TOWARD the normal when entering a denser medium, and AWAY from the normal when entering a rarer medium.",
+    "focus_area": "Check the optical densities of the two media and the angle of refraction relative to the angle of incidence."
+  },
+  "snell_law_confusion": {
+    "topic_key": "refraction",
+    "title": "Snell's Law Error",
+    "explanation": "Misunderstanding the relationship between the angle of incidence and angle of refraction given by Snell's Law (n1 * sin i = n2 * sin r).",
+    "focus_area": "Review how the refractive index determines the ratio of the sine of the angles."
+  },
+  "glass_slab_parallel_confusion": {
+    "topic_key": "refraction",
+    "title": "Glass Slab Emergent Ray",
+    "explanation": "Not knowing that light passing through a rectangular glass slab emerges parallel to the incident ray because the bending at the two parallel surfaces cancels out.",
+    "focus_area": "Verify that the final emergent ray is parallel to the original incident ray path."
+  },
+  "lateral_displacement_confusion": {
+    "topic_key": "refraction",
+    "title": "Lateral Displacement Error",
+    "explanation": "Confusing lateral displacement with angular deviation. The ray shifts sideways but does not change its final angle when passing through a parallel slab.",
+    "focus_area": "Observe the sideways shift between the incident and emergent rays."
+  },
+  "convex_concave_lens_confusion": {
+    "topic_key": "refraction",
+    "title": "Lens Type Confusion",
+    "explanation": "Mixing up the converging behavior of convex lenses with the diverging behavior of concave lenses.",
+    "focus_area": "Check if the lens is thicker at the middle (convex/converging) or thinner at the middle (concave/diverging)."
+  },
+  "lens_focus_confusion": {
+    "topic_key": "refraction",
+    "title": "Lens Focus Mistake",
+    "explanation": "Not understanding that lenses have two principal foci, and failing to use the correct focus for ray tracing.",
+    "focus_area": "Identify which focus the parallel rays actually converge to or appear to diverge from."
+  },
+  "lens_image_nature_confusion": {
+    "topic_key": "refraction",
+    "title": "Lens Image Nature",
+    "explanation": "Incorrectly predicting whether a lens forms a real or virtual image. For example, a concave lens always forms a virtual, erect, diminished image.",
+    "focus_area": "Trace the rays to see if they actually intersect (real) or only appear to intersect (virtual)."
+  },
+  "lens_formula_sign_error": {
+    "topic_key": "refraction",
+    "title": "Lens Sign Convention",
+    "explanation": "Confusing the sign convention for lenses. For instance, object distance (u) is always negative, focal length (f) is positive for convex and negative for concave lenses.",
+    "focus_area": "Apply the Cartesian sign convention carefully to u, v, and f."
+  },
+  "lens_power_confusion": {
+    "topic_key": "refraction",
+    "title": "Lens Power Mistake",
+    "explanation": "Miscalculating the power of a lens (P = 1/f) or forgetting that f must be in meters to get power in dioptres.",
+    "focus_area": "Ensure focal length is converted to meters before calculating power."
   }
 }

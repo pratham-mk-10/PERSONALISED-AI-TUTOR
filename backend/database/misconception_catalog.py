@@ -38,6 +38,14 @@ TAG_TO_TOPIC_KEY = {
     "focus_ray_rule_wrong": "spherical_mirrors",
     "center_ray_rule_wrong": "spherical_mirrors",
     "sign_convention_confusion": "spherical_mirrors",
+    "snell_law_confusion": "refraction",
+    "glass_slab_parallel_confusion": "refraction",
+    "lateral_displacement_confusion": "refraction",
+    "convex_concave_lens_confusion": "refraction",
+    "lens_focus_confusion": "refraction",
+    "lens_image_nature_confusion": "refraction",
+    "lens_formula_sign_error": "refraction",
+    "lens_power_confusion": "refraction",
 }
 
 
