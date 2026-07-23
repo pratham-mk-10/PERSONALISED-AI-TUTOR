@@ -1,5 +1,25 @@
-import React, { useState } from "react";
-import { useSessionStore } from "../../state/sessionStore";
+import React, { useEffect, useState } from "react";
+import { useSessionStore, TITLE_TO_TOPIC_ID } from "../../state/sessionStore";
+import { getStudentMemory } from "../../services/api";
+
+// Inverse of TITLE_TO_TOPIC_ID, so renderTopicCard can look up a topic's
+// backend status by its own dashboard `id` (canonical backend titles carry
+// no "1." / "a." numbering prefix, so they can't be matched directly).
+const TOPIC_ID_TO_TITLE = Object.fromEntries(
+  Object.entries(TITLE_TO_TOPIC_ID).map(([title, id]) => [id, title])
+);
+
+const SEVERITY_COLORS = {
+  red: "#EF4444",
+  yellow: "#F59E0B",
+  green: "#22C55E",
+};
+
+const SEVERITY_LABELS = {
+  red: "Struggling — needs work",
+  yellow: "Almost there",
+  green: "Mastered",
+};
 
 // New nested curriculum structure
 const CHAPTERS = [
@@ -7,6 +27,7 @@ const CHAPTERS = [
     id: "light",
     title: "Light: Reflection & Refraction",
     topics: [
+      { id: "intro-light", title: "0. What is Light?", type: "topic" },
       { id: "plane-mirror", title: "1. Plane Mirror Basics", type: "topic" },
       { id: "laws-reflection", title: "2. Laws of Reflection", type: "topic" },
       {
@@ -14,10 +35,25 @@ const CHAPTERS = [
         title: "3. Spherical Mirrors",
         type: "folder",
         subtopics: [
-          { id: "spherical-mirror-basics", title: "a. Spherical Mirror Basics" },
-          { id: "spherical-mirror-rules", title: "b. Ray Tracing Rules" },
-          { id: "spherical-mirror-image-formation", title: "c. Spherical Mirror Image Formation" },
-          { id: "mirror-formula", title: "d. Mirror Formula (Numerical Section)" },
+          { id: "real-virtual-images", title: "a. Real vs Virtual Images" },
+          { id: "spherical-mirror-basics", title: "b. Spherical Mirror Basics" },
+          { id: "spherical-mirror-rules", title: "c. Ray Tracing Rules" },
+          { id: "spherical-mirror-image-formation", title: "d. Spherical Mirror Image Formation" },
+          { id: "spherical-mirror-uses", title: "e. Uses of Concave and Convex Mirrors" },
+          { id: "mirror-formula", title: "f. Mirror Formula" },
+        ],
+      },
+      {
+        id: "numericals-umbrella",
+        title: "5. Numerical Problems",
+        type: "folder",
+        subtopics: [
+          { id: "numerical-find-v", title: "a. Find v" },
+          { id: "numerical-find-m", title: "b. Find Height / Magnification" },
+          { id: "numerical-find-f", title: "c. Find f" },
+          { id: "numerical-find-u", title: "d. Find u" },
+          { id: "numerical-mirror-id", title: "e. Mirror Identification" },
+          { id: "numerical-combined", title: "f. Combined Problems" },
         ],
       },
       {
@@ -44,12 +80,50 @@ export default function Dashboard({ onStartTopic }) {
     currentTopicId,
     selectChapter,
     selectTopic,
+    setRetestBias,
     progress,
     logout,
   } = useSessionStore();
 
   const activeChapter = CHAPTERS.find((c) => c.id === currentChapterId) || CHAPTERS[0];
-  const [expandedFolders, setExpandedFolders] = useState({ "spherical-mirrors-umbrella": true, "refraction-umbrella": true });
+  const [expandedFolders, setExpandedFolders] = useState({
+    "spherical-mirrors-umbrella": true,
+    "refraction-umbrella": true,
+    "numericals-umbrella": true,
+  });
+  const [memoryData, setMemoryData] = useState(null);
+  const [weakTopicsExpanded, setWeakTopicsExpanded] = useState(false);
+
+  useEffect(() => {
+    const studentId = user?.id || user?.name || "guest-student";
+
+    let cancelled = false;
+    getStudentMemory(studentId).then((data) => {
+      if (!cancelled && data?.has_memory) setMemoryData(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.name]);
+
+  // Already sorted most-struggled -> least-struggled by the backend.
+  const weakTopics = memoryData?.topics || [];
+  // {topic_title: "green"|"yellow"|"red"} for every topic attempted so far,
+  // completed or not — powers the colored dot on every curriculum card.
+  const statusMap = memoryData?.status_map || {};
+
+  const handleRetest = (topicEntry, topicId) => {
+    setRetestBias({
+      topicId,
+      // Every misconception the student tripped on for this topic (up to 3,
+      // most-frequent first), so the regenerated quiz can be weighted across
+      // all of them instead of just the single most common one.
+      tagBreakdown: topicEntry.tag_breakdown || [],
+      severity: topicEntry.severity,
+    });
+    selectTopic(topicId);
+    if (onStartTopic) onStartTopic(topicId);
+  };
 
   const toggleFolder = (folderId) => {
     setExpandedFolders((prev) => ({
@@ -61,6 +135,8 @@ export default function Dashboard({ onStartTopic }) {
   const renderTopicCard = (topic, isSubtopic = false) => {
     const stat = progress[topic.id];
     const isActive = currentTopicId === topic.id;
+    const canonicalTitle = TOPIC_ID_TO_TITLE[topic.id];
+    const status = canonicalTitle ? statusMap[canonicalTitle] : undefined;
 
     return (
       <div
@@ -73,7 +149,15 @@ export default function Dashboard({ onStartTopic }) {
         }}
       >
         <div style={styles.topicInfo}>
-          <h3 style={styles.topicTitle}>{topic.title}</h3>
+          <h3 style={styles.topicTitle}>
+            {status && (
+              <span
+                style={{ ...styles.severityDot, backgroundColor: SEVERITY_COLORS[status] }}
+                title={SEVERITY_LABELS[status]}
+              />
+            )}
+            {topic.title}
+          </h3>
           {stat ? (
             <p style={styles.topicMeta}>
               Attempts: {stat.attempts} · Best score: {stat.bestScore}%
@@ -124,6 +208,55 @@ export default function Dashboard({ onStartTopic }) {
           </button>
         </div>
       </header>
+
+      {weakTopics.length > 0 && (
+        <div style={styles.memorySummaryWrap}>
+          <button
+            style={styles.memorySummaryBtn}
+            onClick={() => setWeakTopicsExpanded((v) => !v)}
+          >
+            <span style={styles.memorySummaryText}>
+              You tripped in {weakTopics.length} {weakTopics.length === 1 ? "topic" : "topics"} last
+              time — would you like to retry {weakTopics.length === 1 ? "it" : "them"}?
+            </span>
+            <span
+              style={{
+                ...styles.memoryChevron,
+                transform: weakTopicsExpanded ? "rotate(90deg)" : "rotate(0deg)",
+              }}
+            >
+              ▶
+            </span>
+          </button>
+
+          {weakTopicsExpanded && (
+            <div style={styles.memoryBannerList}>
+              {weakTopics.map((topicEntry) => {
+                const topicId = TITLE_TO_TOPIC_ID[topicEntry.topic_title];
+                if (!topicId) return null;
+                return (
+                  <div key={topicEntry.topic_title} style={styles.memoryBanner}>
+                    <span
+                      style={{
+                        ...styles.severityDot,
+                        backgroundColor: SEVERITY_COLORS[topicEntry.severity] || SEVERITY_COLORS.yellow,
+                      }}
+                      title={SEVERITY_LABELS[topicEntry.severity]}
+                    />
+                    <p style={styles.memoryText}>{topicEntry.message}</p>
+                    <button
+                      style={styles.memoryBtn}
+                      onClick={() => handleRetest(topicEntry, topicId)}
+                    >
+                      Retest now
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <main style={styles.main}>
         {/* Chapters list */}
@@ -268,6 +401,79 @@ const styles = {
     gap: "40px",
     maxWidth: "1200px",
     margin: "0 auto",
+  },
+  memorySummaryWrap: {
+    maxWidth: "1200px",
+    margin: "0 auto 32px auto",
+  },
+  memorySummaryBtn: {
+    display: "flex",
+    width: "100%",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "16px",
+    padding: "18px 24px",
+    borderRadius: "16px",
+    backgroundColor: "rgba(59, 130, 246, 0.12)",
+    border: "1px solid rgba(59, 130, 246, 0.35)",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  memorySummaryText: {
+    fontSize: "15px",
+    fontWeight: 600,
+    color: "#DBEAFE",
+    lineHeight: 1.4,
+  },
+  memoryChevron: {
+    flexShrink: 0,
+    color: "#60A5FA",
+    fontSize: "14px",
+    transition: "transform 0.2s",
+  },
+  memoryBannerList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    marginTop: "12px",
+  },
+  memoryBanner: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "16px",
+    padding: "18px 24px",
+    borderRadius: "16px",
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
+    border: "1px solid rgba(59, 130, 246, 0.25)",
+  },
+  severityDot: {
+    display: "inline-block",
+    flexShrink: 0,
+    width: "10px",
+    height: "10px",
+    borderRadius: "9999px",
+    marginRight: "10px",
+    verticalAlign: "middle",
+  },
+  memoryText: {
+    flex: 1,
+    fontSize: "15px",
+    color: "#DBEAFE",
+    margin: 0,
+    lineHeight: 1.4,
+  },
+  memoryBtn: {
+    flexShrink: 0,
+    borderRadius: "9999px",
+    border: "none",
+    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+    color: "white",
+    fontSize: "14px",
+    fontWeight: 600,
+    padding: "10px 20px",
+    cursor: "pointer",
+    boxShadow: "0 4px 14px rgba(59, 130, 246, 0.3)",
   },
   sidebar: {
     width: "280px",

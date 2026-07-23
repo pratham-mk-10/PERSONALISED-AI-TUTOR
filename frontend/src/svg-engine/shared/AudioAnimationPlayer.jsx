@@ -75,9 +75,22 @@ const AudioAnimationPlayer = ({
           const blobUrl = URL.createObjectURL(blob);
           const audio = new Audio();
           audio.preload = "auto";
+          // Wait for metadata to be loaded so duration is definitely known
           await new Promise((resolve) => {
-            audio.onloadedmetadata = resolve;
-            audio.onerror = resolve;
+            audio.onloadedmetadata = () => {
+              // Fix for Chromium returning Infinity duration for blobs
+              if (audio.duration === Infinity) {
+                audio.currentTime = 1e101;
+                audio.ontimeupdate = () => {
+                  audio.ontimeupdate = null;
+                  audio.currentTime = 0;
+                  resolve();
+                };
+              } else {
+                resolve();
+              }
+            };
+            audio.onerror = resolve; // don't hang if it fails
             audio.src = blobUrl;
             audio.load();
           });

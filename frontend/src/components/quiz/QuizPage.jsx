@@ -7,6 +7,7 @@ import {
   submitAnswers,
   getDescriptiveQuestions,
   evalDescriptiveAnswer,
+  BASE_URL,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
 import QuizVisualCorrection from "./QuizVisualCorrection";
@@ -15,6 +16,26 @@ import QuizVisualCorrection from "./QuizVisualCorrection";
 const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
 
 const TOPIC_CONTEXTS = {
+  "intro-light": {
+    title: "Introduction to Light",
+    videoTemplate: "IntroToLightAnimation",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9 preliminaries only. Keep questions limited to: what light is, luminous vs non-luminous objects, transparent vs translucent vs opaque materials, rectilinear propagation of light, and the difference between a ray and a beam (parallel, convergent, divergent). Do NOT include reflection laws, mirrors, refraction, or lenses.",
+    taughtConcepts: [
+      "light is a form of energy that enables sight",
+      "luminous objects give out their own light, non-luminous objects only reflect light",
+      "transparent, translucent, and opaque materials",
+      "rectilinear propagation of light and shadows",
+      "a ray is a single line of light, a beam is a bundle of rays (parallel, convergent, or divergent)",
+    ],
+    untaughtConcepts: [
+      "laws of reflection",
+      "plane or spherical mirrors",
+      "mirror formula",
+      "refraction",
+      "lenses",
+    ],
+  },
   "laws-reflection": {
     title: "Laws of Reflection",
     videoTemplate: "ReflectionMisconceptionFeedback",
@@ -47,12 +68,37 @@ const TOPIC_CONTEXTS = {
       "image size equals object size in a plane mirror",
       "image distance equals object distance from the mirror",
       "lateral inversion in plane mirror",
+      "regular reflection vs diffused reflection, and that individual rays obey the law of reflection in both",
       "laws of reflection in plane mirror context",
+      "why AMBULANCE is written reversed (lateral inversion in a rear-view mirror)",
+      "symmetric letters (A, H, I, M, O, T, U) that look identical to their own mirror image, vs asymmetric letters that flip",
+      "multiple images formed by two plane mirrors at an angle: number of images = (360/theta) - 1",
+      "kaleidoscope (two mirrors at 60 degrees) and periscope (two mirrors at 45 degrees) as applications of plane mirror reflection",
     ],
     untaughtConcepts: [
       "spherical mirrors",
       "mirror formula",
       "magnification by spherical mirrors",
+      "refraction",
+      "lenses",
+    ],
+  },
+  "real-virtual-images": {
+    title: "Real vs Virtual Images",
+    videoTemplate: "RealVsVirtualImagesAnimation",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to the general distinction between real and virtual images: whether light rays actually converge or only appear to, whether the image can be captured on a screen, and whether it is inverted or erect. Do NOT include spherical mirror image-formation cases, mirror formula, magnification, sign convention, refraction, or lenses.",
+    taughtConcepts: [
+      "a real image forms where light rays actually converge and can be caught on a screen",
+      "a real image is inverted",
+      "a virtual image forms where light rays only appear to diverge from, traced backward",
+      "a virtual image cannot be caught on a screen and is erect",
+    ],
+    untaughtConcepts: [
+      "spherical mirror image formation cases",
+      "mirror formula",
+      "magnification",
+      "sign convention",
       "refraction",
       "lenses",
     ],
@@ -73,6 +119,7 @@ const TOPIC_CONTEXTS = {
       "principal focus and focal length basic meaning",
       "radius of curvature and focal length relation R=2f",
       "basic everyday uses of concave and convex mirrors",
+      "distinguishing concave, convex, and plane mirrors by the reflection (magnified/diminished/same size), by touch (depressed vs bulging), and the spoon analogy",
     ],
     untaughtConcepts: [
       "mirror formula",
@@ -142,6 +189,51 @@ const TOPIC_CONTEXTS = {
       "pole, principal axis, centre of curvature",
       "radius of curvature and focal length relation R=2f",
       "everyday uses of concave and convex mirrors",
+    ],
+  },
+  "spherical-mirror-uses": {
+    title: "Uses of Concave and Convex Mirrors",
+    videoTemplate: "SphericalMirrorUsesAnimation",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to WHY specific mirrors are used for specific devices: shaving/makeup mirrors and dentist's mirrors (concave, object between focus and pole, magnified virtual image), torches/headlights/searchlights (concave, bulb at focus, parallel reflected beam), solar furnaces/cookers (concave, parallel incoming rays converge at focus), and rear-view/side mirrors (convex, always virtual/erect/diminished image, wider field of view). Do NOT include mirror formula, magnification calculations, sign convention, or numericals.",
+    lessonFocus:
+      "Lesson video focus: reasoning from already-known image-formation cases to explain why each device uses concave or convex mirrors specifically.",
+    taughtConcepts: [
+      "concave mirror used in shaving/makeup mirrors and dentist mirrors because object between F and P gives a magnified virtual image",
+      "concave mirror used in torches/headlights/searchlights because a source at the focus reflects as a parallel beam",
+      "concave mirror used in solar furnaces/cookers because parallel incoming rays converge at the focus",
+      "convex mirror used in rear-view and side mirrors because it always gives a virtual erect diminished image with a wider field of view",
+    ],
+    untaughtConcepts: [
+      "mirror formula",
+      "magnification formula",
+      "sign convention",
+      "numerical problems on spherical mirrors",
+      "refraction",
+      "lenses",
+    ],
+  },
+  "mirror-formula": {
+    title: "Mirror Formula and Magnification",
+    videoTemplate: "MirrorFormulaLesson",
+    syllabusScope:
+      "NCERT Class 10 Science Chapter 9: Light - Reflection and Refraction only. Keep questions limited to: the New Cartesian sign convention (distances from the pole, object distance always negative, concave focal length negative, convex focal length positive, real image distance negative, virtual image distance positive, erect height positive, inverted height negative), the mirror formula 1/v + 1/u = 1/f, and magnification m = h'/h = -v/u including reading the sign and magnitude of m. Prefer conceptual and simple-substitution multiple-choice questions (e.g. given u and f, which sign should v have; given m, is the image real or virtual) over multi-step numerical solving. Do NOT include refraction or lenses.",
+    lessonFocus:
+      "Lesson video focus: sign convention rules, the mirror formula and magnification formula, and two fully worked NCERT examples (a convex rear-view mirror and a concave mirror) with every value computed from the formula.",
+    taughtConcepts: [
+      "sign convention: distances measured from the pole, object distance always negative",
+      "concave mirror focal length is negative, convex mirror focal length is positive",
+      "real image distance is negative, virtual image distance is positive",
+      "erect image height is positive, inverted image height is negative",
+      "mirror formula 1/v + 1/u = 1/f",
+      "magnification m = h'/h = -v/u and interpreting its sign and magnitude",
+    ],
+    untaughtConcepts: [
+      "refraction",
+      "lenses",
+      "lens formula",
+      "power of a lens",
+      "multi-step combined numericals",
     ],
   },
   "refraction-intro": {
@@ -363,7 +455,8 @@ The Angle of Incidence = Angle of Reflection. Both are measured from the Normal.
 The incident ray, reflected ray, and the normal at the point of incidence all lie in the same plane (they are coplanar).`,
   
   "plane-mirror": `A plane mirror is a flat, polished surface that reflects light.
-A plane mirror forms a virtual, erect image of the same size as the object, placed as far behind the mirror as the object is in front. The image is laterally inverted (left-right reversed).`,
+A plane mirror forms a virtual, erect image of the same size as the object, placed as far behind the mirror as the object is in front. The image is laterally inverted (left-right reversed).
+Applications: AMBULANCE is written reversed on ambulances so lateral inversion flips it back to normal in a car's rear-view mirror ahead. Letters like A, H, I, M, O, T, U are left-right symmetric and look identical to their own mirror image; asymmetric letters like R visibly flip. Two plane mirrors placed at an angle theta form multiple images, following Number of images = (360/theta) - 1 -- 3 images at 90 degrees, 5 images at 60 degrees. A kaleidoscope uses two mirrors at 60 degrees; a periscope uses two mirrors at 45 degrees, each bending the light ray 90 degrees.`,
   
   "spherical-mirror-basics": `A spherical mirror is a mirror which has the shape of a piece cut out of a spherical surface.
 Its reflecting surface is curved. A concave mirror curves inwards (like the inside of a spoon) and converges light. A convex mirror curves outwards (like the back of a spoon) and diverges light.
@@ -373,7 +466,8 @@ Key points include:
 - Radius of Curvature (R): The radius of the hollow sphere of which the mirror is a part.
 - Principal Axis: A straight line passing through the pole and the centre of curvature.
 - Principal Focus (F): The point where parallel rays converge (for concave mirror) or appear to diverge from (for convex mirror) after reflection.
-- Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).`,
+- Relation: For spherical mirrors of small aperture, the radius of curvature is twice the focal length (R = 2f).
+- Identification: hold your face close to the mirror -- a giant, magnified reflection means concave, a tiny diminished reflection means convex, a same-size reflection means plane. By touch, a concave surface is depressed inward and a convex surface bulges outward, exactly like the inner (concave) and outer (convex) surfaces of a steel spoon.`,
 
   "refraction-intro": `Refraction is the bending of light when it crosses the boundary between two transparent mediums.
 Key terms: incident ray, refracted ray, normal at point P, angle of incidence i, angle of refraction r.
@@ -397,15 +491,19 @@ Concave lens: always virtual, erect, diminished image on same side as object.`,
 
   "refraction-lens-formula": `Lens formula: 1/v - 1/u = 1/f. Magnification m = v/u = h'/h.
 Power P = 1/f (f in metres), unit dioptre (D). Sign convention: u negative, convex f positive, concave f negative.
-Combined lenses in contact: P = P1 + P2.`,
+Combined lenses in contact: P = P1 + P2.`,`
 };
 
-const QuizPage = () => {
+const QuizPage = ({ onGoBackToLesson = null }) => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
   const progress = useSessionStore((s) => s.progress);
+  const recordResult = useSessionStore((s) => s.recordResult);
+  const retestBias = useSessionStore((s) => s.retestBias);
+  const clearRetestBias = useSessionStore((s) => s.clearRetestBias);
 
   const [quizType, setQuizType] = useState("mcq"); // "mcq" | "descriptive"
+  const [attemptNumber, setAttemptNumber] = useState(1);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -452,7 +550,7 @@ const QuizPage = () => {
       .trim();
 
     setLoadingTts(key);
-    const url = `http://localhost:8000/api/tts?text=${encodeURIComponent(cleanText)}`;
+    const url = `${BASE_URL}/api/tts?text=${encodeURIComponent(cleanText)}`;
     const audio = new Audio(url);
     audioInstanceRef.current = audio;
 
@@ -484,6 +582,7 @@ const QuizPage = () => {
     setCurrentIndex(0);
     setActiveVisualByQuestion({});
     setQuizMode("regular");
+    setAttemptNumber(1);
 
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
@@ -508,18 +607,46 @@ const QuizPage = () => {
         }));
         setQuestions(nextQuestions);
       } else {
-        const data = await getGeneratedQuestions({
-          topic: quizTopicContext.title,
-          difficulty: personalization.difficulty,
-          syllabusScope: quizTopicContext.syllabusScope,
-          tutorContext,
-          videoTemplate: quizTopicContext.videoTemplate,
-          taughtConcepts: quizTopicContext.taughtConcepts,
-          untaughtConcepts: quizTopicContext.untaughtConcepts,
-          lessonContent,
-        });
+        const applyRetestBias = retestBias?.topicId === currentTopicId;
+        const retestTagBreakdown = applyRetestBias ? (retestBias.tagBreakdown || []) : [];
+        if (applyRetestBias) clearRetestBias();
 
-        const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        let rawQuestions = null;
+
+        if (retestTagBreakdown.length > 0) {
+          // Cross-session retest: route through the same weighted
+          // misconception-quiz endpoint startMisconceptionQuiz() uses, so the
+          // regenerated quiz is proportionally weighted across every
+          // misconception this topic's history shows -- not just the single
+          // most-frequent one.
+          const data = await getMisconceptionQuiz({
+            topic: quizTopicContext.title,
+            studentId,
+            misconceptionTags: retestTagBreakdown.map((t) => t.tag),
+            misconceptionWeights: Object.fromEntries(
+              retestTagBreakdown.map((t) => [t.tag, t.count])
+            ),
+            questionCount: 5,
+            difficulty: personalization.difficulty,
+          });
+          rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        }
+
+        if (rawQuestions === null) {
+          const data = await getGeneratedQuestions({
+            topic: quizTopicContext.title,
+            difficulty: personalization.difficulty,
+            syllabusScope: quizTopicContext.syllabusScope,
+            tutorContext,
+            videoTemplate: quizTopicContext.videoTemplate,
+            taughtConcepts: quizTopicContext.taughtConcepts,
+            untaughtConcepts: quizTopicContext.untaughtConcepts,
+            lessonContent,
+            studentId,
+          });
+          rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        }
+
         const nextQuestions = shuffle(rawQuestions).map((q, idx) => ({
           ...q,
           options: Array.isArray(q?.options) ? q.options : [],
@@ -598,7 +725,7 @@ const QuizPage = () => {
       let dbSyncWarning = null;
 
       try {
-        res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId });
+        res = await submitAnswers({ answers: formatted, topic: quizTopicContext.title, studentId, attemptNumber });
         reason = {
           reason: res.reason,
           focus_area: res.focus_area,
@@ -609,6 +736,10 @@ const QuizPage = () => {
             res.main_misconception,
             quizTopicContext.title
           );
+        }
+
+        if (res?.attempt_number) {
+            setAttemptNumber(res.attempt_number);
         }
       } catch (submitErr) {
         dbSyncWarning = submitErr?.message || "Could not submit this attempt right now.";
@@ -654,12 +785,15 @@ const QuizPage = () => {
         };
       });
 
+      const accuracy = Math.round((correctCount / total) * 100);
+      recordResult(currentTopicId, accuracy, mainMisconception);
+
       setReport({
         type: "mcq",
         total,
         correctCount,
         wrongCount: total - correctCount,
-        accuracy: Math.round((correctCount / total) * 100),
+        accuracy,
         reason: reason.reason || "Let's review this concept and try again.",
         focusArea: reason.focus_area || "N/A",
         mainMisconception,
@@ -669,6 +803,9 @@ const QuizPage = () => {
         questionFeedback,
         detailedResults,
         dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
+        shouldRedirectToLesson: res?.should_redirect_to_lesson || false,
+        followUpStrategy: res?.follow_up_strategy || "visual_only",
+        serverAttemptNumber: res?.attempt_number || attemptNumber,
       });
     } catch (err) {
       setError(err?.message || "Unable to process quiz results");
@@ -807,6 +944,7 @@ const QuizPage = () => {
     setError("");
     setActiveVisualByQuestion({});
     setOpenTraceIndex(null);
+    setAttemptNumber(1);
   };
 
   const startMisconceptionQuiz = async () => {
@@ -817,13 +955,17 @@ const QuizPage = () => {
     const quizTopicContext = getQuizTopicContext(currentTopicId);
     const studentId = user?.id || user?.name || "guest-student";
     const wrongItems = report.detailedResults.filter((item) => !item.isCorrect);
-    const misconceptionTags = [
-      ...new Set(
-        wrongItems
-          .map((item) => String(item.focusArea || "").trim())
-          .filter(Boolean)
-      ),
-    ];
+    // Count occurrences instead of just deduping, so a tag the student
+    // tripped on 3 times in this quiz gets proportionally more questions
+    // than one they only missed once -- same weighting the cross-session
+    // retest path uses (see loadQuestions()'s retestTagBreakdown handling).
+    const misconceptionWeights = {};
+    wrongItems.forEach((item) => {
+      const tag = String(item.focusArea || "").trim();
+      if (!tag) return;
+      misconceptionWeights[tag] = (misconceptionWeights[tag] || 0) + 1;
+    });
+    const misconceptionTags = Object.keys(misconceptionWeights);
     const wrongQuestionTexts = wrongItems
       .map((item) => String(item.questionText || "").trim())
       .filter(Boolean);
@@ -841,6 +983,7 @@ const QuizPage = () => {
         topic: quizTopicContext.title,
         studentId,
         misconceptionTags,
+        misconceptionWeights,
         wrongQuestionTexts,
         questionCount: Math.max(2, Math.min(wrongItems.length + 1, 6)),
       });
@@ -864,6 +1007,7 @@ const QuizPage = () => {
       setReport(null);
       setActiveVisualByQuestion({});
       setQuizMode("misconception");
+      setAttemptNumber(prev => prev + 1);
     } catch (err) {
       setError(err?.message || "Unable to start misconception quiz");
     } finally {
@@ -1116,7 +1260,20 @@ const QuizPage = () => {
     // MCQ report
     return (
       <div style={{ padding: "20px" }}>
-        <h1>Quiz Report</h1>
+        <h1>
+            {report.serverAttemptNumber >= 3
+                ? "Round 3 — Let's slow down"
+                : report.serverAttemptNumber === 2
+                ? "Round 2 — Targeted Practice"
+                : "Quiz Report"}
+        </h1>
+        {report.serverAttemptNumber >= 2 && (
+            <p style={{ color: "#F59E0B", marginTop: 4, fontWeight: 600 }}>
+                {report.serverAttemptNumber >= 3
+                    ? "You've attempted this 3 times. A different approach and a lesson revisit should help."
+                    : "This was a targeted round focusing on your specific misconceptions."}
+            </p>
+        )}
         <p style={{ fontWeight: 700, marginTop: "10px" }}>
           Score: {report.correctCount}/{report.total} ({report.accuracy}%)
         </p>
@@ -1299,23 +1456,43 @@ const QuizPage = () => {
         )}
 
         {report.mainMisconception && report.mainMisconception !== "none" && (
-          <div style={{ marginTop: "24px", display: "flex", gap: "10px" }}>
-            <button
-              onClick={startMisconceptionQuiz}
-              disabled={loadingRemedial}
-              style={{
-                padding: "12px 24px",
-                cursor: loadingRemedial ? "not-allowed" : "pointer",
-                borderRadius: "999px",
-                border: "none",
-                background: "linear-gradient(135deg, #10B981, #059669)",
-                color: "#FFFFFF",
-                fontWeight: "bold",
-                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
-              }}
-            >
-              {loadingRemedial ? "Generating remedial round..." : "🎯 Start Targeted Misconception Round"}
-            </button>
+          <div style={{ marginTop: "24px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {report.shouldRedirectToLesson && onGoBackToLesson ? (
+              <button
+                onClick={() => {
+                  onGoBackToLesson();
+                }}
+                style={{
+                  padding: "12px 24px",
+                  cursor: "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #F59E0B, #D97706)",
+                  color: "#FFFFFF",
+                  fontWeight: "bold",
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+                }}
+              >
+                📚 Revisit Lesson — then try again
+              </button>
+            ) : (
+              <button
+                onClick={startMisconceptionQuiz}
+                disabled={loadingRemedial}
+                style={{
+                  padding: "12px 24px",
+                  cursor: loadingRemedial ? "not-allowed" : "pointer",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "linear-gradient(135deg, #10B981, #059669)",
+                  color: "#FFFFFF",
+                  fontWeight: "bold",
+                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+                }}
+              >
+                {loadingRemedial ? "Generating remedial round..." : "🎯 Start Targeted Misconception Round"}
+              </button>
+            )}
           </div>
         )}
 

@@ -370,10 +370,10 @@ const ReflectionMisconceptionFeedback = ({ misconceptionTag }) => {
             else step = 2;                       
             
             return (
-              <svg 
-                width="100%" 
-                height="auto" 
-                viewBox={`0 0 ${SVG_W} ${SVG_H}`} 
+              <svg
+                width="100%"
+                height={SVG_H}
+                viewBox={`0 0 ${SVG_W} ${SVG_H}`}
                 style={{ background: "#F8FAFF", display: "block" }}
               >
                 <Visualizer step={step} />

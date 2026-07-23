@@ -219,5 +219,53 @@
     "title": "Lens Power Mistake",
     "explanation": "Miscalculating the power of a lens (P = 1/f) or forgetting that f must be in meters to get power in dioptres.",
     "focus_area": "Ensure focal length is converted to meters before calculating power."
+  },
+  "image_real_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Plane Mirror Image Is Not Real",
+    "explanation": "A plane mirror image is virtual, not real. Light rays only appear to meet behind the mirror when traced backward; no real light reaches there, so the image can never be captured on a screen.",
+    "focus_area": "Show the reflected rays diverging in front of the mirror and their dashed backward extensions meeting behind it."
+  },
+  "size_mismatch": {
+    "topic_key": "plane_mirror",
+    "title": "Plane Mirror Image Size",
+    "explanation": "The image formed by a plane mirror is always exactly the same size as the object, no matter how far the object is from the mirror.",
+    "focus_area": "Compare the object height and image height directly using matching ray constructions."
+  },
+  "distance_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Plane Mirror Object-Image Distance",
+    "explanation": "The image distance behind a plane mirror is always exactly equal to the object distance in front of it.",
+    "focus_area": "Mark equal distances on both sides of the mirror using the perpendicular from object and image to the mirror."
+  },
+  "lateral_inversion_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Lateral Inversion, Not Upside-Down",
+    "explanation": "A plane mirror image is laterally inverted -- left and right are swapped -- but it is never upside down. Up stays up, down stays down; only left and right swap.",
+    "focus_area": "Use an asymmetric left-right shape (like a flag or a letter) to show only the left-right swap, not a vertical flip."
+  },
+  "regular_vs_diffused_confusion": {
+    "topic_key": "plane_mirror",
+    "title": "Regular vs Diffused Reflection",
+    "explanation": "A smooth surface reflects parallel rays so they stay parallel (regular/specular reflection). A rough surface scatters parallel rays in different directions (diffused reflection) -- but every individual ray, on both surfaces, still obeys the law of reflection at its own point of incidence.",
+    "focus_area": "Show several parallel rays reflecting off a smooth surface (staying parallel) versus a jagged surface (scattering), each ray still making equal angles with its own local normal."
+  },
+  "rearview_reason_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Why Convex Mirrors Are Used for Rear-View",
+    "explanation": "Convex mirrors are used as rear-view and side mirrors because they always form a virtual, erect, diminished image regardless of object distance -- the smaller image fits a wider area of the road into the same mirror, giving a wider field of view than a plane mirror of the same size.",
+    "focus_area": "Compare the field of view captured by a convex mirror versus a plane mirror of the same size."
+  },
+  "mirror_formula_sign_error": {
+    "topic_key": "spherical_mirrors",
+    "title": "Mirror Formula Sign Substitution Error",
+    "explanation": "When using 1/v + 1/u = 1/f, every known value must first be given its correct sign (u always negative, f negative for concave and positive for convex) before substituting -- substituting an unsigned magnitude gives a wrong answer even if the formula itself is applied correctly.",
+    "focus_area": "Write out u, f (and v once found) with their correct signs before and after substituting into the formula."
+  },
+  "magnification_sign_error": {
+    "topic_key": "spherical_mirrors",
+    "title": "Magnification Sign Interpretation Error",
+    "explanation": "The sign of magnification m = -v/u tells you the image's nature: positive m means virtual and erect, negative m means real and inverted. Getting the sign of v or u wrong, or misreading the sign of m, leads to describing the wrong kind of image.",
+    "focus_area": "Compute m from the correctly-signed v and u, then read its sign before describing the image as real/virtual or erect/inverted."
   }
 }

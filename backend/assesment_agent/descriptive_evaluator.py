@@ -55,7 +55,7 @@ class DescriptiveEvaluation(BaseModel):
 class DescriptiveEvaluator:
     def __init__(self):
         self.api_key = _get_api_key()
-        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     def run_smart_gate(self, student_answer: str, required_keywords: List[str]) -> tuple[bool, str | None]:
         """Stage 1: Smart Gate.

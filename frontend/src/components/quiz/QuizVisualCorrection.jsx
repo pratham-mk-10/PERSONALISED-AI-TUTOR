@@ -274,6 +274,7 @@ const QuizVisualCorrection = ({
       case "FirstLawOfReflectionAnimation":
         return <FirstLawOfReflectionAnimation onTryItClicked={noOp} />;
       default:
+        if (!tag || tag === "general_concept_gap") return null;
         return (
           <ReflectionMisconceptionFeedback
             misconceptionTag={tag}

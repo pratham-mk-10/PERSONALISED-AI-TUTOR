@@ -5,6 +5,7 @@ from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 try:
@@ -16,6 +17,8 @@ try:
         update_student_level,
         update_student_topic_resolution,
         get_descriptive_question,
+        increment_topic_attempt,
+        reset_topic_attempt,
     )
     from database.queries import fetch_descriptive_questions_by_topic
     from database.connection import get_connection
@@ -23,6 +26,8 @@ try:
         coerce_misconception_tag,
         get_allowed_misconception_tags,
         get_misconception_metadata,
+        get_topic_status_map,
+        summarize_persistent_weaknesses,
         topic_key_for,
     )
     from assesment_agent.evaluator import Evaluator
@@ -37,6 +42,8 @@ except ImportError:
         update_student_level,
         update_student_topic_resolution,
         get_descriptive_question,
+        increment_topic_attempt,
+        reset_topic_attempt,
     )
     from backend.database.queries import fetch_descriptive_questions_by_topic
     from backend.database.connection import get_connection
@@ -44,6 +51,8 @@ except ImportError:
         coerce_misconception_tag,
         get_allowed_misconception_tags,
         get_misconception_metadata,
+        get_topic_status_map,
+        summarize_persistent_weaknesses,
         topic_key_for,
     )
     from backend.assesment_agent.evaluator import Evaluator
@@ -77,6 +86,18 @@ def _load_content_agent_class():
         backend_root / "content-agent" / "content_agent.py",
     )
     return module
+
+
+def _load_adaptation_agent():
+    backend_root = Path(__file__).resolve().parents[1]
+    return _load_module(
+        "adaptation_agent_module",
+        backend_root / "adaptataion-agent" / "adaptation_agent.py",
+    )
+
+
+_adaptation_module = _load_adaptation_agent()
+adapt_after_submission = _adaptation_module.adapt_after_submission
 
 
 _adaptation_feedback = _load_adaptation_feedback_module()
@@ -139,6 +160,10 @@ class GenerateMisconceptionQuizRequest(BaseModel):
     student_id: str | None = None
     topic: str | None = None
     misconception_tags: list[str] | None = None
+    # Optional tag -> trip-count map. When present, question_count is split
+    # proportionally across tags (more questions on whichever misconception
+    # the student tripped on most) instead of treating every tag equally.
+    misconception_weights: dict[str, int] | None = None
     wrong_question_texts: list[str] | None = None
     question_count: int | None = 5
     difficulty: str | None = "easy"
@@ -148,6 +173,7 @@ class SubmitAnswersRequest(BaseModel):
     student_id: str | None = None
     topic: str | None = None
     answers: list[dict[str, Any]]
+    attempt_number: int | None = 1
 
 
 class EvaluationRequest(BaseModel):
@@ -161,6 +187,19 @@ class EvaluationRequest(BaseModel):
 class MisconceptionReasonRequest(BaseModel):
     misconception_tag: str
     topic: str = "reflection_refraction"
+    question_text: str | None = None
+    student_answer: str | None = None
+    correct_answer: str | None = None
+
+
+class NumericAnswerLogRequest(BaseModel):
+    student_id: str
+    topic: str = "Mirror Formula and Magnification"
+    misconception_tag: str | None = None
+    attempt_number: int = 1
+    question_text: str | None = None
+    student_answer: str | None = None
+    correct_answer: str | None = None
 
 
 def _difficulty_from_level(level: str | None) -> str:
@@ -253,6 +292,47 @@ def _retag_questions_for_misconceptions(questions: list[dict[str, Any]], misconc
     return questions
 
 
+def _allocate_question_counts(tags: list[str], weights: dict[str, int], total: int) -> dict[str, int]:
+    """Split `total` questions across `tags` proportional to `weights`.
+
+    Tags missing from `weights` default to weight 1, so passing no weights
+    at all degrades to a roughly-even split (the prior, unweighted behavior).
+
+    If `total >= len(tags)`: every tag gets at least 1 question, and the
+    counts always sum to exactly `total` (largest-remainder rounding).
+
+    If `total < len(tags)` (more distinct misconceptions than questions to
+    hand out -- reachable from startMisconceptionQuiz, which can pass more
+    unique wrong-answer tags than its capped question_count): only the
+    `total` highest-weighted tags get a question (1 each); the rest are
+    simply absent from the returned dict rather than forced below 1. Callers
+    should treat a missing key as "no dedicated question count," not 0-but-still-a-target.
+    """
+    if not tags or total <= 0:
+        return {}
+
+    tag_weights = [max(weights.get(t, 1), 1) for t in tags]
+
+    if total < len(tags):
+        ranked = sorted(range(len(tags)), key=lambda i: tag_weights[i], reverse=True)
+        return {tags[i]: 1 for i in ranked[:total]}
+
+    weight_sum = sum(tag_weights)
+    raw_shares = [total * w / weight_sum for w in tag_weights]
+    counts = [max(1, int(share)) for share in raw_shares]
+
+    remainder = total - sum(counts)
+    if remainder > 0:
+        # Give the leftover questions to the tags with the largest fractional
+        # share first (largest-remainder method), so the biggest misconceptions
+        # get the rounding benefit rather than an arbitrary tag.
+        order = sorted(range(len(tags)), key=lambda i: raw_shares[i] - int(raw_shares[i]), reverse=True)
+        for i in order[:remainder]:
+            counts[i] += 1
+
+    return {tags[i]: counts[i] for i in range(len(tags))}
+
+
 @router.post("/generate-misconception-quiz")
 def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | None = None):
     payload = data or GenerateMisconceptionQuizRequest()
@@ -277,6 +357,23 @@ def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | N
         seen.add(tag)
         unique_tags.append(tag)
 
+    # Coerce weight keys the same way tags are coerced, so raw tags from the
+    # client line up with `unique_tags`. Aggregate if two raw tags coerce to
+    # the same allowed tag. Non-positive/invalid weights are dropped.
+    weights_by_tag: dict[str, int] = {}
+    for raw_tag, raw_weight in (payload.misconception_weights or {}).items():
+        coerced = coerce_misconception_tag(raw_tag, topic)
+        if coerced not in unique_tags:
+            continue
+        try:
+            weight = int(raw_weight)
+        except (TypeError, ValueError):
+            continue
+        if weight > 0:
+            weights_by_tag[coerced] = weights_by_tag.get(coerced, 0) + weight
+
+    allocation = _allocate_question_counts(unique_tags, weights_by_tag, requested_count)
+
     wrong_texts = [str(item).strip() for item in (payload.wrong_question_texts or []) if str(item).strip()]
     focus_lines = []
     for tag in unique_tags:
@@ -289,10 +386,24 @@ def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | N
             line += f" | {explanation}"
         if focus_area:
             line += f" | Focus: {focus_area}"
+        if tag in allocation:
+            line += f" | Target roughly {allocation[tag]} of the {requested_count} questions on this specific misconception"
+        elif weights_by_tag:
+            # More distinct misconceptions than questions to hand out -- this
+            # tag lost the allocation to higher-weighted ones. Still mention
+            # it as lower-priority context rather than pretending it has a
+            # dedicated slot.
+            line += " | Lower priority than the others above; include only if a question naturally fits"
         focus_lines.append(line)
 
     tutor_context = "Generate ONLY remedial questions that target these misconceptions:\n"
     tutor_context += "\n".join(focus_lines)
+    if weights_by_tag:
+        tutor_context += (
+            "\nThe target counts above reflect how often the student actually tripped on each "
+            "misconception in past attempts — follow them as closely as possible rather than "
+            "splitting evenly across all misconceptions."
+        )
     if wrong_texts:
         tutor_context += "\nUse these previously incorrect question themes for context:\n"
         tutor_context += "\n".join(f"- {text}" for text in wrong_texts[:8])
@@ -308,13 +419,13 @@ def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | N
             taught_concepts=None,
             untaught_concepts=None,
         )
-        questions = _retag_questions_for_misconceptions(questions, unique_tags, topic)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return {
         "questions": questions,
         "target_misconceptions": unique_tags,
+        "question_allocation": allocation if weights_by_tag else None,
         "mode": "remedial-misconception-quiz",
     }
 
@@ -325,15 +436,21 @@ def submit_answers(data: SubmitAnswersRequest):
     topic = data.topic or "reflection_refraction"
     topic_key = topic_key_for(topic)
     # Enable personalized LLM feedback for all core physics topics
-    use_llm_feedback = topic_key in {"laws_of_reflection", "spherical_mirrors", "refraction"}
+    use_llm_feedback = topic_key in {"laws_of_reflection", "reflection_of_light", "spherical_mirrors", "refraction"}
 
     tags: list[str] = []
     wrong_entries: list[dict[str, Any]] = []
     total = 0
     correct = 0
     db_sync_warning = None
+    refined_tags: dict[int, str] = {}
 
-    for ans in data.answers:
+    # Pass 1 (fast, synchronous): work out correctness and collect the wrong
+    # answers whose tag is generic and needs an LLM classification call.
+    provisional_wrong: dict[int, dict[str, Any]] = {}
+    pending_classification: dict[int, dict[str, str]] = {}
+
+    for idx, ans in enumerate(data.answers):
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
         if selected_raw is None or correct_raw is None:
@@ -346,57 +463,96 @@ def submit_answers(data: SubmitAnswersRequest):
         total += 1
         if is_correct:
             correct += 1
-        else:
-            misconception_map = ans.get("misconception_map") or ans.get("misconception_tags") or {}
-            tag = (
-                misconception_map.get(selected)
-                or misconception_map.get(str(selected_raw))
-                or ans.get("misconception_tag")
-                or "general_concept_gap"
-            )
+            continue
 
-            question_text = str(ans.get("question_text") or "").strip()
-            if callable(_classify_misconception_tag) and str(tag).strip() in {
-                "",
-                "no_concept",
-                "general_concept_gap",
-            }:
-                selected_text = selected
-                correct_text = correct_ans
-                options = ans.get("options")
-                if options and isinstance(options, list):
-                    try:
-                        sel_idx = int(selected_raw)
-                        corr_idx = int(correct_raw)
-                        if 0 <= sel_idx < len(options):
-                            selected_text = str(options[sel_idx])
-                        if 0 <= corr_idx < len(options):
-                            correct_text = str(options[corr_idx])
-                    except (ValueError, TypeError):
-                        pass
+        misconception_map = ans.get("misconception_map") or ans.get("misconception_tags") or {}
+        tag = (
+            misconception_map.get(selected)
+            or misconception_map.get(str(selected_raw))
+            or ans.get("misconception_tag")
+            or "general_concept_gap"
+        )
+        question_text = str(ans.get("question_text") or "").strip()
 
+        provisional_wrong[idx] = {
+            "question_id": ans.get("question_id"),
+            "question_text": question_text,
+            "tag": tag,
+            "selected": selected_raw,
+            "correct": correct_raw,
+            "options": ans.get("options"),
+        }
+
+        if callable(_classify_misconception_tag) and str(tag).strip() in {
+            "",
+            "no_concept",
+            "general_concept_gap",
+        }:
+            selected_text = selected
+            correct_text = correct_ans
+            options = ans.get("options")
+            if options and isinstance(options, list):
+                try:
+                    sel_idx = int(selected_raw)
+                    corr_idx = int(correct_raw)
+                    if 0 <= sel_idx < len(options):
+                        selected_text = str(options[sel_idx])
+                    if 0 <= corr_idx < len(options):
+                        correct_text = str(options[corr_idx])
+                except (ValueError, TypeError):
+                    pass
+            pending_classification[idx] = {
+                "question_text": question_text,
+                "selected_text": selected_text,
+                "correct_text": correct_text,
+            }
+
+    # Pass 2 (parallel): resolve generic tags via LLM classification all at
+    # once instead of one sequential network round-trip per wrong answer.
+    if pending_classification:
+        allowed_tags_for_topic = _allowed_misconceptions_for_topic(topic)
+
+        def _classify(idx, ctx):
+            try:
                 auto_tag = _classify_misconception_tag(
                     topic or "Laws of Reflection",
-                    question_text,
-                    selected_text,
-                    correct_text,
-                    allowed_tags=_allowed_misconceptions_for_topic(topic),
+                    ctx["question_text"],
+                    ctx["selected_text"],
+                    ctx["correct_text"],
+                    allowed_tags=allowed_tags_for_topic,
                 )
-                if isinstance(auto_tag, str) and auto_tag.strip():
-                    tag = auto_tag.strip()
+                return idx, auto_tag
+            except Exception:
+                return idx, None
 
-            tag = coerce_misconception_tag(tag, topic)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [
+                executor.submit(_classify, idx, ctx) for idx, ctx in pending_classification.items()
+            ]
+            for future in as_completed(futures):
+                idx, auto_tag = future.result()
+                if isinstance(auto_tag, str) and auto_tag.strip():
+                    provisional_wrong[idx]["tag"] = auto_tag.strip()
+
+    # Pass 3 (fast, synchronous): finalize tags and log behavior in original order.
+    for idx, ans in enumerate(data.answers):
+        selected_raw = ans.get("selected")
+        correct_raw = ans.get("correct")
+        if selected_raw is None or correct_raw is None:
+            continue
+
+        selected = str(selected_raw)
+        correct_ans = str(correct_raw)
+        is_correct = selected == correct_ans
+
+        tag = None
+        if not is_correct:
+            entry = provisional_wrong[idx]
+            tag = coerce_misconception_tag(entry["tag"], topic)
+            entry["tag"] = tag
+            refined_tags[idx] = tag
             tags.append(tag)
-            wrong_entries.append(
-                {
-                    "question_id": ans.get("question_id"),
-                    "question_text": question_text,
-                    "tag": tag,
-                    "selected": selected_raw,
-                    "correct": correct_raw,
-                    "options": ans.get("options"),
-                }
-            )
+            wrong_entries.append(entry)
 
         try:
             log_student_behavior(
@@ -412,9 +568,35 @@ def submit_answers(data: SubmitAnswersRequest):
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
-    explanations_by_tag: dict[str, str] = {}
+    # Increment server-side attempt count; get verified attempt number
+    server_attempt = data.attempt_number or 1
+    try:
+        if data.attempt_number == 1:
+            reset_topic_attempt(student_id, topic_key)
+        server_attempt = increment_topic_attempt(student_id, topic_key)
+    except Exception:
+        server_attempt = data.attempt_number or 1
+
+    exclude_ids = []
+    for a in data.answers:
+        qid = a.get("question_id")
+        if qid is not None and str(qid).isdigit():
+            exclude_ids.append(int(qid))
+
+    # Get adaptation strategy
+    adaptation = adapt_after_submission(
+        main_misconception=main_misconception,
+        topic=topic,
+        attempt_number=server_attempt,
+        exclude_ids=exclude_ids,
+        limit=5,
+    )
+    follow_up_strategy = adaptation.get("strategy", "visual_only")
+    should_redirect_to_lesson = adaptation.get("should_redirect_to_lesson", False)
+
+    explanations_by_idx: dict[int, str] = {}
     if use_llm_feedback:
-        def _fetch_explanation(entry):
+        def _fetch_explanation(entry, q_idx):
             tag = entry["tag"]
             try:
                 sel_opt = entry.get("selected")
@@ -436,49 +618,55 @@ def submit_answers(data: SubmitAnswersRequest):
                 explanation_data = content_agent.generate(
                     subtopic=topic,
                     misconception_tag=tag,
-                    attempt=2,
+                    attempt=server_attempt,
                     question_text=entry.get("question_text") or None,
                     student_answer=sel_text or (str(sel_opt) if sel_opt is not None else None),
                     correct_answer=corr_text or (str(corr_opt) if corr_opt is not None else None),
                 )
-                return tag, explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
+                return q_idx, tag, explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
             except Exception:
-                return tag, _get_misconception_explanation(tag) or "Review this concept carefully."
-
-        unique_entries = {e["tag"]: e for e in wrong_entries}.values()
+                return q_idx, tag, _get_misconception_explanation(tag) or "Review this concept carefully."
         
         with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_tag = {executor.submit(_fetch_explanation, entry): entry["tag"] for entry in unique_entries}
-            for future in as_completed(future_to_tag):
-                tag = future_to_tag[future]
+            future_to_idx = {
+                executor.submit(_fetch_explanation, entry, idx): idx
+                for idx, entry in enumerate(wrong_entries)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
                 try:
-                    result_tag, exp = future.result()
-                    explanations_by_tag[result_tag] = exp
+                    res_idx, res_tag, exp = future.result(timeout=30)
+                    explanations_by_idx[res_idx] = exp
                 except Exception:
-                    explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
+                    # fallback
+                    tag = wrong_entries[idx]["tag"]
+                    explanations_by_idx[idx] = _get_misconception_explanation(tag) or "Review this concept carefully."
 
     explanation = None
     visual_payload = None
     if main_misconception != "none":
-        explanation = explanations_by_tag.get(main_misconception)
+        # Find the first explanation matching the main misconception
+        for idx, entry in enumerate(wrong_entries):
+            if entry["tag"] == main_misconception and idx in explanations_by_idx:
+                explanation = explanations_by_idx[idx]
+                break
+                
         if not explanation:
             if use_llm_feedback:
                 try:
                     explanation_data = content_agent.generate(
                         subtopic=topic,
                         misconception_tag=main_misconception,
-                        attempt=2,
+                        attempt=server_attempt,
                     )
                     explanation = explanation_data.get("explanation")
                 except Exception:
-                    explanation = _get_misconception_explanation(main_misconception)
-            else:
-                explanation = _get_misconception_explanation(main_misconception)
-                
-        # We can construct visual payload locally without hitting LLM again!
+                    pass
+        if not explanation:
+            explanation = _get_misconception_explanation(main_misconception)
         visual_payload = {
             "svg_component": pick_svg_template(topic, main_misconception),
-            "svg_variant": pick_svg_variant(main_misconception)
+            "svg_variant": pick_svg_variant(main_misconception),
         }
 
     level = "beginner"
@@ -499,21 +687,24 @@ def submit_answers(data: SubmitAnswersRequest):
     follow_up = []
 
     question_feedback = []
-    for ans in data.answers:
+    wrong_entry_idx = 0
+    for idx, ans in enumerate(data.answers):
         selected = ans.get("selected")
         correct_ans = ans.get("correct")
         if str(selected) == str(correct_ans):
             continue
 
-        mapping = ans.get("misconception_map") or ans.get("misconception_tags") or {}
-        tag = (
-            mapping.get(selected)
-            or mapping.get(str(selected))
+        tag = refined_tags.get(idx) or coerce_misconception_tag(
+            (ans.get("misconception_map") or ans.get("misconception_tags") or {}).get(selected)
+            or (ans.get("misconception_map") or ans.get("misconception_tags") or {}).get(str(selected))
             or ans.get("misconception_tag")
-            or "general_concept_gap"
+            or "general_concept_gap",
+            topic,
         )
-        tag = coerce_misconception_tag(tag, topic)
-        reason_text = explanations_by_tag.get(tag) if use_llm_feedback else _get_misconception_explanation(tag)
+        
+        reason_text = explanations_by_idx.get(wrong_entry_idx) if use_llm_feedback else _get_misconception_explanation(tag)
+        wrong_entry_idx += 1
+        
         if not reason_text:
             reason_text = _get_misconception_explanation(tag)
 
@@ -534,12 +725,15 @@ def submit_answers(data: SubmitAnswersRequest):
         "level": level,
         "reason": _trim_feedback(explanation or "Review the concept carefully."),
         "focus_area": "N/A" if main_misconception == "none" else main_misconception,
-        "misconception_explanation": _get_misconception_explanation(main_misconception),
+        "misconception_explanation": _trim_feedback(explanation or "Review the concept carefully."),
         "svg_component": (visual_payload or {}).get("svg_component"),
         "svg_variant": (visual_payload or {}).get("svg_variant"),
         "question_feedback": question_feedback,
         "db_sync_warning": db_sync_warning,
         "questions": follow_up,
+        "follow_up_strategy": follow_up_strategy,
+        "should_redirect_to_lesson": should_redirect_to_lesson,
+        "attempt_number": server_attempt,
     }
 
 
@@ -642,6 +836,51 @@ def get_student_route(student_id: str):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/student/{student_id}/memory")
+def get_student_memory_route(student_id: str):
+    """Cross-session misconception memory: every unresolved topic ranked by
+    weakness (most struggled first), for a single "you tripped in these
+    topics" dashboard entry + a weighted retest quiz per topic. Also returns
+    a green/yellow/red status map covering every topic the student has
+    attempted (including completed ones), so the Dashboard can color every
+    topic card from this one fetch instead of a second round-trip."""
+    try:
+        student = get_student_record(student_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    misconceptions = student.get("misconceptions")
+    completed_topics = student.get("completed_topics")
+    unresolved_topics = student.get("unresolved_topics")
+
+    status_map = get_topic_status_map(misconceptions, completed_topics, unresolved_topics)
+    weaknesses = summarize_persistent_weaknesses(misconceptions, unresolved_topics)
+
+    if not weaknesses:
+        return {"has_memory": False, "topics": [], "status_map": status_map}
+
+    topics = []
+    for w in weaknesses:
+        topic_title = w["topic_title"]
+        weak_tag_title = w["weak_tag_title"]
+        if weak_tag_title:
+            message = f"Last time you struggled with {weak_tag_title} in {topic_title}."
+        else:
+            message = f"You didn't fully clear {topic_title} last time."
+        topics.append(
+            {
+                "topic_title": topic_title,
+                "weak_tag": w["weak_tag"],
+                "weak_tag_title": weak_tag_title,
+                "tag_breakdown": w["tag_breakdown"],
+                "severity": w["severity"],
+                "message": message,
+            }
+        )
+
+    return {"has_memory": True, "topics": topics, "status_map": status_map}
+
+
 @router.get("/debug/allowed-misconceptions")
 def debug_allowed_misconceptions(topic: str | None = "Laws of Reflection"):
     """Sanity endpoint: inspect allowed misconception tags for a topic input."""
@@ -682,6 +921,52 @@ def misconception_reason(req: MisconceptionReasonRequest):
 
 
 from fastapi.responses import Response
+
+@router.post("/submit-numeric-answer")
+def submit_numeric_answer(req: NumericAnswerLogRequest):
+    """Logs a single numeric-Try-stage attempt (Mirror Formula) and, once a
+    student has tripped the same tag more than once, fetches an attempt-paced
+    explanation via the same ContentAgent pipeline /submit-answers uses for
+    MCQ. Correctness itself is already determined client-side (deterministic
+    physics via MirrorPhysicsEngine.js) -- this endpoint only logs + explains.
+    """
+    tag = coerce_misconception_tag(req.misconception_tag, req.topic) if req.misconception_tag else None
+
+    try:
+        log_student_behavior(
+            student_id=req.student_id,
+            topic=req.topic,
+            selected_option=req.student_answer or "numeric_response",
+            correct_option=req.correct_answer or "n/a",
+            is_correct=tag is None,
+            misconception_tag=tag,
+        )
+    except Exception:
+        pass
+
+    explanation = None
+    if tag and req.attempt_number >= 2:
+        try:
+            explanation_data = content_agent.generate(
+                subtopic=req.topic,
+                misconception_tag=tag,
+                attempt=req.attempt_number,
+                question_text=req.question_text,
+                student_answer=req.student_answer,
+                correct_answer=req.correct_answer,
+            )
+            explanation = explanation_data.get("explanation")
+        except Exception:
+            explanation = None
+    if tag and not explanation:
+        explanation = _get_misconception_explanation(tag)
+
+    try:
+        update_student_topic_resolution(req.student_id, req.topic, tag or "none")
+    except Exception:
+        pass
+
+    return {"explanation": explanation, "misconception_tag": tag}
 
 @router.get("/api/tts")
 async def text_to_speech(text: str, voice: str = "en-IN-PrabhatNeural"):

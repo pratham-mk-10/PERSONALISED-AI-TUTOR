@@ -48,17 +48,134 @@ TEMPLATE_QUIZ_SCOPE = {
         ],
     },
     "PlaneMirrorBasicsAnimation": {
+        # Corrected: this component only covers ray-diagram vocabulary
+        # (mirror, point of incidence, incident/reflected ray, normal,
+        # angle of incidence/reflection). Image-characteristic concepts were
+        # previously claimed here but were never actually in the lesson --
+        # that content now lives in PlaneMirrorCharacteristicsAnimation below.
+        "taught_concepts": [
+            "definition of a plane mirror",
+            "point of incidence, incident ray, reflected ray, normal",
+            "angle of incidence and angle of reflection measured from the normal",
+            "standard ray-diagram vocabulary for plane mirrors",
+        ],
+        "untaught_concepts": [
+            "image characteristics of a plane mirror",
+            "lateral inversion",
+            "regular vs diffused reflection",
+            "spherical mirrors",
+            "mirror formula",
+            "magnification by spherical mirrors",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "PlaneMirrorCharacteristicsAnimation": {
         "taught_concepts": [
             "image in a plane mirror is virtual and erect",
             "image size equals object size in a plane mirror",
             "image distance equals object distance from the mirror",
             "lateral inversion in plane mirror",
-            "laws of reflection in plane mirror context",
+            "regular reflection vs diffused reflection, and that individual rays obey the law of reflection in both",
         ],
         "untaught_concepts": [
             "spherical mirrors",
             "mirror formula",
             "magnification by spherical mirrors",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "PlaneMirrorApplicationsAnimation": {
+        "taught_concepts": [
+            "why AMBULANCE is written reversed, using lateral inversion in a rear-view mirror",
+            "symmetric letters (A, H, I, M, O, T, U) that look identical to their own mirror image, vs asymmetric letters that visibly flip",
+            "multiple images formed by two plane mirrors at an angle theta: number of images = (360/theta) - 1",
+            "kaleidoscope as two mirrors at 60 degrees",
+            "periscope as two mirrors at 45 degrees, each bending the ray 90 degrees",
+        ],
+        "untaught_concepts": [
+            "spherical mirrors",
+            "mirror formula",
+            "magnification by spherical mirrors",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "RealVsVirtualImagesAnimation": {
+        "taught_concepts": [
+            "a real image forms where light rays actually converge and can be caught on a screen",
+            "a real image is inverted",
+            "a virtual image forms where light rays only appear to diverge from, traced backward",
+            "a virtual image cannot be caught on a screen and is erect",
+        ],
+        "untaught_concepts": [
+            "spherical mirror image formation cases",
+            "mirror formula",
+            "magnification",
+            "sign convention",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "SphericalMirrorUsesAnimation": {
+        "taught_concepts": [
+            "concave mirror used in shaving/makeup mirrors and dentist mirrors because object between F and P gives a magnified virtual image",
+            "concave mirror used in torches/headlights/searchlights because a source at the focus reflects as a parallel beam",
+            "concave mirror used in solar furnaces/cookers because parallel incoming rays converge at the focus",
+            "convex mirror used in rear-view and side mirrors because it always gives a virtual erect diminished image with a wider field of view",
+            "concave mirror used in an ENT doctor's head mirror, same physics as the shaving mirror, to concentrate light into the ear, nose, or throat",
+            "concave mirror used in reflecting telescopes, same physics as the solar cooker, to converge faint starlight at the focus",
+            "convex mirror used in road-safety mirrors at blind curves, shop security mirrors, and ATM mirrors, same physics as the rear-view mirror, for a wider field of view",
+        ],
+        "untaught_concepts": [
+            "mirror formula",
+            "magnification formula",
+            "sign convention",
+            "numerical problems on spherical mirrors",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "SignConventionLesson": {
+        "taught_concepts": [
+            "distances measured from the pole under the New Cartesian sign convention",
+            "object distance u is always negative",
+            "concave mirror focal length is negative, convex mirror focal length is positive",
+            "real image distance is negative, virtual image distance is positive",
+            "erect image height is positive, inverted image height is negative",
+        ],
+        "untaught_concepts": [
+            "mirror formula derivation",
+            "magnification numericals",
+            "refraction",
+            "lenses",
+        ],
+    },
+    "MirrorFormulaLesson": {
+        "taught_concepts": [
+            "mirror formula 1/v + 1/u = 1/f",
+            "magnification m = h'/h = -v/u and interpreting its sign and magnitude",
+            "worked examples applying the sign convention to find image position and nature",
+        ],
+        "untaught_concepts": [
+            "refraction",
+            "lens formula",
+            "power of a lens",
+            "multi-step combined numericals",
+        ],
+    },
+    "IntroToLightAnimation": {
+        "taught_concepts": [
+            "light is a form of energy that enables sight",
+            "luminous vs non-luminous objects",
+            "transparent, translucent, and opaque materials",
+            "rectilinear propagation of light",
+            "ray vs beam (parallel, convergent, divergent)",
+        ],
+        "untaught_concepts": [
+            "laws of reflection",
+            "mirrors",
             "refraction",
             "lenses",
         ],
@@ -85,6 +202,9 @@ TEMPLATE_QUIZ_SCOPE = {
             "principal focus and center of curvature",
             "basic image-formation intuition",
             "ray-rule reasoning",
+            "distinguishing concave, convex, and plane mirrors by looking at your reflection close up (magnified vs diminished vs same size)",
+            "distinguishing concave and convex mirrors by touch (depressed inward vs bulging outward)",
+            "the spoon analogy: inner hollow surface behaves like a concave mirror, outer bulging back behaves like a convex mirror",
         ],
         "untaught_concepts": [
             "advanced derivations of mirror formula",

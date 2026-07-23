@@ -2,9 +2,6 @@
 .env
 .env.*
 !.env.example
-git rm -r --cached .
-git add .
-git commit -m "Reapply .gitignore"
 __pycache__/
 *.py[cod]
 *.pyc
