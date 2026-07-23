@@ -25,16 +25,14 @@ Most "AI Tutors" are simple text-based wrappers around LLMs that say "Wrong answ
 
 ---
 
-## 👥 Core Team & Engineering Ownership
+## 👥 The Team
 
-This capstone project was built as a highly collaborative effort, with each team member owning critical pieces of the underlying architecture. 
+This capstone project was built as a highly collaborative effort. Every aspect of the architecture—from the deterministic physics engine and frontend UI to the multi-agent LLM pipelines and assessment schemas—was developed jointly by our team:
 
-| Team Member | Engineering Ownership | Core Contributions |
-| :--- | :--- | :--- |
-| **Pratham** | **Physics Engine & Content Generation** | Architected the deterministic React SVG Physics Engine using algebraic paraxial math to bypass LLM spatial hallucinations. Engineered the CoT Content Agent pipeline mapping LLM schemas to dynamic visual templates. |
-| **Rajat** | **Orchestration & Frontend Systems** | Built the React (Vite) UI, state routing, Refraction module, and the FastAPI Orchestrator layer that manages the async flows between all three AI agents. |
-| **Rachan** | **Assessment & Cognitive Tagging** | Curated the specialized Physics Question Bank and built the Assessment Agent, utilizing Pydantic schemas to enforce strict JSON evaluation and extract granular misconception tags. |
-| **Pavan** | **Adaptation & State Management** | Engineered the Adaptation Agent logic and decision loop, managing the 3-attempt cycle and dynamically determining when to refine, regenerate, or exit a learning session. |
+- **Pratham**
+- **Rajat**
+- **Rachan**
+- **Pavan**
 
 ---
 
