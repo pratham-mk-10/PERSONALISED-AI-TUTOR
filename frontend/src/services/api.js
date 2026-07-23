@@ -79,6 +79,18 @@ export const getGeneratedQuestions = async ({
   return res.json();
 };
 
+export const getStudentMemory = async (studentId) => {
+  if (!studentId) return { has_memory: false };
+
+  try {
+    const res = await fetch(`${BASE_URL}/student/${encodeURIComponent(studentId)}/memory`);
+    if (!res.ok) return { has_memory: false };
+    return res.json();
+  } catch {
+    return { has_memory: false };
+  }
+};
+
 export const submitAnswers = async ({ answers, topic = null, studentId = null, attemptNumber = 1 }) => {
   const res = await fetch(`${BASE_URL}/submit-answers`, {
     method: "POST",
@@ -101,6 +113,10 @@ export const getMisconceptionQuiz = async ({
   topic = null,
   studentId = null,
   misconceptionTags = [],
+  // Optional { [tag]: tripCount } map. When present, the backend splits
+  // questionCount proportionally across tags instead of treating them
+  // all equally — used for the weighted cross-session retest quiz.
+  misconceptionWeights = null,
   wrongQuestionTexts = [],
   questionCount = 5,
   difficulty = "easy",
@@ -112,6 +128,10 @@ export const getMisconceptionQuiz = async ({
     wrong_question_texts: Array.isArray(wrongQuestionTexts) ? wrongQuestionTexts : [],
     difficulty,
   };
+
+  if (misconceptionWeights && typeof misconceptionWeights === "object" && Object.keys(misconceptionWeights).length > 0) {
+    payload.misconception_weights = misconceptionWeights;
+  }
 
   if (Number.isFinite(questionCount)) {
     payload.question_count = questionCount;
@@ -134,7 +154,7 @@ export const getMisconceptionQuiz = async ({
 };
 
 
-export const getMisconceptionReason = async (misconceptionTag, topic = "reflection_refraction") => {
+export const getMisconceptionReason = async (misconceptionTag, topic = "reflection_refraction", questionText = null, studentAnswer = null, correctAnswer = null) => {
   if (!misconceptionTag || misconceptionTag === "none") {
     return {
       reason: "Great work. Keep practicing to strengthen your understanding.",
@@ -149,13 +169,49 @@ export const getMisconceptionReason = async (misconceptionTag, topic = "reflecti
     },
     body: JSON.stringify({
       misconception_tag: misconceptionTag,
-      topic
+      topic,
+      question_text: questionText,
+      student_answer: studentAnswer,
+      correct_answer: correctAnswer
     })
   });
 
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to get concept feedback (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
+export const submitNumericAnswerLog = async ({
+  studentId,
+  topic = "Mirror Formula and Magnification",
+  misconceptionTag = null,
+  attemptNumber = 1,
+  questionText = null,
+  studentAnswer = null,
+  correctAnswer = null,
+} = {}) => {
+  const res = await fetch(`${BASE_URL}/submit-numeric-answer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      student_id: studentId,
+      topic,
+      misconception_tag: misconceptionTag,
+      attempt_number: attemptNumber,
+      question_text: questionText,
+      student_answer: studentAnswer,
+      correct_answer: correctAnswer,
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to log numeric answer (${res.status}): ${text}`);
   }
 
   return res.json();

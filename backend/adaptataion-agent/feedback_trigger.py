@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from database.misconception_catalog import format_misconceptions_for_prompt
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _ENV_CANDIDATES = [
 	BACKEND_ROOT / ".env",

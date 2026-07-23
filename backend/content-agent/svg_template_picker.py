@@ -20,6 +20,7 @@ PLANE_MIRROR_TAGS = {
     "distance_confusion",
     "lateral_inversion_confusion",
     "plane_mirror_image_properties",
+    "regular_vs_diffused_confusion",
 }
 
 SPHERICAL_MIRROR_BASICS_TAGS = {
@@ -32,6 +33,8 @@ SPHERICAL_MIRROR_BASICS_TAGS = {
     "radius_focal_relation_wrong",
     "sign_convention_confusion",
     "left_right_sign_error",
+    "mirror_formula_sign_error",
+    "magnification_sign_error",
 }
 
 SPHERICAL_MIRROR_RAY_RULE_TAGS = {

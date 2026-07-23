@@ -50,6 +50,28 @@ TAG_PROMPT_HINTS = {
     "rearview_reason_wrong": "Explain rear-view use of convex mirror due to wider field of view and erect diminished image.",
     "sign_convention_confusion": "Explain mirror sign convention briefly and clearly.",
     "left_right_sign_error": "Clarify left-side object distance sign convention for mirrors in NCERT context.",
+    "regular_vs_diffused_confusion": "Clarify that regular (specular) reflection happens on smooth surfaces where parallel rays stay parallel, while diffused reflection happens on rough surfaces where rays scatter -- but every individual ray still obeys the law of reflection at its own point of incidence.",
+    "mirror_formula_sign_error": "Explain that every value (u, f, and once found, v) must be given its correct sign under the Cartesian sign convention BEFORE substituting into 1/v + 1/u = 1/f -- substituting an unsigned magnitude gives a wrong answer even with the right formula.",
+    "magnification_sign_error": "Explain how to read the sign of m = -v/u: positive m means virtual and erect, negative m means real and inverted, and clarify the correctly-signed v and u that should have been used.",
+}
+
+
+TAG_ANALOGY_HINTS = {
+    "angle_from_surface": "A ball bounced off a flat wall: the angle that matters is measured from the imaginary line sticking straight OUT of the wall (the normal), never from the wall's flat surface itself.",
+    "reflection_not_equal": "Kicking a ball at a wall dead-on-symmetric: whatever angle it hits the wall at, it leaves at the exact same angle on the other side of the perpendicular line — never a different one.",
+    "normal_orientation_wrong": "A flagpole standing straight up out of flat ground: the flagpole (normal) is always perpendicular to the ground (mirror), no matter where you stand.",
+    "plane_not_same": "Three points on one flat sheet of paper: the incoming path, the outgoing path, and the perpendicular line all sit on that same single flat sheet — none of them pokes out of it.",
+    "concave_convex_confusion": "A shiny spoon: look at the inside (scooped, curves toward you) versus the outside (bulging, curves away from you) of the same spoon.",
+    "focus_definition_wrong": "Sunlight through a concave shaving mirror actually gathers to a single hot point in front of it; a convex mirror spreads sunlight apart, so that hot point only exists if you trace the spread-out rays backward, behind the mirror.",
+    "focus_convex_confusion": "Standing behind a convex security mirror in a shop: the bright 'meeting point' of the spread-out rays only appears to be behind the mirror's surface, not in the room in front of it.",
+    "image_real_confusion": "A picture on a screen versus your reflection in a bathroom mirror: only the screen picture can be caught on paper; the mirror version only exists where your eye traces the rays back to.",
+    "lateral_inversion_confusion": "Raise your right hand in front of a mirror: the reflection raises what looks like its left hand — nothing flips upside down, only left and right swap.",
+    "convex_real_image_myth": "A shop security mirror image: no matter how close or far you stand, you can never catch that image on a piece of paper — it always stays a same-side, shrunk, upright view.",
+    "rearview_reason_wrong": "A car's side mirror is curved outward like the back of a spoon specifically so a wider slice of the road behind squeezes into one small mirror, at the cost of making cars look smaller/farther than they are.",
+    "sign_convention_confusion": "Standing at the mirror looking toward the object: everything measured in the direction you're facing (away from the mirror, where the object sits) is negative; only measurements taken from mirror going the other way count positive.",
+    "regular_vs_diffused_confusion": "A flat calm pond gives one clear reflection (regular); the same water rippled by wind breaks that same reflection into scattered flashes of light in every direction (diffused) -- each ripple still bounces light off at the correct angle, it just isn't flat anymore.",
+    "mirror_formula_sign_error": "Like a bank statement where withdrawals must be entered as negative numbers before you total the account -- plugging in a raw distance without its correct negative or positive sign into the formula gives a wrong final balance even though the arithmetic itself was done correctly.",
+    "magnification_sign_error": "A magnification's sign is like a thumbs up or thumbs down verdict card revealed at the very end: positive flips the card to 'virtual, erect', negative flips it to 'real, inverted' -- read that card only after correctly signing v and u.",
 }
 
 
@@ -94,10 +116,27 @@ def build_explanation_prompt(subtopic, misconception_tag, attempt, question_text
             "Use their exact wrong answer as a starting point."
         )
     elif attempt >= 3:
+        analogy_hint = TAG_ANALOGY_HINTS.get(misconception_tag)
+        if analogy_hint:
+            analogy_rule = (
+                f"Use exactly this real-world analogy, adapted in your own words: {analogy_hint} "
+                "Do not invent a different analogy."
+            )
+        else:
+            analogy_rule = (
+                "Pick ONE simple, everyday physical object or action (something the student can "
+                "physically see or touch) as the analogy. Before writing the explanation, silently "
+                "check that every part of the analogy maps 1:1 onto a physics quantity in this "
+                "misconception (e.g. the object's straight edge = normal, the bounce angle = angle "
+                "of reflection). If any part of the analogy does not map cleanly, discard it and "
+                "pick a simpler one instead."
+            )
         pace_instruction = (
             "The student has struggled with this concept multiple times. "
-            "Use a completely different analogy from a real-world scenario they can visualize. "
-            "Avoid physics jargon. Be encouraging and extremely simple. "
+            f"{analogy_rule} "
+            "Do not introduce any new physics concept, device, or phenomenon (e.g. refraction, "
+            "sound, echoes, lenses) that is not already part of this misconception — that would "
+            "confuse rather than clarify. Avoid physics jargon. Be encouraging and extremely simple. "
             "End with one concrete memorable sentence they can recall during a test."
         )
     else:

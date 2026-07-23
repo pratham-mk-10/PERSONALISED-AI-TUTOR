@@ -23,7 +23,7 @@ def _load_prompt_builder():
 
 build_explanation_prompt = _load_prompt_builder().build_explanation_prompt
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _ENV_CANDIDATES = [
     BACKEND_ROOT / ".env",
@@ -118,7 +118,7 @@ class ContentAgentLLMService:
 
     def __init__(self, db_connection_factory=None):
         self.db_connection_factory = db_connection_factory
-        self.model = "gemini-1.5-flash"
+        self.model = "gemini-2.5-flash"
 
     def get_explanation(
         self,

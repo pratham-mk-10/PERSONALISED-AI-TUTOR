@@ -38,6 +38,14 @@ TAG_TO_TOPIC_KEY = {
     "focus_ray_rule_wrong": "spherical_mirrors",
     "center_ray_rule_wrong": "spherical_mirrors",
     "sign_convention_confusion": "spherical_mirrors",
+    "image_real_confusion": "plane_mirror",
+    "size_mismatch": "plane_mirror",
+    "distance_confusion": "plane_mirror",
+    "lateral_inversion_confusion": "plane_mirror",
+    "regular_vs_diffused_confusion": "plane_mirror",
+    "rearview_reason_wrong": "spherical_mirrors",
+    "mirror_formula_sign_error": "spherical_mirrors",
+    "magnification_sign_error": "spherical_mirrors",
 }
 
 
@@ -298,6 +306,147 @@ def coerce_misconception_tag(tag: str | None, topic: str | None = None, fallback
     if candidate and candidate in allowed:
         return candidate
     return fallback
+
+
+# Exact `unresolved_topics` title -> TAG_TO_TOPIC_KEY vocabulary key.
+# Unlike topic_keys_for() (which deliberately aliases "Laws of Reflection"
+# across sibling reflection-family topics for allowed-tag-lookup purposes),
+# this is a strict 1:1 mapping so a misconception tag counted toward one
+# topic's weakness score can never leak into a sibling topic's score.
+UNRESOLVED_TOPIC_TITLE_TO_KEY = {
+    "Introduction to Light": "general",
+    "Laws of Reflection": "laws_of_reflection",
+    "Plane Mirror Basics": "plane_mirror",
+    "Real vs Virtual Images": "spherical_mirrors",
+    "Spherical Mirror Basics": "spherical_mirrors",
+    "Ray Tracing Rules of Spherical Mirrors": "spherical_mirrors",
+    "Image Formation by Spherical Mirrors": "spherical_mirrors",
+    "Uses of Concave and Convex Mirrors": "spherical_mirrors",
+    "Mirror Formula and Magnification": "spherical_mirrors",
+    "Numerical Problems: Find v": "spherical_mirrors",
+    "Numerical Problems: Find Height / Magnification": "spherical_mirrors",
+    "Numerical Problems: Find f": "spherical_mirrors",
+    "Numerical Problems: Find u": "spherical_mirrors",
+    "Numerical Problems: Mirror Identification": "spherical_mirrors",
+    "Numerical Problems: Combined": "spherical_mirrors",
+    "Introduction to Refraction": "refraction",
+}
+
+
+# Severity thresholds for a topic's summed misconception count.
+# Applied per-topic on its own merit (not by rank), so every struggling topic
+# gets an honest color instead of only the single worst one standing out.
+RED_SEVERITY_THRESHOLD = 3   # total_count >= 3 -> "red"
+YELLOW_SEVERITY_THRESHOLD = 1  # total_count 1-2 -> "yellow"
+
+# Cap how many distinct misconception tags feed a single topic's retest quiz.
+# Keeps the LLM prompt focused instead of diluting across every tag ever seen.
+MAX_TAGS_PER_TOPIC_BREAKDOWN = 3
+
+
+def _severity_for_count(total_count: int) -> str:
+    if total_count >= RED_SEVERITY_THRESHOLD:
+        return "red"
+    if total_count >= YELLOW_SEVERITY_THRESHOLD:
+        return "yellow"
+    return "green"
+
+
+def summarize_persistent_weaknesses(
+    misconceptions: dict[str, int] | None,
+    unresolved_topics: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Rank every unresolved topic by its summed misconception count.
+
+    Each entry belongs strictly to one topic (via UNRESOLVED_TOPIC_TITLE_TO_KEY,
+    no cross-topic aliasing) so a resolved sibling topic's tags never leak in.
+    Returns entries sorted by total_count descending (most struggled first).
+    Severity ("red"/"yellow") is computed per-topic from its own total_count
+    via `_severity_for_count`, not from rank, so every unresolved topic gets
+    an honest color rather than only the single worst one being flagged.
+    `tag_breakdown` carries up to MAX_TAGS_PER_TOPIC_BREAKDOWN tags sorted by
+    count desc, so callers can weight a retest quiz across every misconception
+    the student actually tripped on, not just the single most frequent one.
+    `weak_tag`/`weak_tag_title` are kept for backward compatibility and are
+    always the top entry of `tag_breakdown`. Empty list if nothing unresolved.
+    """
+    if not unresolved_topics:
+        return []
+
+    misconceptions = misconceptions or {}
+    results: list[dict[str, Any]] = []
+
+    for topic_title in unresolved_topics:
+        topic_key = UNRESOLVED_TOPIC_TITLE_TO_KEY.get(topic_title) or topic_key_for(topic_title)
+        matching = [
+            (tag, count)
+            for tag, count in misconceptions.items()
+            if TAG_TO_TOPIC_KEY.get(tag) == topic_key
+        ]
+        total = sum(count for _, count in matching)
+        matching.sort(key=lambda item: item[1], reverse=True)
+        top_tags = matching[:MAX_TAGS_PER_TOPIC_BREAKDOWN]
+
+        tag_breakdown = []
+        for tag, count in top_tags:
+            meta = get_misconception_metadata(tag)
+            tag_breakdown.append(
+                {
+                    "tag": tag,
+                    "tag_title": (meta or {}).get("title") or tag.replace("_", " ").title(),
+                    "count": count,
+                }
+            )
+
+        top_tag = tag_breakdown[0]["tag"] if tag_breakdown else None
+        weak_tag_title = tag_breakdown[0]["tag_title"] if tag_breakdown else None
+
+        results.append(
+            {
+                "topic_title": topic_title,
+                "weak_tag": top_tag,
+                "weak_tag_title": weak_tag_title,
+                "tag_breakdown": tag_breakdown,
+                "total_count": total,
+            }
+        )
+
+    results.sort(key=lambda r: r["total_count"], reverse=True)
+    for r in results:
+        # An unresolved topic is never "green" even if none of its tripped
+        # tags happen to map into TAG_TO_TOPIC_KEY (total_count == 0) --
+        # unresolved by definition means at least one outstanding gap.
+        r["severity"] = _severity_for_count(r["total_count"]) if r["total_count"] > 0 else "yellow"
+
+    return results
+
+
+def get_topic_status_map(
+    misconceptions: dict[str, int] | None,
+    completed_topics: list[str] | None,
+    unresolved_topics: list[str] | None,
+) -> dict[str, str]:
+    """Return {topic_title: "green"|"yellow"|"red"} for every topic the
+    student has attempted (completed or unresolved), so the Dashboard can
+    color every topic card, not just the ones offered as a retest.
+
+    Completed topics are always "green" regardless of past misconception
+    count — resolution means the student got it right most recently.
+    Unresolved topics reuse the same per-topic severity threshold as
+    `summarize_persistent_weaknesses` (never "green", since an unresolved
+    topic by definition still has at least one outstanding misconception).
+    Topics the student hasn't touched at all are simply absent from the map.
+    """
+    status: dict[str, str] = {}
+
+    for topic_title in completed_topics or []:
+        status[topic_title] = "green"
+
+    weaknesses = summarize_persistent_weaknesses(misconceptions, unresolved_topics)
+    for entry in weaknesses:
+        status[entry["topic_title"]] = entry["severity"]
+
+    return status
 
 
 def format_misconceptions_for_prompt(topic: str | None, include_general: bool = False) -> str:

@@ -615,7 +615,7 @@ def generate_questions(
           if not str(key).isdigit() or int(key) >= len(options):
             continue
           coerced = coerce_misconception_tag(value, topic)
-          if coerced in allowed_tags or coerced == "general_concept_gap":
+          if coerced in allowed_tags and coerced != "general_concept_gap":
             sanitized_map[str(key)] = coerced
         if sanitized_map and len(sanitized_map) > 0:
           q["misconception_map"] = sanitized_map
@@ -679,7 +679,7 @@ def generate_questions(
           sanitized_map = {}
           for key, value in q["misconception_map"].items():
             coerced = coerce_misconception_tag(value, topic)
-            if coerced in allowed_tags or coerced == "general_concept_gap":
+            if coerced in allowed_tags and coerced != "general_concept_gap":
               sanitized_map[str(key)] = coerced
           if sanitized_map:
             q["misconception_map"] = sanitized_map
