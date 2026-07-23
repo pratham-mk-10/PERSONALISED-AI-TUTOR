@@ -343,9 +343,8 @@ def _contains_untaught_concept(question, untaught_concepts):
     bad_phrases = [
       "1/v", "1/u", "1/f", 
       "magnification is", "m =", "m=", 
-      "height of the image", "height of the object", 
-      "size of the image", "distance of the image",
-      "distance of the object", "cm away"
+      "calculate the height", "calculate the size", 
+      "calculate the distance", "cm away"
     ]
     if any(phrase in corpus for phrase in bad_phrases):
       return True

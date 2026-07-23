@@ -37,6 +37,11 @@ export const TITLE_TO_TOPIC_ID = {
 	"Numerical Problems: Mirror Identification": "numerical-mirror-id",
 	"Numerical Problems: Combined": "numerical-combined",
 	"Introduction to Refraction": "refraction-intro",
+	"Laws of Refraction (Snell's Law)": "refraction-snells-law",
+	"Refraction Through a Glass Slab": "refraction-glass-slab",
+	"Spherical Lenses": "refraction-lenses",
+	"Image Formation by Lenses": "refraction-lens-images",
+	"Lens Formula & Power": "refraction-lens-formula",
 };
 
 // Global client-side session/progress store
