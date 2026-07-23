@@ -491,7 +491,7 @@ Concave lens: always virtual, erect, diminished image on same side as object.`,
 
   "refraction-lens-formula": `Lens formula: 1/v - 1/u = 1/f. Magnification m = v/u = h'/h.
 Power P = 1/f (f in metres), unit dioptre (D). Sign convention: u negative, convex f positive, concave f negative.
-Combined lenses in contact: P = P1 + P2.`,`
+Combined lenses in contact: P = P1 + P2.`
 };
 
 const QuizPage = ({ onGoBackToLesson = null }) => {

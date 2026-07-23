@@ -918,7 +918,7 @@ function App() {
         <div style={styles.cardWide}>
           <NumericalChallenge config={COMBINED} />
         </div>
-
+      )}
     </div>
   );
 
