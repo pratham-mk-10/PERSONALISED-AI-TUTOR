@@ -23,7 +23,8 @@ def ensure_student_table():
 		ALTER TABLE student_progress
 		ADD COLUMN IF NOT EXISTS current_topic TEXT,
 		ADD COLUMN IF NOT EXISTS completed_topics JSONB NOT NULL DEFAULT '[]'::jsonb,
-		ADD COLUMN IF NOT EXISTS unresolved_topics JSONB NOT NULL DEFAULT '[]'::jsonb
+		ADD COLUMN IF NOT EXISTS unresolved_topics JSONB NOT NULL DEFAULT '[]'::jsonb,
+		ADD COLUMN IF NOT EXISTS topic_attempts JSONB NOT NULL DEFAULT '{}'::jsonb
 		"""
 	)
 	conn.commit()
@@ -57,7 +58,7 @@ def get_student(student_id):
 	cur = conn.cursor()
 	cur.execute(
 		"""
-		SELECT student_id, misconceptions, attempts, level, current_topic, completed_topics, unresolved_topics
+		SELECT student_id, misconceptions, attempts, level, current_topic, completed_topics, unresolved_topics, topic_attempts
 		FROM student_progress
 		WHERE student_id = %s
 		""",
@@ -75,6 +76,7 @@ def get_student(student_id):
 			"current_topic": row[4],
 			"completed_topics": row[5] or [],
 			"unresolved_topics": row[6] or [],
+			"topic_attempts": row[7] or {},
 		}
 
 	student = {
@@ -85,6 +87,7 @@ def get_student(student_id):
 		"current_topic": None,
 		"completed_topics": [],
 		"unresolved_topics": [],
+		"topic_attempts": {},
 	}
 	upsert_student(student)
 	return student
@@ -103,9 +106,10 @@ def upsert_student(student):
 			level,
 			current_topic,
 			completed_topics,
-			unresolved_topics
+			unresolved_topics,
+			topic_attempts
 		)
-		VALUES (%s, %s, %s, %s, %s, %s, %s)
+		VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 		ON CONFLICT (student_id)
 		DO UPDATE SET
 			misconceptions = EXCLUDED.misconceptions,
@@ -113,7 +117,8 @@ def upsert_student(student):
 			level = EXCLUDED.level,
 			current_topic = EXCLUDED.current_topic,
 			completed_topics = EXCLUDED.completed_topics,
-			unresolved_topics = EXCLUDED.unresolved_topics
+			unresolved_topics = EXCLUDED.unresolved_topics,
+			topic_attempts = EXCLUDED.topic_attempts
 		""",
 		(
 			student["student_id"],
@@ -123,6 +128,7 @@ def upsert_student(student):
 			student.get("current_topic"),
 			Json(student.get("completed_topics", [])),
 			Json(student.get("unresolved_topics", [])),
+			Json(student.get("topic_attempts", {})),
 		),
 	)
 	conn.commit()
@@ -320,3 +326,21 @@ def log_flagged_evaluation(student_id, question_id, student_answer, raw_response
 	conn.close()
 
 
+def increment_topic_attempt(student_id: str, topic_key: str) -> int:
+	"""Increments attempt count for (student, topic). Returns the new count."""
+	student = get_student(student_id)
+	attempts = dict(student.get("topic_attempts") or {})
+	new_count = attempts.get(topic_key, 0) + 1
+	attempts[topic_key] = new_count
+	student["topic_attempts"] = attempts
+	upsert_student(student)
+	return new_count
+
+
+def reset_topic_attempt(student_id: str, topic_key: str):
+	"""Resets attempt count for a topic (called when student revisits lesson)."""
+	student = get_student(student_id)
+	attempts = dict(student.get("topic_attempts") or {})
+	attempts[topic_key] = 0
+	student["topic_attempts"] = attempts
+	upsert_student(student)

@@ -343,9 +343,8 @@ def _contains_untaught_concept(question, untaught_concepts):
     bad_phrases = [
       "1/v", "1/u", "1/f", 
       "magnification is", "m =", "m=", 
-      "height of the image", "height of the object", 
-      "size of the image", "distance of the image",
-      "distance of the object", "cm away"
+      "calculate the height", "calculate the size", 
+      "calculate the distance", "cm away"
     ]
     if any(phrase in corpus for phrase in bad_phrases):
       return True
@@ -615,7 +614,7 @@ def generate_questions(
           if not str(key).isdigit() or int(key) >= len(options):
             continue
           coerced = coerce_misconception_tag(value, topic)
-          if coerced in allowed_tags or coerced == "general_concept_gap":
+          if coerced in allowed_tags and coerced != "general_concept_gap":
             sanitized_map[str(key)] = coerced
         if sanitized_map and len(sanitized_map) > 0:
           q["misconception_map"] = sanitized_map
@@ -679,7 +678,7 @@ def generate_questions(
           sanitized_map = {}
           for key, value in q["misconception_map"].items():
             coerced = coerce_misconception_tag(value, topic)
-            if coerced in allowed_tags or coerced == "general_concept_gap":
+            if coerced in allowed_tags and coerced != "general_concept_gap":
               sanitized_map[str(key)] = coerced
           if sanitized_map:
             q["misconception_map"] = sanitized_map

@@ -1,10 +1,19 @@
 // ============================================================
-// FirstLawOfReflectionAnimation.jsx
-// Animation for the reflection rule: Angle of Incidence = Angle of Reflection
+// FirstLawOfReflectionAnimation.jsx — 7-PART AUDIO-SYNCED VERSION
+//
+// Part 1: Mirror (reflecting surface)
+// Part 2: Normal (perpendicular to mirror)
+// Part 3: Incident Ray draws in slowly
+// Part 4: Angle of Incidence (i)
+// Part 5: Reflected Ray draws in slowly
+// Part 6: Angle of Reflection (r)
+// Part 7: First Law — ∠i = ∠r (both from Normal)
+//
+// Physics: angle of incidence = angle of reflection = 35°
 // ============================================================
 
-import React, { useRef, useEffect } from "react";
-import AnimationPlayer from "../../shared/AnimationPlayer";
+import React from "react";
+import AudioAnimationPlayer from "../../shared/AudioAnimationPlayer";
 import {
   incidentRayStart,
   reflectedRayEnd,
@@ -19,331 +28,223 @@ import {
   Label,
 } from "../../shared/SVGUtils";
 
-// ── CONSTANTS ────────────────────────────────────────────────
-const SVG_W    = 420;
-const SVG_H    = 300;
-const CX       = 210;
-const CY       = 220;
-const RAY_LEN  = 160;
-const ANGLE    = 35;
-const ARC_R    = 45;
+const SVG_W = 420;
+const SVG_H = 300;
+const CX = 210;
+const CY = 220;
+const RAY_LEN = 160;
+const ANGLE = 35;
+const ARC_R = 45;
+
+const S = [0, 0.14, 0.28, 0.42, 0.57, 0.71, 0.85, 1.0];
+
+function sp(progress, stepIndex) {
+  const start = S[stepIndex];
+  const end = S[stepIndex + 1];
+  return clamp((progress - start) / (end - start), 0, 1);
+}
+
+const AUDIO_STEPS = [
+  {
+    progress: S[1],
+    text:
+      "Welcome. Let us learn the first law of reflection. " +
+      "Look at this horizontal line at the bottom of the diagram. " +
+      "This is a plane mirror — a smooth, flat, polished reflecting surface. " +
+      "When light strikes this surface, it bounces back. " +
+      "This bouncing of light is called reflection. " +
+      "The mirror is our reflecting surface for this entire lesson.",
+  },
+  {
+    progress: S[2],
+    text:
+      "Now, at the centre of the mirror, we draw a dashed line going straight upward. " +
+      "This line is perpendicular to the mirror — it makes exactly ninety degrees with the surface. " +
+      "This important reference line is called the Normal. " +
+      "Remember this critical rule: in reflection, ALL angles are measured from the Normal, " +
+      "never from the mirror surface itself.",
+  },
+  {
+    progress: S[3],
+    text:
+      "Now watch the blue ray appear slowly. " +
+      "This is the Incident Ray — the ray of light travelling toward the mirror. " +
+      "It moves from the upper left and strikes the mirror at the point of incidence. " +
+      "The incident ray is still approaching the mirror at this moment.",
+  },
+  {
+    progress: S[4],
+    text:
+      "The angle between the Incident Ray and the Normal, measured in the air above the mirror, " +
+      "is called the Angle of Incidence. We write it as the letter i. " +
+      "In this diagram, i equals thirty five degrees. " +
+      "Always measure this angle from the Normal, not from the mirror surface.",
+  },
+  {
+    progress: S[5],
+    text:
+      "Now watch the red ray appear. " +
+      "This is the Reflected Ray — the ray that bounces off the mirror after impact. " +
+      "It leaves the point of incidence and travels into the upper right. " +
+      "The reflected ray obeys the same physics: it stays in the same plane as the incident ray and the normal.",
+  },
+  {
+    progress: S[6],
+    text:
+      "The angle between the Reflected Ray and the Normal, on the other side of the normal, " +
+      "is called the Angle of Reflection. We write it as the letter r. " +
+      "In this diagram, r also equals thirty five degrees. " +
+      "Notice that r is on the opposite side of the normal from i, but both are measured from the normal.",
+  },
+  {
+    progress: S[7],
+    text:
+      "This brings us to the First Law of Reflection. " +
+      "The angle of incidence equals the angle of reflection. " +
+      "In symbols: angle i equals angle r. " +
+      "Both angles are measured from the Normal. " +
+      "In our diagram, i equals thirty five degrees and r equals thirty five degrees — they are equal. " +
+      "This is the fundamental rule of reflection that you must always remember.",
+  },
+];
 
 const FirstLawOfReflectionAnimation = ({ onTryItClicked }) => {
-  const audioRef = useRef(null);
-  const lastStepRef = useRef(-1);
-  const incStart  = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
-  const refEnd    = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
-
-  const playAudio = (step) => {
-    if (step === lastStepRef.current) return;
-
-    lastStepRef.current = step;
-
-    const audioFiles = {
-      0: ["/audio/mirror.wav"],
-      1: ["/audio/normal.wav"],
-      2: ["/audio/incident.wav"],
-      3: ["/audio/AngleOfIncidence.wav"],
-      4: ["/audio/reflected.wav"],
-      5: ["/audio/AngleOfReflection.wav"],
-      6: ["/audio/law.wav"],
-    };
-
-    const [audioFile, fallbackFile] = audioFiles[step] || [];
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
-    const audio = new Audio(audioFile);
-    audioRef.current = audio;
-
-    audio.onerror = () => {
-      if (!fallbackFile) return;
-
-      const fallbackAudio = new Audio(fallbackFile);
-      audioRef.current = fallbackAudio;
-      fallbackAudio.play().catch(() => {});
-    };
-
-    audio.play().catch(() => {});
-  };
-
-  // Stop any playing audio when this animation unmounts
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      lastStepRef.current = -1;
-    };
-  }, []);
+  const incStart = incidentRayStart(CX, CY, RAY_LEN, ANGLE);
+  const refEnd = reflectedRayEnd(CX, CY, RAY_LEN, ANGLE);
+  const incArcPath = describeArc(CX, CY, ARC_R, -ANGLE, 0);
+  const refArcPath = describeArc(CX, CY, ARC_R, 0, ANGLE);
+  const incLabelX = CX - ARC_R * 1.4 * Math.sin((ANGLE / 2) * Math.PI / 180);
+  const incLabelY = CY - ARC_R * 1.2 * Math.cos((ANGLE / 2) * Math.PI / 180);
+  const refLabelX = CX + ARC_R * 1.4 * Math.sin((ANGLE / 2) * Math.PI / 180);
+  const refLabelY = CY - ARC_R * 1.2 * Math.cos((ANGLE / 2) * Math.PI / 180);
 
   return (
-    <AnimationPlayer
-      duration={42000}
-      title="Watch: Reflection Rule"
+    <AudioAnimationPlayer
+      audioSteps={AUDIO_STEPS}
+      title="Watch: 1st Law of Reflection — 7 Parts"
       onTryItClicked={onTryItClicked}
       showTryIt={true}
+      tryButtonLabel="Try it yourself →"
     >
-      {({ progress, playing, hasStarted }) => {
-        let step = 0;
+      {({ progress }) => {
+        const part =
+          progress < S[1] ? 0 :
+          progress < S[2] ? 1 :
+          progress < S[3] ? 2 :
+          progress < S[4] ? 3 :
+          progress < S[5] ? 4 :
+          progress < S[6] ? 5 : 6;
 
-        if (progress < 0.10) step = 0;
-        else if (progress < 0.22) step = 1;
-        else if (progress < 0.40) step = 2;
-        else if (progress < 0.56) step = 3;
-        else if (progress < 0.74) step = 4;
-        else if (progress < 0.94) step = 5;
-        else step = 6;
-
-        if (hasStarted) {
-          playAudio(step);
-          if (!playing && audioRef.current) {
-            audioRef.current.pause();
-          }
-        }
-
-        // ── PHASES ──
-        const mirrorOpacity = clamp(progress / 0.10, 0, 1);
-
-        const incPhase = clamp((progress - 0.22) / 0.18, 0, 1);
-        const refPhase = clamp((progress - 0.56) / 0.20, 0, 1);
-
-        const showIncArc = step >= 3;
-        const showRefArc = step >= 5;
-        const showLaw = step === 6;
+        const mirrorOpacity = part >= 0 ? clamp(sp(progress, 0) / 0.5, 0, 1) : 0;
+        const normalOpacity = part >= 1 ? clamp(sp(progress, 1) / 0.55, 0, 1) : 0;
+        const incPhase = part >= 2 ? clamp(sp(progress, 2) / 0.7, 0, 1) : 0;
+        const refPhase = part >= 4 ? clamp(sp(progress, 4) / 0.7, 0, 1) : 0;
+        const arcIOp = part >= 3 ? clamp(sp(progress, 3) / 0.45, 0, 1) : 0;
+        const arcROp = part >= 5 ? clamp(sp(progress, 5) / 0.45, 0, 1) : 0;
+        const lawOp = part >= 6 ? clamp(sp(progress, 6) / 0.4, 0, 1) : 0;
 
         const incTip = lerp(incStart.x, incStart.y, CX, CY, incPhase);
         const refTip = lerp(CX, CY, refEnd.x, refEnd.y, refPhase);
 
-        // ── ARC PATHS ──
-        const incArcPath = describeArc(CX, CY, ARC_R, -ANGLE, 0);
-        const refArcPath = describeArc(CX, CY, ARC_R, 0, ANGLE);
-
-        const incLabelX = CX - ARC_R * 1.4 * Math.sin((ANGLE / 2) * Math.PI / 180);
-        const incLabelY = CY - ARC_R * 1.2 * Math.cos((ANGLE / 2) * Math.PI / 180);
-        const refLabelX = CX + ARC_R * 1.4 * Math.sin((ANGLE / 2) * Math.PI / 180);
-        const refLabelY = CY - ARC_R * 1.2 * Math.cos((ANGLE / 2) * Math.PI / 180);
+        const CAPTIONS = [
+          { top: "Part 1 — The Mirror", bot: "Smooth flat reflecting surface where light bounces back" },
+          { top: "Part 2 — The Normal (N)", bot: "⊥ to mirror at 90° — all angles measured from here" },
+          { top: "Part 3 — Incident Ray", bot: "Blue ray travelling toward the mirror" },
+          { top: "Part 4 — Angle of Incidence (i)", bot: "i = 35° measured from Normal in air" },
+          { top: "Part 5 — Reflected Ray", bot: "Red ray bouncing off the mirror" },
+          { top: "Part 6 — Angle of Reflection (r)", bot: "r = 35° measured from Normal on other side" },
+          { top: "Part 7 — 1st Law: ∠i = ∠r", bot: "Angle of incidence equals angle of reflection" },
+        ];
+        const cap = CAPTIONS[part];
 
         return (
           <svg width={SVG_W} height={SVG_H} style={{ display: "block" }}>
-
-            {/* ── BACKGROUND ── */}
             <rect width={SVG_W} height={SVG_H} fill="#F8FAFF" />
 
-            {/* ── MIRROR + NORMAL ── */}
             <g opacity={mirrorOpacity}>
               <PlaneMirror x1={60} x2={360} y={CY} />
-
-              {/* Highlight mirror during explanation */}
-              
-              {step === 0 && (
-                <line
-                  x1={60} x2={360}
-                  y1={CY} y2={CY}
-                  stroke="#22C55E"
-                  strokeWidth="4"
-                  opacity="0.4"
-                />
+              {part === 0 && (
+                <line x1={60} x2={360} y1={CY} y2={CY} stroke="#22C55E" strokeWidth="4" opacity="0.4" />
               )}
-
-              <Normal x={CX} topY={60} bottomY={CY} />
-              <Label x={CX + 8} y={75} text="Normal" color="#6B7280" size={12} anchor="start" />
             </g>
 
-            {/* ── INCIDENT RAY ── */}
+            {normalOpacity > 0 && (
+              <g opacity={normalOpacity}>
+                <Normal x={CX} topY={60} bottomY={CY} />
+                <Label x={CX + 8} y={75} text="Normal" color="#6B7280" size={12} anchor="start" />
+              </g>
+            )}
+
             {incPhase > 0 && (
               <g>
                 <line
                   x1={incStart.x} y1={incStart.y}
-                  x2={incTip.x}   y2={incTip.y}
-                  stroke="#2563EB"
-                  strokeWidth="2.5"
-                  markerEnd="url(#arrow-blue)"
+                  x2={incTip.x} y2={incTip.y}
+                  stroke="#2563EB" strokeWidth="2.5"
+                  markerEnd={incPhase >= 0.98 ? "url(#flr-arrow-blue)" : undefined}
                 />
-
-                {/* moving highlight dot */}
-                {progress >= 0.4 && progress < 0.65 && (
-                  <circle cx={incTip.x} cy={incTip.y} r={4} fill="#2563EB" />
-                )}
+                {incPhase < 0.98 && <circle cx={incTip.x} cy={incTip.y} r={4} fill="#2563EB" />}
               </g>
             )}
 
-            {/* ── REFLECTED RAY ── */}
             {refPhase > 0 && (
-              <>
+              <g>
                 <line
                   x1={CX} y1={CY}
                   x2={refTip.x} y2={refTip.y}
-                  stroke="#DC2626"
-                  strokeWidth="2.5"
-                  markerEnd="url(#arrow-red)"
+                  stroke="#DC2626" strokeWidth="2.5"
+                  markerEnd={refPhase >= 0.98 ? "url(#flr-arrow-red)" : undefined}
                 />
-
-                {/* moving highlight dot */}
-                {progress >= 0.65 && progress < 0.85 && (
-                  <circle cx={refTip.x} cy={refTip.y} r={4} fill="#DC2626" />
-                )}
-              </>
+                {refPhase < 0.98 && <circle cx={refTip.x} cy={refTip.y} r={4} fill="#DC2626" />}
+              </g>
             )}
 
-            {/* ── MARKERS ── */}
             <defs>
-              <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <marker id="flr-arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#2563EB" />
               </marker>
-              <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <marker id="flr-arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                 <path d="M0,0 L0,6 L8,3 z" fill="#DC2626" />
               </marker>
             </defs>
 
-            {/* ── ANGLES + LABELS ── */}
-            {showIncArc && (
-              <>
-                <AngleArc
-                  pathD={incArcPath}
-                  color="#2563EB"
-                  label="i"
-                  labelX={incLabelX - 6}
-                  labelY={incLabelY}
-                />
-              </>
+            {arcIOp > 0 && (
+              <g opacity={arcIOp}>
+                <AngleArc pathD={incArcPath} color="#2563EB" label="i" labelX={incLabelX - 6} labelY={incLabelY} />
+                <Label x={incLabelX} y={incLabelY + 18} text="= 35°" color="#1E40AF" size={10} anchor="middle" />
+              </g>
             )}
 
-            {showRefArc && (
-              <>
-                <AngleArc
-                  pathD={refArcPath}
-                  color="#DC2626"
-                  label="r"
-                  labelX={refLabelX + 6}
-                  labelY={refLabelY}
-                />
-              </>
+            {arcROp > 0 && (
+              <g opacity={arcROp}>
+                <AngleArc pathD={refArcPath} color="#DC2626" label="r" labelX={refLabelX + 6} labelY={refLabelY} />
+                <Label x={refLabelX} y={refLabelY + 18} text="= 35°" color="#991B1B" size={10} anchor="middle" />
+              </g>
             )}
 
-            {showLaw && (
-              <>
+            {lawOp > 0 && (
+              <g opacity={lawOp}>
                 <rect x={90} y={55} width={240} height={28} rx={6} fill="#EFF6FF" stroke="#BFDBFE" />
-                <Label
-                  x={210}
-                  y={29}
-                  text="∠i = ∠r  (both from Normal)"
-                  color="#1E40AF"
-                  size={12}
-                  bold
-                />
-              </>
+                <Label x={210} y={29} text="∠i = ∠r  (both from Normal)" color="#1E40AF" size={12} bold anchor="middle" />
+              </g>
             )}
 
-            {/* ── TEACHER CAPTIONS ── */}
-            {step === 0 && (
-              <Label
-                x={210}
-                y={CY + 25}
-                text="This is a mirror (reflecting surface)"
-                color="#111827"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-            {step === 1 && (
-              <Label
-                x={210} y={40}
-                text="This dotted line is called the Normal"
-                color="#111827"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 2 && (
-              <Label
-                x={210} y={40}
-                text="This blue line is the Incident Ray"
-                color="#2563EB"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 3 && (
-              <>
-                <Label
-                  x={210}
-                  y={30}
-                  text="The angle made by the incident ray with the normal"
-                  color="#2563EB"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={48}
-                  text="is called the angle of incidence."
-                  color="#2563EB"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-              </>
-            )}
-
-            {step === 4 && (
-              <Label
-                x={210} y={40}
-                text="This red line is the Reflected Ray"
-                color="#DC2626"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
-
-            {step === 5 && (
-              <>
-                <Label
-                  x={210}
-                  y={30}
-                  text="The angle made by the reflected ray with the normal"
-                  color="#DC2626"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-                <Label
-                  x={210}
-                  y={48}
-                  text="is called the angle of reflection."
-                  color="#DC2626"
-                  size={12}
-                  anchor="middle"
-                  bold
-                />
-              </>
-            )}
-
-            {step === 6 && (
-              <Label
-                x={210}
-                y={50}
-                text="The angle of incidence equals the angle of reflection (∠i = ∠r)"
-                color="#1E40AF"
-                size={14}
-                anchor="middle"
-                bold
-              />
-            )}
+            <rect x={0} y={SVG_H - 52} width={SVG_W} height={52} fill="#EEF2FF" opacity="0.95" />
+            <line x1={0} y1={SVG_H - 52} x2={SVG_W} y2={SVG_H - 52} stroke="#C7D2FE" strokeWidth="1.2" />
+            <rect x={10} y={SVG_H - 45} width={60} height={18} rx={9} fill="#4F46E5" opacity="0.85" />
+            <text x={40} y={SVG_H - 32} fill="#FFFFFF" fontSize="10" fontWeight="700" fontFamily="Arial" textAnchor="middle">
+              Part {part + 1} / 7
+            </text>
+            <text x={SVG_W / 2} y={SVG_H - 28} fill="#1D4ED8" fontSize="12" fontWeight="700" fontFamily="Arial" textAnchor="middle">
+              {cap.top}
+            </text>
+            <text x={SVG_W / 2} y={SVG_H - 12} fill="#4B5563" fontSize="10" fontFamily="Arial" textAnchor="middle">
+              {cap.bot}
+            </text>
           </svg>
         );
       }}
-    </AnimationPlayer>
+    </AudioAnimationPlayer>
   );
 };
 
