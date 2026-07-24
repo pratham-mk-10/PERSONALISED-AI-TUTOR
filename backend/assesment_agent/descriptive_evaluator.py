@@ -55,7 +55,7 @@ class DescriptiveEvaluation(BaseModel):
 class DescriptiveEvaluator:
     def __init__(self):
         self.api_key = _get_api_key()
-        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
     def run_smart_gate(self, student_answer: str, required_keywords: List[str]) -> tuple[bool, str | None]:
         """Stage 1: Smart Gate.
@@ -105,7 +105,7 @@ class DescriptiveEvaluator:
         )
         
         try:
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
                 return res["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
@@ -131,7 +131,7 @@ class DescriptiveEvaluator:
                     method="POST"
                 )
                 try:
-                    with urllib.request.urlopen(m_req, timeout=20) as m_resp:
+                    with urllib.request.urlopen(m_req, timeout=8) as m_resp:
                         m_res = json.loads(m_resp.read().decode("utf-8"))
                         return m_res["choices"][0]["message"]["content"]
                 except Exception:

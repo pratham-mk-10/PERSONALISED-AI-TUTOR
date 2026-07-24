@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from database.misconception_catalog import format_misconceptions_for_prompt
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _ENV_CANDIDATES = [
 	BACKEND_ROOT / ".env",
@@ -69,7 +69,7 @@ def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=
 	)
 
 	try:
-		with request.urlopen(req, timeout=20) as resp:
+		with request.urlopen(req, timeout=8) as resp:
 			res = json.loads(resp.read().decode("utf-8"))
 			try:
 				return res["candidates"][0]["content"]["parts"][0]["text"]
@@ -101,7 +101,7 @@ def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=
 			method="POST",
 		)
 		try:
-			with request.urlopen(m_req, timeout=20) as m_resp:
+			with request.urlopen(m_req, timeout=8) as m_resp:
 				m_res = json.loads(m_resp.read().decode("utf-8"))
 				return m_res["choices"][0]["message"]["content"]
 		except Exception:
