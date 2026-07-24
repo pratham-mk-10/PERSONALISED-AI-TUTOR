@@ -164,7 +164,22 @@ class DescriptiveEvaluator:
             }
 
         # --- STAGE 2: UNIFIED CoT LLM ENGINE ---
-        system_instruction = """You are an expert Class 10 Physics examiner grading a student's descriptive answer using Chain-of-Thought (CoT) reasoning.
+        severity_caps_info = """
+SEVERITY CAPS (apply to BOTH understanding and completeness scores if tag is not null):
+- HIGH severity misconceptions: maximum allowed score = 2.5 / 10
+  Tags: CONVEX_REAL_IMAGE, VIRTUAL_ON_SCREEN, PLANE_REAL_IMAGE, REFRACTION_REFLECTION_CONFUSED,
+        SPEED_OF_LIGHT_MEDIUM, TOTAL_INTERNAL_LESS_DENSE, CONCAVE_LENS_REAL_IMAGE, EYE_DEFECT_LENS_WRONG
+- MEDIUM severity misconceptions: maximum allowed score = 5.5 / 10
+  Tags: CONCAVE_ALWAYS_REAL, FOCAL_LENGTH_NEGATIVE, CONCAVE_ALWAYS_VIRTUAL, LENS_MIRROR_CONFUSED,
+        OBJECT_AT_FOCUS, IMAGE_SAME_SIDE_VIRTUAL, MIRROR_FORMULA_INVERTED, CRITICAL_ANGLE_CONFUSION,
+        SCATTERING_ALL_EQUAL, CONVEX_LENS_ALWAYS_MAGNIFIED, RAINBOW_REFLECTION_ONLY, NOVEL_UNTAGGED_ERROR
+- LOW severity misconceptions: maximum allowed score = 8.5 / 10
+  Tags: CONVEX_INVERTED, FOCAL_POINT_ON_MIRROR, MAGNIFICATION_ALWAYS_POSITIVE, OBJECT_BEYOND_CENTRE,
+        LENS_FOCAL_BOTH_SIDES, POWER_UNIT_WRONG, APERTURE_BRIGHTNESS_WRONG, DISPERSION_SINGLE_COLOUR,
+        HUMAN_EYE_INVERTED_IGNORED, ACCOMMODATION_PERMANENT
+"""
+
+        system_instruction = f"""You are an expert Class 10 Physics examiner grading a student's descriptive answer using Chain-of-Thought (CoT) reasoning.
 
 CRITICAL OBJECTIVES & GRADING DIRECTIVES:
 1. SOLVE THE LEXICAL GAP PROBLEM: You MUST evaluate conceptual understanding and physical semantic intent. Do NOT penalize students for missing textbook jargon or using informal words (e.g. if they write "curves inwards and light smashes together" instead of "concave mirror converging rays", grade their understanding as 10/10).
@@ -174,8 +189,10 @@ CRITICAL OBJECTIVES & GRADING DIRECTIVES:
    - "completeness": Coverage of required rubric points (SECONDARY WEIGHT, 25%).
    - "keywords": Scientific terminology usage (MINIMAL WEIGHT, 5%).
 
+{severity_caps_info}
+
 Output your evaluation strictly as a single JSON object conforming to this schema:
-{
+{{
   "reasoning_trace": [
     "Step 1: Analyze semantic intent and check for lexical gap equivalence.",
     "Step 2: Verify negation and physical entailment accuracy.",
@@ -183,13 +200,13 @@ Output your evaluation strictly as a single JSON object conforming to this schem
   ],
   "contradicted_span": "Exact text containing physical error, or null if correct.",
   "misconception_tag": "Specific tag from allowed list, or 'NOVEL_UNTAGGED_ERROR' if incorrect without matching tag, or null if correct.",
-  "scores": {
+  "scores": {{
     "understanding": 0-10,
     "completeness": 0-10,
     "keywords": 0-10
-  },
+  }},
   "feedback": "Encouraging pedagogical explanation focusing on physics understanding."
-}"""
+}}"""
 
         few_shot_anchors = """
 ### Few-Shot Anchors:
@@ -271,13 +288,53 @@ Rubric Requirements:
 Allowed Misconception Tags:
 {json.dumps(known_misconceptions, indent=2)}
 
-Student Answer:
-"{student_answer}"
-
 {few_shot_anchors}
+
+Student Answer to Evaluate:
+"{student_answer}"
 
 Evaluate the student answer following the Chain of Thought grading process and output JSON strictly conforming to the schema.
 """
+
+        # Severity maps for capping
+        severity_map = {
+            "CONVEX_REAL_IMAGE": "HIGH",
+            "VIRTUAL_ON_SCREEN": "HIGH",
+            "PLANE_REAL_IMAGE": "HIGH",
+            "REFRACTION_REFLECTION_CONFUSED": "HIGH",
+            "SPEED_OF_LIGHT_MEDIUM": "HIGH",
+            "TOTAL_INTERNAL_LESS_DENSE": "HIGH",
+            "CONCAVE_LENS_REAL_IMAGE": "HIGH",
+            "EYE_DEFECT_LENS_WRONG": "HIGH",
+            "CONCAVE_ALWAYS_REAL": "MEDIUM",
+            "FOCAL_LENGTH_NEGATIVE": "MEDIUM",
+            "CONCAVE_ALWAYS_VIRTUAL": "MEDIUM",
+            "LENS_MIRROR_CONFUSED": "MEDIUM",
+            "OBJECT_AT_FOCUS": "MEDIUM",
+            "IMAGE_SAME_SIDE_VIRTUAL": "MEDIUM",
+            "MIRROR_FORMULA_INVERTED": "MEDIUM",
+            "CRITICAL_ANGLE_CONFUSION": "MEDIUM",
+            "SCATTERING_ALL_EQUAL": "MEDIUM",
+            "CONVEX_LENS_ALWAYS_MAGNIFIED": "MEDIUM",
+            "RAINBOW_REFLECTION_ONLY": "MEDIUM",
+            "NOVEL_UNTAGGED_ERROR": "MEDIUM",
+            "CONVEX_INVERTED": "LOW",
+            "FOCAL_POINT_ON_MIRROR": "LOW",
+            "MAGNIFICATION_ALWAYS_POSITIVE": "LOW",
+            "OBJECT_BEYOND_CENTRE": "LOW",
+            "LENS_FOCAL_BOTH_SIDES": "LOW",
+            "POWER_UNIT_WRONG": "LOW",
+            "APERTURE_BRIGHTNESS_WRONG": "LOW",
+            "DISPERSION_SINGLE_COLOUR": "LOW",
+            "HUMAN_EYE_INVERTED_IGNORED": "LOW",
+            "ACCOMMODATION_PERMANENT": "LOW",
+        }
+
+        cap_values = {
+            "HIGH": 2.5,
+            "MEDIUM": 5.5,
+            "LOW": 8.5,
+        }
 
         raw_response = ""
         last_error = ""
@@ -298,6 +355,21 @@ Evaluate the student answer following the Chain of Thought grading process and o
 
                 parsed_dict = json.loads(cleaned)
                 
+                # Apply severity caps in python
+                tag = parsed_dict.get("misconception_tag")
+                if tag:
+                    tag_upper = str(tag).strip().upper()
+                    if tag_upper in severity_map:
+                        severity = severity_map[tag_upper]
+                        cap = cap_values[severity]
+                        if "scores" in parsed_dict:
+                            if "understanding" in parsed_dict["scores"]:
+                                parsed_dict["scores"]["understanding"] = int(round(min(float(parsed_dict["scores"]["understanding"]), cap)))
+                            if "completeness" in parsed_dict["scores"]:
+                                parsed_dict["scores"]["completeness"] = int(round(min(float(parsed_dict["scores"]["completeness"]), cap)))
+                            if "keywords" in parsed_dict["scores"]:
+                                parsed_dict["scores"]["keywords"] = int(round(min(float(parsed_dict["scores"]["keywords"]), cap)))
+
                 val = DescriptiveEvaluation(**parsed_dict)
                 return val.model_dump()
             except Exception as e:

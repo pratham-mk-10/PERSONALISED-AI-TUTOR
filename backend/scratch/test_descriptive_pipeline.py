@@ -28,7 +28,7 @@ def run_tests():
     res1 = evaluator.evaluate_answer("test_student", 1, question, ans1, rubric, misconceptions, keywords)
     print("Student Answer:", ans1)
     print("Result:", json.dumps(res1, indent=2))
-    assert res1["scores"]["conceptual"] == 0
+    assert res1["scores"]["understanding"] == 0
     assert "too short" in res1["feedback"]
     print("TEST 1 PASSED.\n")
 
@@ -39,7 +39,7 @@ def run_tests():
     res2 = evaluator.evaluate_answer("test_student", 1, question, ans2, rubric, misconceptions, keywords)
     print("Student Answer:", ans2)
     print("Result:", json.dumps(res2, indent=2))
-    assert res2["scores"]["conceptual"] == 0
+    assert res2["scores"]["understanding"] == 0
     assert "does not contain" in res2["feedback"]
     print("TEST 2 PASSED.\n")
 
@@ -51,7 +51,7 @@ def run_tests():
     res3 = evaluator.evaluate_answer("test_student", 1, question, ans3, rubric, misconceptions, keywords)
     print("Student Answer:", ans3)
     print("Result:", json.dumps(res3, indent=2))
-    assert res3["scores"]["conceptual"] > 0
+    assert res3["scores"]["understanding"] > 0
     assert res3["misconception_tag"] == "center_of_curvature_confusion"
     print("TEST 3 PASSED.\n")
 
@@ -62,7 +62,7 @@ def run_tests():
     res4 = evaluator.evaluate_answer("test_student", 1, question, ans4, rubric, misconceptions, keywords)
     print("Student Answer:", ans4)
     print("Result:", json.dumps(res4, indent=2))
-    assert res4["scores"]["conceptual"] >= 8
+    assert res4["scores"]["understanding"] >= 8
     assert res4["misconception_tag"] is None
     print("TEST 4 PASSED.\n")
 
