@@ -121,7 +121,17 @@ def seed_data(cur):
 		("laws_of_reflection", "normal_orientation_wrong", "Normal Orientation", "Mistakenly drawing the normal not perpendicular to the surface.", "geometry"),
 	]
 
-	for topic, tag, title, expl, focus in (spherical_misconceptions + reflection_misconceptions):
+	for topic, tag, title, expl, focus in (spherical_misconceptions + reflection_misconceptions + [
+		("refraction", "refraction_bending_normal", "Bending Direction Error", "Student thinks light bends away from normal when entering denser medium.", "refraction direction"),
+		("refraction", "snell_law_confusion", "Snell Law Confusion", "Incorrect relationship between angles and refractive indices.", "Snell law"),
+		("refraction", "glass_slab_parallel_confusion", "Glass Slab Parallel Ray Error", "Thinks emergent ray is not parallel to incident ray in glass slab.", "glass slab"),
+		("refraction", "lateral_displacement_confusion", "Lateral Displacement Error", "Confuses lateral displacement with change in ray direction.", "lateral displacement"),
+		("refraction", "convex_concave_lens_confusion", "Convex vs Concave Lens", "Mixes up converging and diverging lens types.", "lens types"),
+		("refraction", "lens_focus_confusion", "Lens Focus Error", "Incorrect location or meaning of principal focus for lenses.", "lens focus"),
+		("refraction", "lens_image_nature_confusion", "Lens Image Nature Error", "Wrong real/virtual or erect/inverted prediction for lens images.", "lens images"),
+		("refraction", "lens_formula_sign_error", "Lens Formula Sign Error", "Uses wrong sign convention in lens formula.", "sign convention"),
+		("refraction", "lens_power_confusion", "Lens Power Confusion", "Incorrect dioptre calculation or unit.", "lens power"),
+	]):
 		cur.execute(
 			"""
 			INSERT INTO topic_misconceptions (topic_key, tag, title, explanation, focus_area)

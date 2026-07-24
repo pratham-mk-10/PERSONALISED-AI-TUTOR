@@ -507,8 +507,10 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
                     { color: "#DC2626", text: "P = Pole" },
                     { color: "#7C3AED", text: "C = Centre of curvature" },
                     { color: "#16A34A", text: "F = Principal focus" },
+                    { type: "line", color: "#94A3B8", text: "Line through P and C = Principal axis (normal at P)" },
                     { type: "line", color: "#F59E0B", text: "Orange = Incident rays" },
                     { type: "line", color: "#EF4444", text: "Red = Reflected rays" },
+                    { color: "#EA580C", text: "Aperture = diameter of the reflecting surface" },
                   ]}
                 />
               </g>
@@ -601,9 +603,11 @@ const SphericalMirrorDetailedAnimation = ({ onTryItClicked }) => {
                   items={[
                     { color: "#DC2626", text: "P = Pole" },
                     { color: "#16A34A", text: "F = Virtual focus" },
+                    { type: "line", color: "#94A3B8", text: "Principal axis (normal to mirror at P)" },
                     { type: "line", color: "#F59E0B", text: "Orange = Incident rays" },
                     { type: "line", color: "#EF4444", text: "Red = Reflected (diverging)" },
                     { type: "line", color: "#94A3B8", dash: "5,5", text: "Gray dotted = backward extension" },
+                    { color: "#EA580C", text: "Aperture = diameter of the reflecting surface" },
                   ]}
                 />
               </g>

@@ -118,7 +118,7 @@ class ContentAgentLLMService:
 
     def __init__(self, db_connection_factory=None):
         self.db_connection_factory = db_connection_factory
-        self.model = "gemini-1.5-flash"
+        self.model = "gemini-2.5-flash"
 
     def get_explanation(
         self,

@@ -21,7 +21,7 @@ def _load_env_files():
 
 _load_env_files()
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 def _get_api_key():
     # Reload env each request to pick up updates without relying on import-time values.
