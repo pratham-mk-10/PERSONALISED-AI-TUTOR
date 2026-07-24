@@ -25,8 +25,8 @@ def get_connection():
         normalized_url = database_url.replace("postgres://", "postgresql://", 1)
         sslmode = os.getenv("DB_SSLMODE")
         if sslmode:
-            return psycopg2.connect(normalized_url, sslmode=sslmode)
-        return psycopg2.connect(normalized_url)
+            return psycopg2.connect(normalized_url, sslmode=sslmode, connect_timeout=2)
+        return psycopg2.connect(normalized_url, connect_timeout=2)
 
     db_password = os.getenv("DB_PASSWORD", CFG_DB_PASSWORD)
     if not db_password or db_password in {"your_password", "change_me", "CHANGE_ME"}:

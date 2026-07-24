@@ -219,5 +219,53 @@
     "title": "Lens Power Mistake",
     "explanation": "Miscalculating the power of a lens (P = 1/f) or forgetting that f must be in meters to get power in dioptres.",
     "focus_area": "Ensure focal length is converted to meters before calculating power."
+  },
+  "lens_optical_center_confusion": {
+    "topic_key": "refraction",
+    "title": "Optical Center Ray Mistake",
+    "explanation": "Thinking a light ray bends when passing through the optical center of a lens. A ray passing through the optical center goes straight without any deviation.",
+    "focus_area": "Draw a straight line passing through the exact center of the lens."
+  },
+  "lens_parallel_ray_wrong": {
+    "topic_key": "refraction",
+    "title": "Parallel Ray Lens Mistake",
+    "explanation": "Thinking a ray parallel to the principal axis passes straight through or bends arbitrarily. It must pass through the principal focus on the other side of a convex lens.",
+    "focus_area": "Trace the parallel incident ray so it intersects the principal axis exactly at F2."
+  },
+  "concave_lens_converge_myth": {
+    "topic_key": "refraction",
+    "title": "Concave Lens Converging Mistake",
+    "explanation": "Thinking a concave lens converges light like a convex lens. A concave lens is a diverging lens, so rays spread out after passing through it.",
+    "focus_area": "Ensure that the refracted rays diverge away from the principal axis."
+  },
+  "concave_lens_parallel_ray_wrong": {
+    "topic_key": "refraction",
+    "title": "Concave Lens Parallel Ray Mistake",
+    "explanation": "Thinking a parallel ray passes through F2. For a concave lens, a parallel ray diverges such that it appears to come from F1 on the same side.",
+    "focus_area": "Trace the diverging ray backwards with a dotted line to show it originates from F1."
+  },
+  "glass_slab_lateral_shift_wrong": {
+    "topic_key": "refraction",
+    "title": "Glass Slab Lateral Shift Mistake",
+    "explanation": "Thinking the emergent ray leaves the slab at a random angle. The emergent ray must be exactly parallel to the original incident ray.",
+    "focus_area": "Ensure the final emergent ray has the exact same slope as the original incident ray."
+  },
+  "tir_critical_angle_confusion": {
+    "topic_key": "refraction",
+    "title": "Critical Angle Confusion",
+    "explanation": "Thinking light always refracts out of a denser medium. If the angle of incidence is greater than the critical angle, total internal reflection occurs and light bounces back completely.",
+    "focus_area": "Draw the ray reflecting back into the denser medium with angle of reflection equal to angle of incidence."
+  },
+  "mirror_formula_wrong": {
+    "topic_key": "spherical_mirrors",
+    "title": "Mirror Formula Error",
+    "explanation": "Calculating the image distance incorrectly due to sign convention errors or using the wrong formula. The mirror formula is 1/v + 1/u = 1/f.",
+    "focus_area": "Double-check the signs of u and f, and ensure the image is formed at the correct calculated distance."
+  },
+  "lens_formula_wrong": {
+    "topic_key": "refraction",
+    "title": "Lens Formula Error",
+    "explanation": "Calculating the image distance incorrectly. The lens formula is 1/v - 1/u = 1/f. Be careful with signs.",
+    "focus_area": "Ensure the image intersection point matches the mathematically calculated value of v."
   }
 }

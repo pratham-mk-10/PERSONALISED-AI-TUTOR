@@ -246,3 +246,63 @@ Return STRICT JSON ONLY:
 		return tag
 	except Exception:
 		return None
+
+
+def classify_misconception_tags_batch(topic, items, allowed_tags=None):
+	"""Use the LLM to classify multiple misconceptions in a single batch to avoid rate limits."""
+	api_key = _get_api_key()
+	if not api_key or not items:
+		return {}
+
+	allowed_tags = [str(tag).strip() for tag in (allowed_tags or []) if str(tag).strip()]
+	allowed_block = format_misconceptions_for_prompt(topic)
+	if allowed_tags:
+		allowed_block_lines = []
+		for line in allowed_block.splitlines():
+			cleaned = line.lstrip("- ").strip()
+			tag = cleaned.split(":", 1)[0].strip()
+			if tag in allowed_tags:
+				allowed_block_lines.append(line)
+		if allowed_block_lines:
+			allowed_block = "\n".join(allowed_block_lines)
+		else:
+			allowed_block = "\n".join(f"- {tag}" for tag in allowed_tags)
+
+	context = ""
+	for i, item in enumerate(items):
+		context += f"\nItem {i}:\nQuestion: {item['question_text']}\nStudent's answer: {item['student_answer']}\nCorrect answer: {item['correct_answer']}\n"
+
+	prompt = f"""
+You are an expert NCERT Class 10 physics teacher.
+
+Your task is to classify the student's main misconception for several questions.
+
+Use ONLY the allowed tags for this topic:
+{allowed_block}
+
+If no specific tag fits, use general_concept_gap.
+
+{context}
+
+Return STRICT JSON ONLY, mapping each Item index to its chosen tag. Example:
+{{"0": "<tag_for_item_0>", "1": "<tag_for_item_1>"}}
+""".strip()
+
+	try:
+		raw = _post_chat_completion(
+			api_key,
+			"You are a teaching assistant. Return JSON only.",
+			prompt,
+			temperature=0.1
+		)
+		parsed = _extract_json(raw) or {}
+		
+		results = {}
+		for i, _ in enumerate(items):
+			tag = str(parsed.get(str(i), "")).strip()
+			if tag and (not allowed_tags or tag in allowed_tags):
+				results[i] = tag
+		return results
+	except Exception:
+		return {}
+

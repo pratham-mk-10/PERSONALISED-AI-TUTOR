@@ -4,6 +4,8 @@ SPHERICAL_MIRROR_BASICS_TEMPLATE = "SphericalMirrorBasicsWatch"
 SPHERICAL_MIRROR_DETAILED_TEMPLATE = "SphericalMirrorDetailedAnimation"
 SPHERICAL_MIRROR_IMAGE_TEMPLATE = "SphericalMirrorDetailedAnimation"
 SPHERICAL_MIRROR_FEEDBACK_TEMPLATE = "SphericalMirrorMisconceptionFeedback"
+SNELLS_LAW_TEMPLATE = "SnellsLawAnimation"
+GLASS_SLAB_TEMPLATE = "GlassSlabAnimation"
 
 REFLECTION_TAGS = {
     "angle_from_surface",
@@ -53,6 +55,18 @@ SPHERICAL_MIRROR_IMAGE_TAGS = {
     "rearview_reason_wrong",
 }
 
+REFRACTION_TAGS = {
+    "snell_law_confusion",
+    "refraction_bending_normal",
+    "refractive_index_confusion",
+}
+
+GLASS_SLAB_TAGS = {
+    "glass_slab_lateral_shift_wrong",
+    "glass_slab_parallel_confusion",
+    "lateral_displacement_confusion",
+}
+
 
 def _normalized(value: str | None) -> str:
     return str(value or "").strip().lower()
@@ -66,6 +80,8 @@ def pick_svg_variant(misconception_tag: str | None) -> str:
         | SPHERICAL_MIRROR_BASICS_TAGS
         | SPHERICAL_MIRROR_RAY_RULE_TAGS
         | SPHERICAL_MIRROR_IMAGE_TAGS
+        | REFRACTION_TAGS
+        | GLASS_SLAB_TAGS
     ):
         return tag
     return "general_concept_gap"
@@ -85,6 +101,10 @@ def pick_svg_template(subtopic: str | None, misconception_tag: str | None = None
         return SPHERICAL_MIRROR_FEEDBACK_TEMPLATE
     if tag in SPHERICAL_MIRROR_IMAGE_TAGS:
         return SPHERICAL_MIRROR_FEEDBACK_TEMPLATE
+    if tag in REFRACTION_TAGS:
+        return SNELLS_LAW_TEMPLATE
+    if tag in GLASS_SLAB_TAGS:
+        return GLASS_SLAB_TEMPLATE
 
     if "plane mirror" in topic:
         return PLANE_MIRROR_TEMPLATE

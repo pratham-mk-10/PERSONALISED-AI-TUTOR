@@ -319,6 +319,8 @@ def generate_misconception_quiz_route(data: GenerateMisconceptionQuizRequest | N
     }
 
 
+
+
 @router.post("/submit-answers")
 def submit_answers(data: SubmitAnswersRequest):
     student_id = data.student_id or "guest"
@@ -333,7 +335,10 @@ def submit_answers(data: SubmitAnswersRequest):
     correct = 0
     db_sync_warning = None
 
-    for ans in data.answers:
+    classification_tasks = {} # i -> args
+    parsed_answers = []
+
+    for i, ans in enumerate(data.answers):
         selected_raw = ans.get("selected")
         correct_raw = ans.get("correct")
         if selected_raw is None or correct_raw is None:
@@ -343,10 +348,12 @@ def submit_answers(data: SubmitAnswersRequest):
         correct_ans = str(correct_raw)
         is_correct = selected == correct_ans
 
-        total += 1
-        if is_correct:
-            correct += 1
-        else:
+        tag = "general_concept_gap"
+        question_text = str(ans.get("question_text") or "").strip()
+        selected_text = selected
+        correct_text = correct_ans
+
+        if not is_correct:
             misconception_map = ans.get("misconception_map") or ans.get("misconception_tags") or {}
             tag = (
                 misconception_map.get(selected)
@@ -355,14 +362,11 @@ def submit_answers(data: SubmitAnswersRequest):
                 or "general_concept_gap"
             )
 
-            question_text = str(ans.get("question_text") or "").strip()
             if callable(_classify_misconception_tag) and str(tag).strip() in {
                 "",
                 "no_concept",
                 "general_concept_gap",
             }:
-                selected_text = selected
-                correct_text = correct_ans
                 options = ans.get("options")
                 if options and isinstance(options, list):
                     try:
@@ -375,111 +379,103 @@ def submit_answers(data: SubmitAnswersRequest):
                     except (ValueError, TypeError):
                         pass
 
-                auto_tag = _classify_misconception_tag(
-                    topic or "Laws of Reflection",
-                    question_text,
-                    selected_text,
-                    correct_text,
-                    allowed_tags=_allowed_misconceptions_for_topic(topic),
-                )
-                if isinstance(auto_tag, str) and auto_tag.strip():
-                    tag = auto_tag.strip()
+                classification_tasks[i] = {
+                    "question_text": question_text,
+                    "student_answer": selected_text,
+                    "correct_answer": correct_text
+                }
+
+        parsed_answers.append({
+            "idx": i,
+            "ans": ans,
+            "selected_raw": selected_raw,
+            "correct_raw": correct_raw,
+            "selected": selected,
+            "correct_ans": correct_ans,
+            "is_correct": is_correct,
+            "tag": tag,
+            "question_text": question_text
+        })
+
+    # Run LLM classification in a single batch call to avoid rate limits (HTTP 429)
+    classified_results = {}
+    if classification_tasks:
+        classify_misconception_tags_batch = getattr(_adaptation_feedback, "classify_misconception_tags_batch", None)
+                
+        if classify_misconception_tags_batch:
+            items_list = []
+            idx_map = {}
+            for idx, item in classification_tasks.items():
+                idx_map[len(items_list)] = idx
+                items_list.append(item)
+            
+            batch_results = classify_misconception_tags_batch(
+                topic or "Laws of Reflection",
+                items_list,
+                _allowed_misconceptions_for_topic(topic)
+            )
+            for list_idx, tag in batch_results.items():
+                if int(list_idx) in idx_map:
+                    real_idx = idx_map[int(list_idx)]
+                    classified_results[real_idx] = tag
+
+    for item in parsed_answers:
+        idx = item["idx"]
+        ans = item["ans"]
+        selected = item["selected"]
+        correct_ans = item["correct_ans"]
+        is_correct = item["is_correct"]
+        tag = item["tag"]
+
+        total += 1
+        if is_correct:
+            correct += 1
+        else:
+            if idx in classified_results:
+                tag = classified_results[idx]
 
             tag = coerce_misconception_tag(tag, topic)
             tags.append(tag)
             wrong_entries.append(
                 {
                     "question_id": ans.get("question_id"),
-                    "question_text": question_text,
+                    "question_text": item["question_text"],
                     "tag": tag,
-                    "selected": selected_raw,
-                    "correct": correct_raw,
+                    "selected": item["selected_raw"],
+                    "correct": item["correct_raw"],
                     "options": ans.get("options"),
                 }
             )
 
-        try:
-            log_student_behavior(
-                student_id=student_id,
-                topic=topic,
-                selected_option=selected,
-                correct_option=correct_ans,
-                is_correct=is_correct,
-                misconception_tag=None if is_correct else tag,
-            )
-        except Exception as exc:
-            db_sync_warning = str(exc)
+        if not db_sync_warning:
+            try:
+                log_student_behavior(
+                    student_id=student_id,
+                    topic=topic,
+                    selected_option=selected,
+                    correct_option=correct_ans,
+                    is_correct=is_correct,
+                    misconception_tag=None if is_correct else tag,
+                )
+            except Exception as exc:
+                db_sync_warning = str(exc)
 
     main_misconception = Counter(tags).most_common(1)[0][0] if tags else "none"
 
     explanations_by_tag: dict[str, str] = {}
-    if use_llm_feedback:
-        def _fetch_explanation(entry):
-            tag = entry["tag"]
-            try:
-                sel_opt = entry.get("selected")
-                corr_opt = entry.get("correct")
-                opts = entry.get("options")
-                sel_text = None
-                corr_text = None
-                if opts and isinstance(opts, list):
-                    try:
-                        sel_idx = int(sel_opt)
-                        corr_idx = int(corr_opt)
-                        if 0 <= sel_idx < len(opts):
-                            sel_text = str(opts[sel_idx])
-                        if 0 <= corr_idx < len(opts):
-                            corr_text = str(opts[corr_idx])
-                    except (ValueError, TypeError):
-                        pass
-
-                explanation_data = content_agent.generate(
-                    subtopic=topic,
-                    misconception_tag=tag,
-                    attempt=2,
-                    question_text=entry.get("question_text") or None,
-                    student_answer=sel_text or (str(sel_opt) if sel_opt is not None else None),
-                    correct_answer=corr_text or (str(corr_opt) if corr_opt is not None else None),
-                )
-                return tag, explanation_data.get("explanation") or _get_misconception_explanation(tag) or "Review this concept carefully."
-            except Exception:
-                return tag, _get_misconception_explanation(tag) or "Review this concept carefully."
-
-        unique_entries = {e["tag"]: e for e in wrong_entries}.values()
-        
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_tag = {executor.submit(_fetch_explanation, entry): entry["tag"] for entry in unique_entries}
-            for future in as_completed(future_to_tag):
-                tag = future_to_tag[future]
-                try:
-                    result_tag, exp = future.result()
-                    explanations_by_tag[result_tag] = exp
-                except Exception:
-                    explanations_by_tag[tag] = _get_misconception_explanation(tag) or "Review this concept carefully."
-
+    visuals_by_tag: dict[str, dict] = {}
+    
     explanation = None
     visual_payload = None
+    
     if main_misconception != "none":
-        explanation = explanations_by_tag.get(main_misconception)
-        if not explanation:
-            if use_llm_feedback:
-                try:
-                    explanation_data = content_agent.generate(
-                        subtopic=topic,
-                        misconception_tag=main_misconception,
-                        attempt=2,
-                    )
-                    explanation = explanation_data.get("explanation")
-                except Exception:
-                    explanation = _get_misconception_explanation(main_misconception)
-            else:
-                explanation = _get_misconception_explanation(main_misconception)
-                
-        # We can construct visual payload locally without hitting LLM again!
-        visual_payload = {
-            "svg_component": pick_svg_template(topic, main_misconception),
-            "svg_variant": pick_svg_variant(main_misconception)
-        }
+        explanation = _get_misconception_explanation(main_misconception)
+        
+        if not visual_payload:
+            visual_payload = {}
+            
+        visual_payload["svg_component"] = pick_svg_template(topic, main_misconception)
+        visual_payload["svg_variant"] = pick_svg_variant(main_misconception)
 
     level = "beginner"
     acc = correct / total if total else 0
@@ -488,12 +484,13 @@ def submit_answers(data: SubmitAnswersRequest):
     elif acc > 0.4:
         level = "intermediate"
 
-    try:
-        set_student_current_topic(student_id, topic)
-        update_student_level(student_id, level)
-        update_student_topic_resolution(student_id, topic, main_misconception)
-    except Exception as exc:
-        db_sync_warning = str(exc)
+    if not db_sync_warning:
+        try:
+            set_student_current_topic(student_id, topic)
+            update_student_level(student_id, level)
+            update_student_topic_resolution(student_id, topic, main_misconception)
+        except Exception as exc:
+            db_sync_warning = str(exc)
 
     # Keep submit fast; front-end already has dedicated question-generation calls.
     follow_up = []
@@ -518,14 +515,17 @@ def submit_answers(data: SubmitAnswersRequest):
             reason_text = _get_misconception_explanation(tag)
 
         reason_text = reason_text or "Review this concept carefully."
+        tag_visuals = visuals_by_tag.get(tag) or {}
+        
         question_feedback.append(
             {
                 "question_id": ans.get("question_id"),
                 "question_text": ans.get("question_text"),
                 "reason": " ".join(str(reason_text or "").split()),
                 "focus_area": tag,
-                "svg_component": pick_svg_template(topic, tag),
-                "svg_variant": pick_svg_variant(tag),
+                "svg_component": tag_visuals.get("svg_component") or pick_svg_template(topic, tag),
+                "svg_variant": tag_visuals.get("svg_variant") or pick_svg_variant(tag),
+                "animation_parameters": tag_visuals.get("animation_parameters"),
             }
         )
 
@@ -537,6 +537,7 @@ def submit_answers(data: SubmitAnswersRequest):
         "misconception_explanation": _get_misconception_explanation(main_misconception),
         "svg_component": (visual_payload or {}).get("svg_component"),
         "svg_variant": (visual_payload or {}).get("svg_variant"),
+        "animation_parameters": (visual_payload or {}).get("animation_parameters"),
         "question_feedback": question_feedback,
         "db_sync_warning": db_sync_warning,
         "questions": follow_up,
@@ -679,6 +680,40 @@ def misconception_reason(req: MisconceptionReasonRequest):
         "reason": _trim_feedback(reasoning.get("reason", "Review the concept carefully.")),
         "focus_area": reasoning.get("focus_area", req.misconception_tag),
     }
+
+
+class GenerateVisualFixRequest(BaseModel):
+    topic: str
+    misconception_tag: str
+    question_text: str | None = None
+    student_answer: str | None = None
+    correct_answer: str | None = None
+
+@router.post("/generate-visual-fix")
+def generate_visual_fix(req: GenerateVisualFixRequest):
+    try:
+        explanation_data = content_agent.generate(
+            subtopic=req.topic,
+            misconception_tag=req.misconception_tag,
+            attempt=2,
+            question_text=req.question_text,
+            student_answer=req.student_answer,
+            correct_answer=req.correct_answer,
+        )
+        return {
+            "explanation": explanation_data.get("explanation") or _get_misconception_explanation(req.misconception_tag),
+            "animation_parameters": explanation_data.get("animation_parameters"),
+            "svg_component": explanation_data.get("svg_component"),
+            "svg_variant": explanation_data.get("svg_variant")
+        }
+    except Exception as e:
+        return {
+            "explanation": _get_misconception_explanation(req.misconception_tag),
+            "animation_parameters": None,
+            "svg_component": pick_svg_template(req.topic, req.misconception_tag),
+            "svg_variant": pick_svg_variant(req.misconception_tag)
+        }
+
 
 
 from fastapi.responses import Response

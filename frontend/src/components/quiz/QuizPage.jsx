@@ -9,7 +9,7 @@ import {
   evalDescriptiveAnswer,
 } from "../../services/api";
 import { useSessionStore } from "../../state/sessionStore";
-import QuizVisualCorrection from "./QuizVisualCorrection";
+import QuizVisualCorrection, { DYNAMIC_TAGS } from "./QuizVisualCorrection";
 
 
 const QUESTION_HISTORY_KEY = "apt_seen_question_ids";
@@ -274,9 +274,16 @@ const TAG_TO_VISUAL_TEMPLATE = {
   lens_power_confusion: "LensFormulaAnimation",
 };
 
-const resolveVisualTemplateByTag = (tag) => {
+const resolveVisualTemplateByTag = (tag, topicId = "") => {
   const key = String(tag || "").trim();
-  return TAG_TO_VISUAL_TEMPLATE[key] || null;
+  let component = TAG_TO_VISUAL_TEMPLATE[key];
+  if (!component && key === "general_concept_gap") {
+    if (topicId.includes("refraction")) {
+      return "RefractionIntroAnimation";
+    }
+    return "ReflectionMisconceptionFeedback";
+  }
+  return component || null;
 };
 
 const loadQuestionHistory = () => {
@@ -419,6 +426,11 @@ const QuizPage = () => {
   const [currentPlayingKey, setCurrentPlayingKey] = useState(null);
   const [loadingTts, setLoadingTts] = useState(null);
   const [openTraceIndex, setOpenTraceIndex] = useState(null);
+  
+  // Background prefetching state
+  const [prefetchedVisualFixes, setPrefetchedVisualFixes] = useState({});
+  const [fetchingVisualFixes, setFetchingVisualFixes] = useState({});
+  
   const audioInstanceRef = useRef(null);
 
   // Clean up audio on unmount or report change
@@ -427,6 +439,59 @@ const QuizPage = () => {
       if (audioInstanceRef.current) {
         audioInstanceRef.current.pause();
       }
+    };
+  }, [report]);
+
+  // Background queue for prefetching visual fixes sequentially
+  useEffect(() => {
+    if (!report?.detailedResults?.length) return;
+
+    let isCancelled = false;
+
+    const processQueue = async () => {
+      // Find all incorrect questions that have a dynamic focus area
+      const queue = report.detailedResults.filter(
+        (item) => !item.isCorrect && item.focusArea && DYNAMIC_TAGS.includes(item.focusArea)
+      );
+
+      for (const item of queue) {
+        if (isCancelled) break;
+        
+        // Skip if we already prefetched or are currently fetching
+        if (prefetchedVisualFixes[item.index] || fetchingVisualFixes[item.index]) {
+          continue;
+        }
+
+        // Mark as fetching
+        setFetchingVisualFixes((prev) => ({ ...prev, [item.index]: true }));
+
+        try {
+          const { generateVisualFix } = await import("../../services/api");
+          const res = await generateVisualFix({
+            topic: currentTopicId || "reflection_refraction",
+            misconception_tag: item.focusArea,
+            question_text: item.questionText,
+            student_answer: item.options ? item.options[item.selectedIndex] : item.studentAnswer,
+            correct_answer: item.options ? item.options[item.correctIndex] : null,
+          });
+
+          if (!isCancelled) {
+            setPrefetchedVisualFixes((prev) => ({ ...prev, [item.index]: res }));
+          }
+        } catch (e) {
+          console.error("Failed to generate background visual fix for q", item.index, e);
+        } finally {
+          if (!isCancelled) {
+            setFetchingVisualFixes((prev) => ({ ...prev, [item.index]: false }));
+          }
+        }
+      }
+    };
+
+    processQueue();
+
+    return () => {
+      isCancelled = true;
     };
   }, [report]);
 
@@ -651,6 +716,7 @@ const QuizPage = () => {
           focusArea,
           svgComponent: selectedFeedback?.svg_component || null,
           svgVariant: selectedFeedback?.svg_variant || focusArea || null,
+          animationParameters: selectedFeedback?.animation_parameters || null,
         };
       });
 
@@ -666,6 +732,7 @@ const QuizPage = () => {
         misconceptionExplanation,
         svgComponent: res?.svg_component || null,
         svgVariant: res?.svg_variant || null,
+        animationParameters: res?.animation_parameters || null,
         questionFeedback,
         detailedResults,
         dbSyncWarning: res?.db_sync_warning || dbSyncWarning,
@@ -962,8 +1029,9 @@ const QuizPage = () => {
 
           {report.mainMisconception && report.mainMisconception !== "none" && (
             <QuizVisualCorrection
-              svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception) || "SphericalMirrorMisconceptionFeedback"}
+              svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception, currentTopicId) || "SphericalMirrorMisconceptionFeedback"}
               svgVariant={report.svgVariant || report.mainMisconception}
+              animationParameters={report.animationParameters}
               misconceptionTag={report.mainMisconception}
               explanation={report.misconceptionExplanation || "Let's review this concept."}
             />
@@ -1149,8 +1217,9 @@ const QuizPage = () => {
 
         {report.mainMisconception && report.mainMisconception !== "none" && (
           <QuizVisualCorrection
-            svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception) || "ReflectionMisconceptionFeedback"}
+            svgComponent={report.svgComponent || resolveVisualTemplateByTag(report.mainMisconception, currentTopicId) || "ReflectionMisconceptionFeedback"}
             svgVariant={report.svgVariant || report.mainMisconception}
+            animationParameters={report.animationParameters}
             misconceptionTag={report.mainMisconception}
             explanation={report.misconceptionExplanation || report.reason}
           />
@@ -1270,25 +1339,33 @@ const QuizPage = () => {
                         fontWeight: 700,
                         cursor: "pointer",
                       }}
+                      disabled={fetchingVisualFixes[item.index]}
                     >
-                      {activeVisualByQuestion[item.index] ? "Hide Visual Fix" : "See Visual Fix"}
+                      {activeVisualByQuestion[item.index] 
+                        ? "Hide Visual Fix" 
+                        : fetchingVisualFixes[item.index] 
+                          ? "Generating Visual Fix... (⏳)" 
+                          : "See Visual Fix"
+                      }
                     </button>
 
                     {activeVisualByQuestion[item.index] && (
                       <QuizVisualCorrection
                         svgComponent={
                           item.svgComponent
-                          || resolveVisualTemplateByTag(item.focusArea)
+                          || resolveVisualTemplateByTag(item.focusArea, currentTopicId)
                           || report.svgComponent
                           || "ReflectionMisconceptionFeedback"
                         }
                         svgVariant={item.svgVariant || item.focusArea || report.mainMisconception}
+                        animationParameters={item.animationParameters}
                         misconceptionTag={item.focusArea || report.mainMisconception}
                         explanation={item.reason || report.misconceptionExplanation || report.reason}
                         questionText={item.questionText}
                         selectedOptionText={item.options[item.selectedIndex]}
                         correctOptionText={item.options[item.correctIndex]}
                         topicId={currentTopicId}
+                        asyncData={prefetchedVisualFixes[item.index]}
                       />
                     )}
                   </div>

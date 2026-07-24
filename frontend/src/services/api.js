@@ -188,4 +188,21 @@ export const evalDescriptiveAnswer = async ({ studentId, questionId, studentAnsw
     throw new Error(`Evaluation failed (${res.status}): ${text}`);
   }
   return res.json();
+};
+
+export const generateVisualFix = async (payload) => {
+  try {
+    const res = await fetch(`${BASE_URL}/generate-visual-fix`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      throw new Error("Failed to generate visual fix");
+    }
+    return await res.json();
+  } catch (error) {
+    console.error("Error generating visual fix:", error);
+    throw error;
+  }
 };

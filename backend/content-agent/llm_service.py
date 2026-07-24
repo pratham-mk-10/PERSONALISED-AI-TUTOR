@@ -22,6 +22,7 @@ def _load_prompt_builder():
 
 
 build_explanation_prompt = _load_prompt_builder().build_explanation_prompt
+build_dynamic_feedback_prompt = _load_prompt_builder().build_dynamic_feedback_prompt
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -157,6 +158,36 @@ class ContentAgentLLMService:
             self._save_to_cache(subtopic, misconception_tag, attempt, explanation)
 
         return explanation
+
+    def get_dynamic_feedback(
+        self,
+        subtopic: str,
+        misconception_tag: str,
+        question_text: Optional[str] = None,
+        student_answer: Optional[str] = None
+    ) -> dict:
+        prompt = build_dynamic_feedback_prompt(
+            subtopic,
+            misconception_tag,
+            question_text=question_text,
+            student_answer=student_answer
+        )
+        
+        response = self._call_llm(prompt)
+        
+        # Clean up markdown code blocks if the LLM added them
+        if response.startswith("```json"):
+            response = response[7:]
+        if response.startswith("```"):
+            response = response[3:]
+        if response.endswith("```"):
+            response = response[:-3]
+            
+        try:
+            return json.loads(response.strip())
+        except json.JSONDecodeError:
+            # Fallback if parsing fails
+            return {}
 
     def _call_llm(self, prompt: str) -> str:
         _load_env_files()

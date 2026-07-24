@@ -6,6 +6,38 @@ import SphericalMirrorDetailedAnimation from "../../svg-engine/reflection/spheri
 import SphericalMirrorMisconceptionFeedback from "../../svg-engine/reflection/spherical-mirrors/animations/feedback/SphericalMirrorMisconceptionFeedback";
 import ReflectionMisconceptionFeedback from "../../svg-engine/reflection/animations/feedback/ReflectionMisconceptionFeedback";
 import DynamicMirrorFeedback from "./DynamicMirrorFeedback";
+import DynamicSVGRenderer from "../../svg-engine/dynamic/DynamicSVGRenderer";
+import RefractionIntroAnimation from "../../svg-engine/refraction/animations/RefractionIntroAnimation";
+import SnellsLawAnimation from "../../svg-engine/refraction/animations/SnellsLawAnimation";
+import GlassSlabAnimation from "../../svg-engine/refraction/animations/GlassSlabAnimation";
+import SphericalLensesAnimation from "../../svg-engine/refraction/animations/SphericalLensesAnimation";
+import LensImageFormationAnimation from "../../svg-engine/refraction/animations/LensImageFormationAnimation";
+import LensFormulaAnimation from "../../svg-engine/refraction/animations/LensFormulaAnimation";
+import { generateVisualFix } from "../../services/api";
+
+export const DYNAMIC_TAGS = [
+  "ray_passes_through_center_of_curvature", 
+  "ray_misses_focal_point", 
+  "lens_optical_center_confusion",
+  "lens_parallel_ray_wrong",
+  "concave_lens_converge_myth",
+  "concave_lens_parallel_ray_wrong",
+  "tir_critical_angle_confusion",
+  "mirror_formula_wrong",
+  "lens_formula_wrong",
+  "convex_real_image_myth",
+  "convex_size_confusion",
+  "real_virtual_confusion",
+  "image_position_confusion",
+  "image_size_confusion",
+  "inverted_erect_confusion",
+  "focus_infinity_confusion",
+  "beyond_c_confusion",
+  "parallel_ray_rule_wrong",
+  "focus_ray_rule_wrong",
+  "center_ray_rule_wrong",
+  "sign_convention_confusion"
+];
 
 const styles = {
   shell: {
@@ -215,18 +247,68 @@ const parseQuestionToFeedbackProps = (questionText, selectedOptionText, correctO
 const QuizVisualCorrection = ({
   svgComponent,
   svgVariant,
+  animationParameters,
   misconceptionTag,
   explanation,
   questionText = "",
   selectedOptionText = "",
   correctOptionText = "",
   topicId = "",
+  asyncData: propAsyncData = null,
 }) => {
   const tag = String(svgVariant || misconceptionTag || "").trim();
   const noOp = () => {};
 
+  const [asyncData, setAsyncData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    // If the data was prefetched by the parent, use it immediately
+    if (propAsyncData) {
+      setAsyncData(propAsyncData);
+      return;
+    }
+
+    if (DYNAMIC_TAGS.includes(tag) && !animationParameters && questionText) {
+      let isMounted = true;
+      setLoading(true);
+      generateVisualFix({
+        topic: topicId || "reflection_refraction",
+        misconception_tag: tag,
+        question_text: questionText,
+        student_answer: selectedOptionText,
+        correct_answer: correctOptionText
+      })
+      .then((data) => {
+        if (isMounted) {
+          setAsyncData(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoading(false);
+      });
+      return () => { isMounted = false; };
+    }
+  }, [tag, topicId, questionText, selectedOptionText, correctOptionText, animationParameters, propAsyncData]);
+
   if (!svgComponent && !tag) {
     return null;
+  }
+
+  if (loading) {
+    return (
+      <div style={styles.shell}>
+        <h3 style={styles.title}>Visual Correction</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
+          <div style={{ width: '40px', height: '40px', border: '4px solid #dbeafe', borderTop: '4px solid #1e3a8a', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <p style={{ marginTop: '16px', color: '#64748b', fontSize: '14px', textAlign: 'center' }}>Generating personalized visual correction...</p>
+          <style>
+            {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+          </style>
+        </div>
+      </div>
+    );
   }
 
   let dynamicProps = null;
@@ -237,7 +319,23 @@ const QuizVisualCorrection = ({
     dynamicProps = resolveDynamicFeedbackProps(tag);
   }
 
+  // Use async data if available, otherwise fallback to props
+  const finalAnimParams = asyncData?.animation_parameters || animationParameters;
+  const finalExplanation = asyncData?.explanation || explanation;
+  const finalSvgComp = asyncData?.svg_component || svgComponent;
+
   const renderByTemplate = () => {
+    // If we have dynamic animation parameters, render the new dynamic engine
+    if (finalAnimParams || finalSvgComp === "DynamicSVGRenderer") {
+      return (
+        <DynamicSVGRenderer 
+          parameters={finalAnimParams} 
+          explanation={finalExplanation} 
+          topicId={topicId}
+        />
+      );
+    }
+
     if (dynamicProps) {
       return (
         <DynamicMirrorFeedback
@@ -248,12 +346,12 @@ const QuizVisualCorrection = ({
       );
     }
 
-    switch (svgComponent) {
+    switch (finalSvgComp) {
       case "ReflectionMisconceptionFeedback":
         return (
           <ReflectionMisconceptionFeedback
             misconceptionTag={tag}
-            explanation={explanation}
+            explanation={finalExplanation}
           />
         );
       case "PlaneMirrorBasicsAnimation":
@@ -264,7 +362,7 @@ const QuizVisualCorrection = ({
         return (
           <SphericalMirrorMisconceptionFeedback
             misconceptionTag={tag}
-            explanation={explanation}
+            explanation={finalExplanation}
           />
         );
       case "SphericalMirrorDetailedAnimation":
@@ -273,11 +371,23 @@ const QuizVisualCorrection = ({
         return <SecondLawOfReflectionAnimation onTryItClicked={noOp} />;
       case "FirstLawOfReflectionAnimation":
         return <FirstLawOfReflectionAnimation onTryItClicked={noOp} />;
+      case "RefractionIntroAnimation":
+        return <RefractionIntroAnimation onContinue={noOp} />;
+      case "SnellsLawAnimation":
+        return <SnellsLawAnimation onContinue={noOp} />;
+      case "GlassSlabAnimation":
+        return <GlassSlabAnimation onContinue={noOp} />;
+      case "SphericalLensesAnimation":
+        return <SphericalLensesAnimation onContinue={noOp} />;
+      case "LensImageFormationAnimation":
+        return <LensImageFormationAnimation onContinue={noOp} />;
+      case "LensFormulaAnimation":
+        return <LensFormulaAnimation onContinue={noOp} />;
       default:
         return (
           <ReflectionMisconceptionFeedback
             misconceptionTag={tag}
-            explanation={explanation}
+            explanation={finalExplanation}
           />
         );
     }

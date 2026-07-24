@@ -1,0 +1,35 @@
+{
+  "explanation": "Your misconception about Snell's Law suggests you believe the angle of refraction is always larger than the angle of incidence, regardless of the medium. This is incorrect. Snell's Law states that the ratio of the sine of the angle of incidence to the sine of the angle of refraction is constant and equal to the ratio of the refractive indices of the two media (n1*sin(i) = n2*sin(r)). If light moves from a rarer medium (like air, n1=1) to a denser medium (like glass, n2=1.5), the angle of refraction will be smaller than the angle of incidence. Conversely, if light moves from a denser to a rarer medium, the angle of refraction will be larger. The correct path depends on the relative refractive indices of the two media involved.",
+  "animation_parameters": {
+    "student_incorrect_trajectory": [
+      {
+        "x": 0,
+        "y": 100
+      },
+      {
+        "x": 400,
+        "y": 100
+      },
+      {
+        "x": 200,
+        "y": 200
+      }
+    ],
+    "physics_correct_trajectory": [
+      {
+        "x": 0,
+        "y": 100
+      },
+      {
+        "x": 400,
+        "y": 100
+      },
+      {
+        "x": 527.2,
+        "y": 350
+      }
+    ]
+  },
+  "svg_component": "DynamicSVGRenderer",
+  "svg_variant": "general_concept_gap"
+}
