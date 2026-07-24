@@ -306,7 +306,7 @@ def generate_text(prompt):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=45)
+        response = requests.post(url, headers=headers, json=data, timeout=15)
         response.raise_for_status()
         result = response.json()
         content = result["candidates"][0]["content"]["parts"][0]["text"]

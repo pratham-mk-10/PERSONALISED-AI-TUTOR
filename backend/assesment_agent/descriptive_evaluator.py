@@ -105,7 +105,7 @@ class DescriptiveEvaluator:
         )
         
         try:
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
                 return res["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
@@ -131,7 +131,7 @@ class DescriptiveEvaluator:
                     method="POST"
                 )
                 try:
-                    with urllib.request.urlopen(m_req, timeout=20) as m_resp:
+                    with urllib.request.urlopen(m_req, timeout=8) as m_resp:
                         m_res = json.loads(m_resp.read().decode("utf-8"))
                         return m_res["choices"][0]["message"]["content"]
                 except Exception:

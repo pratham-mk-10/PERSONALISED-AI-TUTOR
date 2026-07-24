@@ -69,7 +69,7 @@ def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=
 	)
 
 	try:
-		with request.urlopen(req, timeout=20) as resp:
+		with request.urlopen(req, timeout=8) as resp:
 			res = json.loads(resp.read().decode("utf-8"))
 			try:
 				return res["candidates"][0]["content"]["parts"][0]["text"]
@@ -101,7 +101,7 @@ def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=
 			method="POST",
 		)
 		try:
-			with request.urlopen(m_req, timeout=20) as m_resp:
+			with request.urlopen(m_req, timeout=8) as m_resp:
 				m_res = json.loads(m_resp.read().decode("utf-8"))
 				return m_res["choices"][0]["message"]["content"]
 		except Exception:
