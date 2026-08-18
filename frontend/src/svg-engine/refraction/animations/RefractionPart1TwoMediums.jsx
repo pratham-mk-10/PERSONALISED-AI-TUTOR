@@ -5,9 +5,9 @@ export default createRefractionPart({
   title: "Part 1 / 6 — The Two Mediums",
   narration:
     "Welcome. Let us begin. Look at this diagram carefully. " +
-    "The top half of the diagram, shaded in blue, represents AIR. " +
+    "The top half of the diagram represents air. " +
     "Air has a refractive index of one point zero zero. " +
-    "The bottom half, in deeper blue, represents WATER. " +
+    "The bottom half, shaded in blue, represents water. " +
     "Water has a refractive index of one point three three. " +
     "The refractive index of a medium tells us how slowly light travels in it. " +
     "A higher refractive index means light travels more slowly. " +

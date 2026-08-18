@@ -24,7 +24,7 @@ import { computeCorrectResult, STATIC_EXPLANATIONS } from "./numericalSubtopics"
 
 const NumericalChallenge = ({ config }) => {
   const user = useSessionStore((s) => s.user);
-  const studentId = user?.id || user?.name || "guest-student";
+  const studentId = user?.student_id || user?.name || "guest-student";
 
   const problems = config.problems;
 

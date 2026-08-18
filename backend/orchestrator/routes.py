@@ -19,6 +19,9 @@ try:
         get_descriptive_question,
         increment_topic_attempt,
         reset_topic_attempt,
+        create_user,
+        get_user_by_username,
+        get_student_topic_progress,
     )
     from database.queries import fetch_descriptive_questions_by_topic
     from database.connection import get_connection
@@ -44,6 +47,9 @@ except ImportError:
         get_descriptive_question,
         increment_topic_attempt,
         reset_topic_attempt,
+        create_user,
+        get_user_by_username,
+        get_student_topic_progress,
     )
     from backend.database.queries import fetch_descriptive_questions_by_topic
     from backend.database.connection import get_connection
@@ -143,6 +149,13 @@ class GetQuestionsRequest(BaseModel):
     asked_question_ids: list[int | None] | None = None
     limit: int | None = 5
 
+import bcrypt
+
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+
 
 class GenerateQuestionsRequest(BaseModel):
     topic: str | None = None
@@ -232,6 +245,42 @@ def get_questions(data: GetQuestionsRequest | None = None):
 
     questions = generate_questions(topic, difficulty)
     return {"questions": questions[:5]}
+
+
+@router.post("/api/auth/register")
+def register_user(data: AuthRequest):
+    if not data.username or not data.password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+    
+    existing = get_user_by_username(data.username)
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    
+    hashed = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    try:
+        student_id = create_user(data.username, hashed)
+        return {"student_id": student_id, "username": data.username}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/auth/login")
+def login_user(data: AuthRequest):
+    user = get_user_by_username(data.username)
+    if not user or not bcrypt.checkpw(data.password.encode('utf-8'), user["password_hash"].encode('utf-8')):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    return {"student_id": user["student_id"], "username": user["username"]}
+
+
+@router.get("/api/topics/progress")
+def get_topics_progress(student_id: str):
+    if not student_id:
+        raise HTTPException(status_code=400, detail="Student ID required")
+    progress = get_student_topic_progress(student_id)
+    return {"progress": progress}
+
+
+
 
 
 @router.post("/generate-questions")
@@ -975,11 +1024,15 @@ async def text_to_speech(text: str, voice: str = "en-IN-PrabhatNeural"):
     
     try:
         import edge_tts
+        import re
     except ImportError:
         raise HTTPException(status_code=500, detail="edge-tts package is not installed. Please run 'pip install edge-tts'.")
 
+    # Fix TTS mispronouncing "angles" as "angels"
+    tts_text = re.sub(r'\bangles\b', 'an-gles', text, flags=re.IGNORECASE)
+
     try:
-        communicate = edge_tts.Communicate(text, voice)
+        communicate = edge_tts.Communicate(tts_text, voice)
         
         audio_data = bytearray()
         print("Starting stream...")

@@ -91,6 +91,17 @@ export const getStudentMemory = async (studentId) => {
   }
 };
 
+export const getTopicsProgress = async (studentId) => {
+  if (!studentId) return { progress: {} };
+  try {
+    const res = await fetch(`${BASE_URL}/api/topics/progress?student_id=${encodeURIComponent(studentId)}`);
+    if (!res.ok) return { progress: {} };
+    return res.json();
+  } catch {
+    return { progress: {} };
+  }
+};
+
 export const submitAnswers = async ({ answers, topic = null, studentId = null, attemptNumber = 1 }) => {
   const res = await fetch(`${BASE_URL}/submit-answers`, {
     method: "POST",

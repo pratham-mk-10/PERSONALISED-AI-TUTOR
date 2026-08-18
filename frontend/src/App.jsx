@@ -167,12 +167,27 @@ function App() {
   };
   const currentFlow = TOPIC_FLOWS[currentTopicId] || [];
   const currentFlowIds = currentFlow.map((s) => s.id);
+  const TOPIC_SEQUENCE = Object.keys(TOPIC_FLOWS);
   const stageLabels = Object.fromEntries(
     Object.values(TOPIC_FLOWS).flat().map((s) => [s.id, s.label])
   );
 
   const handleGoBackToLesson = () => {
     setStage(currentFlow[0]?.id || "pmTell");
+  };
+
+  const handleAdvanceToNextTopic = () => {
+    const currentIndex = TOPIC_SEQUENCE.indexOf(currentTopicId);
+    const nextTopicId = currentIndex >= 0 ? TOPIC_SEQUENCE[currentIndex + 1] : null;
+
+    if (!nextTopicId) {
+      setView("dashboard");
+      return;
+    }
+
+    selectTopic(nextTopicId);
+    setStage(TOPIC_FLOWS[nextTopicId]?.[0]?.id || "pmTell");
+    setView("session");
   };
 
   const renderSession = () => (
@@ -377,6 +392,7 @@ function App() {
         <div style={styles.card}>
           <QuizPage
             onGoBackToLesson={handleGoBackToLesson}
+            onAdvanceToNextTopic={handleAdvanceToNextTopic}
           />
         </div>
       )}
@@ -756,6 +772,7 @@ function App() {
           setStage={setStage}
           setView={setView}
           selectTopic={selectTopic}
+          onAdvanceToNextTopic={handleAdvanceToNextTopic}
           styles={styles}
         />
       )}
@@ -931,7 +948,7 @@ function App() {
   }
 
   if (!user) {
-    return <NameEntry onSubmit={(name) => login({ name })} />;
+    return <NameEntry onSubmit={(user) => login(user)} />;
   }
 
   return (
