@@ -3,7 +3,119 @@ try:
 except ImportError:
 	from backend.database.connection import get_connection
 from psycopg2.extras import Json
+import uuid
 
+def ensure_users_table():
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		CREATE TABLE IF NOT EXISTS users (
+			student_id TEXT PRIMARY KEY,
+			username TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		"""
+	)
+	conn.commit()
+	conn.close()
+
+def create_user(username, password_hash):
+	ensure_users_table()
+	conn = get_connection()
+	cur = conn.cursor()
+	student_id = str(uuid.uuid4())
+	try:
+		cur.execute(
+			"""
+			INSERT INTO users (student_id, username, password_hash)
+			VALUES (%s, %s, %s)
+			RETURNING student_id
+			""",
+			(student_id, username, password_hash)
+		)
+		result = cur.fetchone()[0]
+		conn.commit()
+		return result
+	except Exception as e:
+		conn.rollback()
+		raise e
+	finally:
+		conn.close()
+
+def get_user_by_username(username):
+	ensure_users_table()
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		SELECT student_id, username, password_hash
+		FROM users
+		WHERE username = %s
+		""",
+		(username,)
+	)
+	row = cur.fetchone()
+	conn.close()
+	if row:
+		return {
+			"student_id": row[0],
+			"username": row[1],
+			"password_hash": row[2]
+		}
+	return None
+
+def ensure_student_topics_table():
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		CREATE TABLE IF NOT EXISTS student_topics (
+			student_id TEXT NOT NULL,
+			topic_id TEXT NOT NULL,
+			status TEXT NOT NULL,
+			last_accessed TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (student_id, topic_id)
+		);
+		"""
+	)
+	conn.commit()
+	conn.close()
+
+def upsert_student_topic_status(student_id, topic_id, status):
+	ensure_student_topics_table()
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		INSERT INTO student_topics (student_id, topic_id, status, last_accessed)
+		VALUES (%s, %s, %s, NOW())
+		ON CONFLICT (student_id, topic_id)
+		DO UPDATE SET
+			status = EXCLUDED.status,
+			last_accessed = EXCLUDED.last_accessed
+		""",
+		(student_id, topic_id, status)
+	)
+	conn.commit()
+	conn.close()
+
+def get_student_topic_progress(student_id):
+	ensure_student_topics_table()
+	conn = get_connection()
+	cur = conn.cursor()
+	cur.execute(
+		"""
+		SELECT topic_id, status
+		FROM student_topics
+		WHERE student_id = %s
+		""",
+		(student_id,)
+	)
+	rows = cur.fetchall()
+	conn.close()
+	return {row[0]: row[1] for row in rows}
 
 def ensure_student_table():
 	conn = get_connection()
@@ -173,11 +285,14 @@ def update_student_topic_resolution(student_id, topic, main_misconception):
 	if main_misconception and main_misconception != "none":
 		unresolved.add(topic)
 		completed.discard(topic)
+		upsert_student_topic_status(student_id, topic, "attempted")
 	else:
 		completed.add(topic)
 		unresolved.discard(topic)
+		upsert_student_topic_status(student_id, topic, "completed")
 
 	student["completed_topics"] = sorted(completed)
+
 	student["unresolved_topics"] = sorted(unresolved)
 	student["current_topic"] = topic
 	upsert_student(student)

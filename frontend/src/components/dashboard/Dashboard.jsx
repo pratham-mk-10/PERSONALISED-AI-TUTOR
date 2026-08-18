@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useSessionStore, TITLE_TO_TOPIC_ID } from "../../state/sessionStore";
-import { getStudentMemory } from "../../services/api";
+import { getStudentMemory, getTopicsProgress } from "../../services/api";
 
 // Inverse of TITLE_TO_TOPIC_ID, so renderTopicCard can look up a topic's
 // backend status by its own dashboard `id` (canonical backend titles carry
@@ -92,14 +92,18 @@ export default function Dashboard({ onStartTopic }) {
     "numericals-umbrella": true,
   });
   const [memoryData, setMemoryData] = useState(null);
+  const [topicsProgress, setTopicsProgress] = useState({});
   const [weakTopicsExpanded, setWeakTopicsExpanded] = useState(false);
 
   useEffect(() => {
-    const studentId = user?.id || user?.name || "guest-student";
+    const studentId = user?.student_id || user?.name || "guest-student";
 
     let cancelled = false;
     getStudentMemory(studentId).then((data) => {
       if (!cancelled && data?.has_memory) setMemoryData(data);
+    });
+    getTopicsProgress(studentId).then((data) => {
+      if (!cancelled && data?.progress) setTopicsProgress(data.progress);
     });
     return () => {
       cancelled = true;
@@ -132,11 +136,28 @@ export default function Dashboard({ onStartTopic }) {
     }));
   };
 
+  let nextTopicId = null;
+  for (const item of activeChapter.topics) {
+    if (item.type === "folder") {
+      for (const sub of item.subtopics) {
+        if (topicsProgress[sub.id] !== "completed" && !nextTopicId) {
+          nextTopicId = sub.id;
+        }
+      }
+    } else {
+      if (topicsProgress[item.id] !== "completed" && !nextTopicId) {
+        nextTopicId = item.id;
+      }
+    }
+  }
+
   const renderTopicCard = (topic, isSubtopic = false) => {
     const stat = progress[topic.id];
     const isActive = currentTopicId === topic.id;
+    const isNext = topic.id === nextTopicId;
     const canonicalTitle = TOPIC_ID_TO_TITLE[topic.id];
     const status = canonicalTitle ? statusMap[canonicalTitle] : undefined;
+    const dbStatus = topicsProgress[topic.id];
 
     return (
       <div
@@ -144,8 +165,8 @@ export default function Dashboard({ onStartTopic }) {
         style={{
           ...styles.topicCard,
           marginLeft: isSubtopic ? "40px" : "0px",
-          border: isActive ? "1px solid #3B82F6" : "1px solid rgba(255, 255, 255, 0.02)",
-          boxShadow: isActive ? "0 0 15px rgba(59, 130, 246, 0.3)" : "none",
+          border: isNext ? "1px solid #10B981" : (isActive ? "1px solid #3B82F6" : "1px solid rgba(255, 255, 255, 0.02)"),
+          boxShadow: isNext ? "0 0 20px rgba(16, 185, 129, 0.3)" : (isActive ? "0 0 15px rgba(59, 130, 246, 0.3)" : "none"),
         }}
       >
         <div style={styles.topicInfo}>
@@ -157,6 +178,9 @@ export default function Dashboard({ onStartTopic }) {
               />
             )}
             {topic.title}
+            {isNext && <span style={styles.nextBadge}>Up Next</span>}
+            {dbStatus === "completed" && <span style={styles.completedBadge}>Completed</span>}
+            {dbStatus === "attempted" && <span style={styles.attemptedBadge}>Attempted</span>}
           </h3>
           {stat ? (
             <p style={styles.topicMeta}>
@@ -527,6 +551,36 @@ const styles = {
     fontSize: "14px",
     color: "#94A3B8",
     margin: 0,
+  },
+  nextBadge: {
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    color: "#34D399",
+    padding: "2px 8px",
+    borderRadius: "9999px",
+    marginLeft: "12px",
+    verticalAlign: "middle",
+  },
+  completedBadge: {
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    color: "#60A5FA",
+    padding: "2px 8px",
+    borderRadius: "9999px",
+    marginLeft: "12px",
+    verticalAlign: "middle",
+  },
+  attemptedBadge: {
+    fontSize: "12px",
+    fontWeight: "600",
+    backgroundColor: "rgba(245, 158, 11, 0.2)",
+    color: "#FBBF24",
+    padding: "2px 8px",
+    borderRadius: "9999px",
+    marginLeft: "12px",
+    verticalAlign: "middle",
   },
   topicActions: {
     display: "flex",

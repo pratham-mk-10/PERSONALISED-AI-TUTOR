@@ -33,7 +33,7 @@ function topicIdForStage(stage) {
   });
 }
 
-export default function RefractionSession({ stage, setStage, setView, selectTopic, styles }) {
+export default function RefractionSession({ stage, setStage, setView, selectTopic, onAdvanceToNextTopic = null, styles }) {
   const topicId = topicIdForStage(stage);
   if (!topicId) return null;
 
@@ -95,7 +95,7 @@ export default function RefractionSession({ stage, setStage, setView, selectTopi
 
     return (
       <div style={styles.card}>
-        <QuizPage />
+        <QuizPage onAdvanceToNextTopic={onAdvanceToNextTopic} />
         <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
           {topic.nextTell && nextTopicId ? (
             <button

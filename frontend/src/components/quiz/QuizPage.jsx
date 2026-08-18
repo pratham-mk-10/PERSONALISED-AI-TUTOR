@@ -494,7 +494,7 @@ Power P = 1/f (f in metres), unit dioptre (D). Sign convention: u negative, conv
 Combined lenses in contact: P = P1 + P2.`
 };
 
-const QuizPage = ({ onGoBackToLesson = null }) => {
+const QuizPage = ({ onGoBackToLesson = null, onAdvanceToNextTopic = null }) => {
   const currentTopicId = useSessionStore((s) => s.currentTopicId);
   const user = useSessionStore((s) => s.user);
   const progress = useSessionStore((s) => s.progress);
@@ -518,6 +518,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
   const [loadingTts, setLoadingTts] = useState(null);
   const [openTraceIndex, setOpenTraceIndex] = useState(null);
   const audioInstanceRef = useRef(null);
+  const autoAdvanceTriggeredRef = useRef(false);
 
   // Clean up audio on unmount or report change
   useEffect(() => {
@@ -532,6 +533,34 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
   useEffect(() => {
     loadQuestions();
   }, [currentTopicId, quizType]);
+
+  useEffect(() => {
+    autoAdvanceTriggeredRef.current = false;
+  }, [currentTopicId, quizType]);
+
+  useEffect(() => {
+    if (!report || autoAdvanceTriggeredRef.current) {
+      return;
+    }
+
+    const isPerfectFirstAttempt =
+      report.type === "mcq" &&
+      report.accuracy === 100 &&
+      report.mainMisconception === "none" &&
+      report.serverAttemptNumber === 1 &&
+      typeof onAdvanceToNextTopic === "function";
+
+    if (!isPerfectFirstAttempt) {
+      return;
+    }
+
+    autoAdvanceTriggeredRef.current = true;
+    const timer = window.setTimeout(() => {
+      onAdvanceToNextTopic();
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [onAdvanceToNextTopic, report]);
 
   const handlePlaySpeech = (text, key) => {
     if (audioInstanceRef.current) {
@@ -576,6 +605,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
   };
 
   const loadQuestions = async () => {
+    autoAdvanceTriggeredRef.current = false;
     setLoading(true);
     setError("");
     setReport(null);
@@ -587,7 +617,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
     const seenIds = loadQuestionHistory();
     const quizTopicContext = getQuizTopicContext(currentTopicId);
     const personalization = getPersonalization(currentTopicId, progress);
-    const studentId = user?.id || user?.name || "guest-student";
+    const studentId = user?.student_id || user?.name || "guest-student";
     const tutorContext = [quizTopicContext.lessonFocus, personalization.tutorContext]
       .filter(Boolean)
       .join(" ");
@@ -699,7 +729,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
     setSubmitting(true);
     try {
       const quizTopicContext = getQuizTopicContext(currentTopicId);
-      const studentId = user?.id || user?.name || "guest-student";
+      const studentId = user?.student_id || user?.name || "guest-student";
 
       const formatted = questions.map(q => ({
         question_id: q.id ?? q._key,
@@ -824,7 +854,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
 
     setSubmitting(true);
     try {
-      const studentId = user?.id || user?.name || "guest-student";
+      const studentId = user?.student_id || user?.name || "guest-student";
       const topicContext = getQuizTopicContext(currentTopicId);
 
       const evaluationPromises = questions.map(async (q) => {
@@ -953,7 +983,7 @@ const QuizPage = ({ onGoBackToLesson = null }) => {
     }
 
     const quizTopicContext = getQuizTopicContext(currentTopicId);
-    const studentId = user?.id || user?.name || "guest-student";
+    const studentId = user?.student_id || user?.name || "guest-student";
     const wrongItems = report.detailedResults.filter((item) => !item.isCorrect);
     // Count occurrences instead of just deduping, so a tag the student
     // tripped on 3 times in this quiz gets proportionally more questions
