@@ -59,7 +59,7 @@ class DescriptiveEvaluator:
 
     def run_smart_gate(self, student_answer: str, required_keywords: List[str]) -> tuple[bool, str | None]:
         """Stage 1: Smart Gate.
-        Checks length (>= 4 words) and keyword overlap using set.intersection.
+        Checks length (>= 4 words), keyword overlap, and syntactic/lexical structure (preventing pure keyword dumps).
         """
         cleaned_ans = student_answer.strip()
         
@@ -73,6 +73,38 @@ class DescriptiveEvaluator:
             
             if not student_word_set.intersection(keyword_set):
                 return False, f"Your answer does not contain the key concepts required (e.g. {', '.join(required_keywords[:3])}). Please focus on the physics elements of the question."
+
+        # Check for isolated keyword dumps / lack of sentence structure (verbs and connecting grammar)
+        common_verbs_connectors = {
+            "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+            "do", "does", "did", "form", "forms", "formed", "forming", "reflect", "reflects",
+            "reflected", "reflecting", "refract", "refracts", "refracted", "refracting",
+            "bend", "bends", "bent", "bending", "converge", "converges", "converged", "converging",
+            "diverge", "diverges", "diverged", "diverging", "meet", "meets", "met", "meeting",
+            "cross", "crosses", "crossed", "crossing", "create", "creates", "created", "creating",
+            "cause", "causes", "caused", "causing", "make", "makes", "made", "making",
+            "produce", "produces", "produced", "producing", "behave", "behaves", "behaved",
+            "travel", "travels", "traveled", "travelling", "pass", "passes", "passed", "passing",
+            "lie", "lies", "lay", "lying", "appear", "appears", "appeared", "appearing",
+            "act", "acts", "acted", "acting", "show", "shows", "showed", "showing",
+            "happen", "happens", "happened", "equal", "equals", "equalled", "spread", "spreads",
+            "smash", "smashes", "turn", "turns", "bounce", "bounces", "go", "goes", "went",
+            "come", "comes", "came", "because", "since", "so", "when", "where", "why", "which",
+            "that", "as", "than", "if", "while", "due", "thus", "hence", "therefore", "inwards", "outwards",
+            "interacts", "focuses", "focused", "focusing", "intersects", "intersect", "intersecting",
+            "enters", "exits", "strikes", "struck", "striking", "placed", "places", "gets", "got",
+            "gives", "given", "takes", "took", "see", "sees", "seen", "look", "looks", "looked",
+            "held", "holds", "varies", "depends", "increases", "decreases", "remains", "stays", "changes",
+            "moves", "moved", "moving"
+        }
+        
+        has_verb_or_connector = any(w in common_verbs_connectors for w in words)
+        
+        keyword_set_full = {str(k).strip().lower() for k in required_keywords if str(k).strip()} if required_keywords else set()
+        is_pure_keyword_list = len(words) >= 4 and not has_verb_or_connector and set(words).issubset(keyword_set_full.union({"and", "or", "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "with", "from"}))
+        
+        if not has_verb_or_connector or is_pure_keyword_list:
+            return False, "Your answer appears to be a list of isolated keywords. Please write a complete, coherent sentence expressing full lexical meaning and explanation."
 
         return True, None
 
@@ -188,6 +220,9 @@ CRITICAL OBJECTIVES & GRADING DIRECTIVES:
    - "understanding": Conceptual accuracy & correctness (HEAVIEST WEIGHT, 70%).
    - "completeness": Coverage of required rubric points (SECONDARY WEIGHT, 25%).
    - "keywords": Scientific terminology usage (MINIMAL WEIGHT, 5%).
+4. LEXICAL MEANING vs KEYWORD DUMPING:
+   - An acceptable answer MUST convey genuine lexical and conceptual meaning through coherent sentence structure connecting ideas.
+   - KEYWORD DUMPING PENALTY: If the student merely lists or strings together keywords/phrases without proper syntactic structure, verbs, or explanatory context (e.g. "concave mirror light rays focus real image"), you MUST assign VERY LOW scores for "understanding" (0-2 out of 10) and "completeness" (0-2 out of 10). Isolated keywords do NOT demonstrate conceptual understanding or lexical meaning.
 
 {severity_caps_info}
 
@@ -276,6 +311,27 @@ Anchor Example 3 (Incorrect / Negation Violation - Low Score):
     "keywords": 2
   },
   "feedback": "It looks like you mixed up the two mirrors! A concave mirror curves inwards and converges light, whereas a convex mirror curves outwards and diverges light."
+}
+
+Anchor Example 4 (Keyword Dump / Lack of Lexical Meaning - Low Score):
+- Question: Why does a concave mirror form a real image but a convex mirror forms a virtual one?
+- Rubric (same as above)
+- Student Answer: "concave mirror light rays focus real image convex mirror virtual image"
+- Expected Output JSON:
+{
+  "reasoning_trace": [
+    "Step 1: Analyzed student answer structure. Student listed scientific terms/keywords without proper sentence syntax or explanatory verbs.",
+    "Step 2: Applied Keyword Dumping penalty. Isolated keywords do not express full lexical meaning or explain physical mechanism.",
+    "Step 3: Assigned low understanding (1/10) and completeness (1/10)."
+  ],
+  "contradicted_span": null,
+  "misconception_tag": "NOVEL_UNTAGGED_ERROR",
+  "scores": {
+    "understanding": 1,
+    "completeness": 1,
+    "keywords": 5
+  },
+  "feedback": "Your answer contains relevant keywords but lacks sentence structure and clear lexical explanation. Please write complete sentences explaining how and why light rays form real or virtual images."
 }
 """
 

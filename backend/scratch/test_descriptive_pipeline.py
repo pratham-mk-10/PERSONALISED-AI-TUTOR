@@ -66,7 +66,19 @@ def run_tests():
     assert res4["misconception_tag"] is None
     print("TEST 4 PASSED.\n")
 
+    print("==================================================")
+    print("TEST 5: Keyword-Only Answer (Gate / Score Failure for Lack of Lexical Meaning)")
+    print("==================================================")
+    ans5 = "concave convex real virtual mirror ray"
+    res5 = evaluator.evaluate_answer("test_student", 1, question, ans5, rubric, misconceptions, keywords)
+    print("Student Answer:", ans5)
+    print("Result:", json.dumps(res5, indent=2))
+    assert res5["scores"]["understanding"] <= 2
+    assert ("isolated keywords" in res5["feedback"] or "sentence structure" in res5["feedback"] or "lexical" in res5["feedback"])
+    print("TEST 5 PASSED.\n")
+
     print("ALL TESTS RUN COMPLETED.")
 
 if __name__ == "__main__":
     run_tests()
+
