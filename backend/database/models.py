@@ -432,7 +432,7 @@ def log_flagged_evaluation(student_id, question_id, student_answer, raw_response
 	cur = conn.cursor()
 	cur.execute(
 		"""
-		INSERT INTO flagged_evaluations (student_id, question_id, student_answer, raw_response, error_message)
+		INSERT INTO flagged_evaluations (student_id, question_id, student_answer, raw_llm_output, failure_reason)
 		VALUES (%s, %s, %s, %s, %s)
 		""",
 		(student_id, question_id, student_answer, raw_response, error_message),

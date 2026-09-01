@@ -59,22 +59,37 @@ class DescriptiveEvaluator:
 
     def run_smart_gate(self, student_answer: str, required_keywords: List[str]) -> tuple[bool, str | None]:
         """Stage 1: Smart Gate.
-        Checks length (>= 4 words), keyword overlap, and syntactic/lexical structure (preventing pure keyword dumps).
+        Checks length (>= 4 words), keyword overlap (supporting formulas/symbols/multi-word phrases),
+        and syntactic/lexical structure (preventing pure keyword dumps).
         """
         cleaned_ans = student_answer.strip()
-        
         words = re.findall(r"\b\w+\b", cleaned_ans.lower())
         if len(words) < 4:
             return False, "Your answer is too short (must be at least 4 words). Please write a complete explanation."
 
         if required_keywords:
-            student_word_set = set(words)
-            keyword_set = {str(k).strip().lower() for k in required_keywords if str(k).strip()}
+            cleaned_lower = cleaned_ans.lower()
+            cleaned_no_spaces = cleaned_lower.replace(" ", "")
+            student_tokens = set(words)
             
-            if not student_word_set.intersection(keyword_set):
-                return False, f"Your answer does not contain the key concepts required (e.g. {', '.join(required_keywords[:3])}). Please focus on the physics elements of the question."
+            has_kw_match = False
+            for kw in required_keywords:
+                kw_clean = str(kw).strip().lower()
+                if not kw_clean:
+                    continue
+                if kw_clean in cleaned_lower or kw_clean.replace(" ", "") in cleaned_no_spaces:
+                    has_kw_match = True
+                    break
+                kw_tokens = set(re.findall(r"\b\w+\b", kw_clean))
+                meaningful_kw_tokens = {t for t in kw_tokens if len(t) > 1 or t in {"u", "v", "f", "r", "p", "i", "m", "c"}}
+                if meaningful_kw_tokens and (meaningful_kw_tokens.issubset(student_tokens) or kw_tokens.intersection(student_tokens)):
+                    has_kw_match = True
+                    break
+            
+            if not has_kw_match:
+                example_kws = ", ".join(required_keywords[:3])
+                return False, f"Your answer does not contain the key concepts required (e.g. {example_kws}). Please focus on the physics elements of the question."
 
-        # Check for isolated keyword dumps / lack of sentence structure (verbs and connecting grammar)
         common_verbs_connectors = {
             "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
             "do", "does", "did", "form", "forms", "formed", "forming", "reflect", "reflects",
@@ -95,14 +110,17 @@ class DescriptiveEvaluator:
             "enters", "exits", "strikes", "struck", "striking", "placed", "places", "gets", "got",
             "gives", "given", "takes", "took", "see", "sees", "seen", "look", "looks", "looked",
             "held", "holds", "varies", "depends", "increases", "decreases", "remains", "stays", "changes",
-            "moves", "moved", "moving"
+            "moves", "moved", "moving", "can", "could", "will", "would", "should", "may", "might", "must",
+            "between", "through", "along", "into", "from", "with", "by", "of", "to", "for", "in", "on", "at"
         }
-        
+
         has_verb_or_connector = any(w in common_verbs_connectors for w in words)
-        
-        keyword_set_full = {str(k).strip().lower() for k in required_keywords if str(k).strip()} if required_keywords else set()
-        is_pure_keyword_list = len(words) >= 4 and not has_verb_or_connector and set(words).issubset(keyword_set_full.union({"and", "or", "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "with", "from"}))
-        
+        keyword_tokens_full = set()
+        for k in (required_keywords or []):
+            keyword_tokens_full.update(re.findall(r"\b\w+\b", str(k).lower()))
+            
+        is_pure_keyword_list = len(words) >= 4 and set(words).issubset(keyword_tokens_full.union({"and", "or", "the", "a", "an"})) and not any(w in common_verbs_connectors - {"of", "to", "for", "in", "on", "at", "and", "or"} for w in words)
+
         if not has_verb_or_connector or is_pure_keyword_list:
             return False, "Your answer appears to be a list of isolated keywords. Please write a complete, coherent sentence expressing full lexical meaning and explanation."
 
