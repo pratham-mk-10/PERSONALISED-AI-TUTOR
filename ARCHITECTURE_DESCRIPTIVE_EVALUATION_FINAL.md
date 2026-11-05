@@ -32,7 +32,7 @@
 | Python | 3.11+ | Base language |
 | FastAPI | 0.111+ | API framework |
 | Pydantic | v2 (2.7+) | Schema validation — critical, NOT v1 |
-| google-generativeai | 0.7+ | Gemini 3.5 Flash API client |
+| google-generativeai | 0.7+ | Gemini 2.5 Flash API client |
 | mistralai | 1.0+ | Mistral-Small fallback client |
 | psycopg2-binary | 2.9+ | PostgreSQL driver |
 | SQLAlchemy | 2.0+ | ORM for DB interactions |

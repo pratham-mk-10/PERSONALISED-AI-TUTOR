@@ -255,4 +255,65 @@ export const evalDescriptiveAnswer = async ({ studentId, questionId, studentAnsw
     throw new Error(`Evaluation failed (${res.status}): ${text}`);
   }
   return res.json();
-};
+};
+
+// ── Material AI Tutor APIs ──
+
+export const uploadMaterialFile = async (file, sessionId = "default") => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("session_id", sessionId);
+
+  const res = await fetch(`${BASE_URL}/api/material/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to upload file (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
+export const chatWithMaterial = async ({ sessionId = "default", message, materialIds = null }) => {
+  const res = await fetch(`${BASE_URL}/api/material/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      message,
+      material_ids: materialIds,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get response (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
+export const listSessionMaterials = async (sessionId = "default") => {
+  const res = await fetch(`${BASE_URL}/api/material/${encodeURIComponent(sessionId)}/list`);
+  if (!res.ok) {
+    return { materials: [] };
+  }
+  return res.json();
+};
+
+export const deleteMaterialFile = async (sessionId = "default", materialId) => {
+  const res = await fetch(`${BASE_URL}/api/material/${encodeURIComponent(sessionId)}/${encodeURIComponent(materialId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to delete material (${res.status}): ${text}`);
+  }
+  return res.json();
+};
+

@@ -4,9 +4,14 @@ from pathlib import Path
 from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
+
+try:
+    from material_agent import MaterialTutorAgent
+except ImportError:
+    from backend.material_agent import MaterialTutorAgent
 
 try:
     from database.models import (
@@ -141,6 +146,8 @@ get_template_quiz_scope = getattr(_content_agent_module, "get_template_quiz_scop
 pick_svg_template = getattr(_content_agent_module, "pick_svg_template", lambda _topic, _tag=None: None)
 pick_svg_variant = getattr(_content_agent_module, "pick_svg_variant", lambda _tag=None: None)
 content_agent = ContentAgent(get_connection)
+# Material Tutor agent instance with multi-model Gemini Flash adapter
+material_tutor_agent = MaterialTutorAgent()
 
 
 class GetQuestionsRequest(BaseModel):
@@ -1044,4 +1051,68 @@ async def text_to_speech(text: str, voice: str = "en-IN-PrabhatNeural"):
         return Response(content=bytes(audio_data), media_type="audio/mpeg")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── Material AI Tutor Endpoints (In-Memory Extensible Agent) ──
+
+class MaterialChatRequest(BaseModel):
+    session_id: str = "default"
+    message: str
+    material_ids: list[str] | None = None
+
+
+@router.post("/api/material/upload")
+async def upload_material(
+    file: UploadFile = File(...),
+    session_id: str = Form("default"),
+):
+    try:
+        content_bytes = await file.read()
+        res = material_tutor_agent.process_upload(
+            session_id=session_id,
+            filename=file.filename or "uploaded_file",
+            content_bytes=content_bytes,
+            mime_type=file.content_type or "",
+        )
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to process upload: {str(exc)}")
+
+
+@router.post("/api/material/chat")
+async def chat_with_material(req: MaterialChatRequest):
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    try:
+        res = material_tutor_agent.answer_query(
+            session_id=req.session_id,
+            student_query=req.message,
+            material_ids=req.material_ids,
+        )
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate answer: {str(exc)}")
+
+
+@router.get("/api/material/{session_id}/list")
+async def list_session_materials(session_id: str):
+    records = material_tutor_agent.cache.get_session_materials(session_id)
+    return {
+        "materials": [
+            {
+                "material_id": r.material_id,
+                "filename": r.filename,
+                "page_count": r.page_count,
+                "created_at": r.created_at,
+            }
+            for r in records
+        ]
+    }
+
+
+@router.delete("/api/material/{session_id}/{material_id}")
+async def delete_session_material(session_id: str, material_id: str):
+    deleted = material_tutor_agent.cache.delete_material(session_id, material_id)
+    return {"deleted": deleted, "material_id": material_id}
+
 

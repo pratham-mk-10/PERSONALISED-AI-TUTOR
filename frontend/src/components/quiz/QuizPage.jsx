@@ -1067,7 +1067,7 @@ const QuizPage = ({ onGoBackToLesson = null, onAdvanceToNextTopic = null }) => {
       return (
         <div style={{ padding: "20px" }}>
           <h1 style={{ color: "#F8FAFC", marginBottom: "4px" }}>Descriptive Practice Evaluation</h1>
-          <p style={{ color: "#9CA3AF", marginTop: 0 }}>Gemini 3.5 Flash CoT Evaluation Pipeline</p>
+          <p style={{ color: "#9CA3AF", marginTop: 0 }}>Gemini 2.5 Flash CoT Evaluation Pipeline</p>
 
           {/* Core score meters */}
           <div style={{

@@ -1,6 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSessionStore, TITLE_TO_TOPIC_ID } from "../../state/sessionStore";
-import { getStudentMemory, getTopicsProgress } from "../../services/api";
+import {
+  getStudentMemory,
+  getTopicsProgress,
+  uploadMaterialFile,
+  chatWithMaterial,
+  deleteMaterialFile,
+} from "../../services/api";
+import ChatTriggerButton from "../chat/ChatTriggerButton";
+import MaterialChatSidebar from "../chat/MaterialChatSidebar";
 
 // Inverse of TITLE_TO_TOPIC_ID, so renderTopicCard can look up a topic's
 // backend status by its own dashboard `id` (canonical backend titles carry
@@ -94,6 +102,122 @@ export default function Dashboard({ onStartTopic }) {
   const [memoryData, setMemoryData] = useState(null);
   const [topicsProgress, setTopicsProgress] = useState({});
   const [weakTopicsExpanded, setWeakTopicsExpanded] = useState(false);
+
+  // ── Material Chat sidebar state ──
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatFiles, setChatFiles] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatIsTyping, setChatIsTyping] = useState(false);
+
+  const sessionId = user?.student_id || user?.name || "guest-student";
+  const toggleChat = useCallback(() => setIsChatOpen((v) => !v), []);
+
+  const handleUploadFiles = useCallback(
+    async (incomingFiles) => {
+      for (const file of incomingFiles) {
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const placeholder = {
+          id: tempId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: "uploading",
+        };
+        setChatFiles((prev) => [...prev, placeholder]);
+
+        try {
+          const res = await uploadMaterialFile(file, sessionId);
+          setChatFiles((prev) =>
+            prev.map((item) =>
+              item.id === tempId
+                ? {
+                    ...item,
+                    materialId: res.material_id,
+                    pageCount: res.page_count,
+                    status: "ready",
+                  }
+                : item
+            )
+          );
+        } catch (err) {
+          console.error("Upload error:", err);
+          setChatFiles((prev) =>
+            prev.map((item) =>
+              item.id === tempId
+                ? { ...item, status: "error", error: err.message }
+                : item
+            )
+          );
+        }
+      }
+    },
+    [sessionId]
+  );
+
+  const handleDeleteFile = useCallback(
+    async (fileObj) => {
+      if (fileObj.materialId) {
+        try {
+          await deleteMaterialFile(sessionId, fileObj.materialId);
+        } catch (e) {
+          console.warn("Error deleting material from backend", e);
+        }
+      }
+      setChatFiles((prev) =>
+        prev.filter(
+          (item) => item.id !== fileObj.id && item.materialId !== fileObj.materialId
+        )
+      );
+    },
+    [sessionId]
+  );
+
+  const handleChatSend = useCallback(
+    async (text) => {
+      // 1. Append user message
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "user", text, ts: Date.now() },
+      ]);
+
+      // 2. Set typing state
+      setChatIsTyping(true);
+
+      try {
+        const readyMaterialIds = chatFiles
+          .filter((f) => f.status === "ready" && f.materialId)
+          .map((f) => f.materialId);
+
+        const res = await chatWithMaterial({
+          sessionId,
+          message: text,
+          materialIds: readyMaterialIds.length > 0 ? readyMaterialIds : null,
+        });
+
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "agent",
+            text: res.reply,
+            materialsReferenced: res.materials_referenced,
+            ts: Date.now(),
+          },
+        ]);
+      } catch (err) {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: "agent",
+            text: `⚠️ Error generating tutor response: ${err.message}. Please check your connection or try again.`,
+            ts: Date.now(),
+          },
+        ]);
+      } finally {
+        setChatIsTyping(false);
+      }
+    },
+    [chatFiles, sessionId]
+  );
 
   useEffect(() => {
     const studentId = user?.student_id || user?.name || "guest-student";
@@ -230,6 +354,16 @@ export default function Dashboard({ onStartTopic }) {
           <button style={styles.logoutBtn} onClick={logout}>
             Logout
           </button>
+          <button
+            style={styles.materialAiBtn}
+            onClick={toggleChat}
+            title="Ask AI Material Tutor"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "6px" }}>
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+            </svg>
+            Material AI
+          </button>
         </div>
       </header>
 
@@ -345,6 +479,23 @@ export default function Dashboard({ onStartTopic }) {
           </div>
         </section>
       </main>
+
+      {/* ── Material AI Tutor — FAB + Sidebar ── */}
+      <ChatTriggerButton
+        onClick={toggleChat}
+        isOpen={isChatOpen}
+        fileCount={chatFiles.length}
+      />
+      <MaterialChatSidebar
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        files={chatFiles}
+        onUploadFiles={handleUploadFiles}
+        onDeleteFile={handleDeleteFile}
+        messages={chatMessages}
+        onSend={handleChatSend}
+        isTyping={chatIsTyping}
+      />
     </div>
   );
 }
@@ -417,6 +568,19 @@ const styles = {
     borderRadius: "9999px",
     fontSize: "14px",
     fontWeight: "500",
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  materialAiBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid rgba(59, 130, 246, 0.35)",
+    background: "rgba(59, 130, 246, 0.12)",
+    color: "#60A5FA",
+    padding: "8px 16px",
+    borderRadius: "9999px",
+    fontSize: "14px",
+    fontWeight: "600",
     cursor: "pointer",
     transition: "all 0.2s",
   },

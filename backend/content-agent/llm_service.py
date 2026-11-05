@@ -47,7 +47,6 @@ def _get_api_key():
 
 
 def _post_chat_completion(api_key, system_instruction, user_prompt):
-    url = f"{API_URL}?key={api_key}"
     payload = {
         "contents": [
             {
@@ -66,23 +65,27 @@ def _post_chat_completion(api_key, system_instruction, user_prompt):
         }
     
     body = json.dumps(payload).encode("utf-8")
-    req = request.Request(
-        url,
-        data=body,
-        headers={
-            "Content-Type": "application/json"
-        },
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=8) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            try:
-                return res["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError):
-                return ""
-    except Exception as e:
-        # Fallback to mistral
+    for model in ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        req = request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "application/json"
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=12) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                try:
+                    return res["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    return ""
+        except Exception:
+            continue
+
+    # Fallback to mistral
         mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
         if not mistral_key:
             return ""

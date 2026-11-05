@@ -109,8 +109,7 @@ class DescriptiveEvaluator:
         return True, None
 
     def _call_llm(self, system_instruction: str, prompt: str) -> str:
-        """Call Gemini 3.5 Flash directly with temperature=0 and JSON output mode."""
-        url = f"{self.api_url}?key={self.api_key}"
+        """Call Gemini 2.5 Flash directly with temperature=0 and JSON output mode."""
         payload = {
             "contents": [
                 {
@@ -129,46 +128,57 @@ class DescriptiveEvaluator:
             }
         
         body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
+        candidate_models = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]
         
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                return res["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception as e:
-            mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
-            if mistral_key:
-                mistral_url = "https://api.mistral.ai/v1/chat/completions"
-                mistral_payload = {
-                    "model": "mistral-small-latest",
-                    "messages": [
-                        {"role": "system", "content": system_instruction},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.0,
-                    "response_format": {"type": "json_object"}
-                }
-                m_req = urllib.request.Request(
-                    mistral_url,
-                    data=json.dumps(mistral_payload).encode("utf-8"),
-                    headers={
-                        "Authorization": f"Bearer {mistral_key}",
-                        "Content-Type": "application/json"
-                    },
-                    method="POST"
-                )
-                try:
-                    with urllib.request.urlopen(m_req, timeout=8) as m_resp:
-                        m_res = json.loads(m_resp.read().decode("utf-8"))
-                        return m_res["choices"][0]["message"]["content"]
-                except Exception:
-                    pass
-            raise e
+        last_gemini_error = None
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    return res["candidates"][0]["content"]["parts"][0]["text"]
+            except Exception as e:
+                last_gemini_error = e
+                continue
+
+        # Fallback to Mistral if Gemini models fail
+        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
+        if mistral_key:
+            mistral_url = "https://api.mistral.ai/v1/chat/completions"
+            mistral_payload = {
+                "model": "mistral-small-latest",
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.0,
+                "response_format": {"type": "json_object"}
+            }
+            m_req = urllib.request.Request(
+                mistral_url,
+                data=json.dumps(mistral_payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {mistral_key}",
+                    "Content-Type": "application/json"
+                },
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(m_req, timeout=10) as m_resp:
+                    m_res = json.loads(m_resp.read().decode("utf-8"))
+                    return m_res["choices"][0]["message"]["content"]
+            except Exception:
+                pass
+
+        if last_gemini_error:
+            raise last_gemini_error
+        raise RuntimeError("No LLM adapter succeeded in generating response.")
 
     def evaluate_answer(
         self,

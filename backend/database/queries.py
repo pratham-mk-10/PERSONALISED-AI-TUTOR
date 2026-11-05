@@ -264,48 +264,61 @@ def fetch_misconception_for_answer(question_id, selected_option):
 
 
 def fetch_descriptive_questions_by_topic(topic):
-    conn = get_connection()
-    cur = conn.cursor()
-    
-    # Normalize input topic: lowercase and convert dash/underscore
-    normalized = str(topic).strip().lower().replace("-", "_")
-    if "laws" in normalized and "reflection" in normalized:
-        normalized = "laws_of_reflection"
-    elif "spherical" in normalized:
-        if "basics" in normalized:
-            normalized = "spherical_mirror_basics"
-        elif "rules" in normalized:
-            normalized = "spherical_mirror_rules"
-        elif "image" in normalized or "formation" in normalized:
-            normalized = "spherical_mirror_image_formation"
-        else:
-            normalized = "spherical_mirrors"
-    elif "plane" in normalized:
-        normalized = "plane_mirror"
-    elif "refraction" in normalized:
-        normalized = "refraction"
+    try:
+        try:
+            from database.models import ensure_descriptive_tables
+        except ImportError:
+            from backend.database.models import ensure_descriptive_tables
+        ensure_descriptive_tables()
+    except Exception as e:
+        print("[fetch_descriptive_questions_by_topic] ensure tables notice:", e)
 
-    cur.execute(
-        """
-        SELECT id, topic, question_text, rubric_items, required_keywords
-        FROM descriptive_questions
-        WHERE LOWER(REPLACE(topic, '-', '_')) = %s
-           OR LOWER(REPLACE(topic, '-', '_')) LIKE %s
-        """,
-        (normalized, f"%{normalized}%"),
-    )
-    rows = cur.fetchall()
-    conn.close()
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # Normalize input topic: lowercase and convert dash/underscore
+        normalized = str(topic).strip().lower().replace("-", "_")
+        if "laws" in normalized and "reflection" in normalized:
+            normalized = "laws_of_reflection"
+        elif "spherical" in normalized:
+            if "basics" in normalized:
+                normalized = "spherical_mirror_basics"
+            elif "rules" in normalized:
+                normalized = "spherical_mirror_rules"
+            elif "image" in normalized or "formation" in normalized:
+                normalized = "spherical_mirror_image_formation"
+            else:
+                normalized = "spherical_mirrors"
+        elif "plane" in normalized:
+            normalized = "plane_mirror"
+        elif "refraction" in normalized:
+            normalized = "refraction"
 
-    return [
-        {
-            "id": r[0],
-            "topic": r[1],
-            "question_text": r[2],
-            "rubric_items": r[3],
-            "required_keywords": r[4],
-        }
-        for r in rows
-    ]
+        cur.execute(
+            """
+            SELECT id, topic, question_text, rubric_items, required_keywords
+            FROM descriptive_questions
+            WHERE LOWER(REPLACE(topic, '-', '_')) = %s
+               OR LOWER(REPLACE(topic, '-', '_')) LIKE %s
+            """,
+            (normalized, f"%{normalized}%"),
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": r[0],
+                "topic": r[1],
+                "question_text": r[2],
+                "rubric_items": r[3],
+                "required_keywords": r[4],
+            }
+            for r in rows
+        ]
+    except Exception as exc:
+        print("[fetch_descriptive_questions_by_topic] query failed:", exc)
+        return []
 
 

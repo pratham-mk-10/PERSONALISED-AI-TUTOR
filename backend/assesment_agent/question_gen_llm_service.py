@@ -274,8 +274,6 @@ def _fallback_response(prompt):
     return json.dumps(questions)
 
 
-API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-
 def generate_text(prompt):
     _load_env_files()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
@@ -283,7 +281,6 @@ def generate_text(prompt):
     if not gemini_key:
         return _fallback_response(prompt)
 
-    url = f"{API_URL}?key={gemini_key}"
     headers = {
         "Content-Type": "application/json"
     }
@@ -305,19 +302,23 @@ def generate_text(prompt):
         }
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=15)
-        response.raise_for_status()
-        result = response.json()
-        content = result["candidates"][0]["content"]["parts"][0]["text"]
-        
-        # Ensure it parses as a list of questions if the LLM outputted just the array
-        content_stripped = content.strip()
-        if content_stripped.startswith("[") and content_stripped.endswith("]"):
-            content = f'{{"questions": {content}}}'
-        return content
-    except Exception as e:
-        print(f"Gemini API failed (possibly rate limited 429): {e}. Falling back to Mistral...")
+    for model in ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=15)
+            response.raise_for_status()
+            result = response.json()
+            content = result["candidates"][0]["content"]["parts"][0]["text"]
+            
+            # Ensure it parses as a list of questions if the LLM outputted just the array
+            content_stripped = content.strip()
+            if content_stripped.startswith("[") and content_stripped.endswith("]"):
+                content = f'{{"questions": {content}}}'
+            return content
+        except Exception:
+            continue
+
+    print("Gemini API candidate models failed. Falling back to Mistral...")
         
         mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
         if not mistral_key:
