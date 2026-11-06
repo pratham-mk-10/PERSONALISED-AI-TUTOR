@@ -6,6 +6,7 @@ import urllib.request
 from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from llm_gateway import call_llm
 
 # Add backend and repo root to path to ensure robust imports
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -109,76 +110,13 @@ class DescriptiveEvaluator:
         return True, None
 
     def _call_llm(self, system_instruction: str, prompt: str) -> str:
-        """Call Gemini 2.5 Flash directly with temperature=0 and JSON output mode."""
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.0,
-                "responseMimeType": "application/json"
-            }
-        }
-        if system_instruction:
-            payload["systemInstruction"] = {
-                "parts": [{"text": system_instruction}]
-            }
-        
-        body = json.dumps(payload).encode("utf-8")
-        candidate_models = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]
-        
-        last_gemini_error = None
-        for model in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
-            req = urllib.request.Request(
-                url,
-                data=body,
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=12) as resp:
-                    res = json.loads(resp.read().decode("utf-8"))
-                    return res["candidates"][0]["content"]["parts"][0]["text"]
-            except Exception as e:
-                last_gemini_error = e
-                continue
-
-        # Fallback to Mistral if Gemini models fail
-        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
-        if mistral_key:
-            mistral_url = "https://api.mistral.ai/v1/chat/completions"
-            mistral_payload = {
-                "model": "mistral-small-latest",
-                "messages": [
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.0,
-                "response_format": {"type": "json_object"}
-            }
-            m_req = urllib.request.Request(
-                mistral_url,
-                data=json.dumps(mistral_payload).encode("utf-8"),
-                headers={
-                    "Authorization": f"Bearer {mistral_key}",
-                    "Content-Type": "application/json"
-                },
-                method="POST"
-            )
-            try:
-                with urllib.request.urlopen(m_req, timeout=10) as m_resp:
-                    m_res = json.loads(m_resp.read().decode("utf-8"))
-                    return m_res["choices"][0]["message"]["content"]
-            except Exception:
-                pass
-
-        if last_gemini_error:
-            raise last_gemini_error
-        raise RuntimeError("No LLM adapter succeeded in generating response.")
+        """Call LLM via the centralised llm_gateway with json_mode=True."""
+        return call_llm(
+            system_instruction=system_instruction,
+            user_prompt=prompt,
+            temperature=0.0,
+            json_mode=True,
+        )
 
     def evaluate_answer(
         self,

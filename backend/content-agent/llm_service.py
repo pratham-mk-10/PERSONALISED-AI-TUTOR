@@ -25,6 +25,10 @@ build_explanation_prompt = _load_prompt_builder().build_explanation_prompt
 
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+import sys as _sys
+if str(BACKEND_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(BACKEND_ROOT))
+from llm_gateway import call_llm
 _ENV_CANDIDATES = [
     BACKEND_ROOT / ".env",
     BACKEND_ROOT / "env",
@@ -47,74 +51,16 @@ def _get_api_key():
 
 
 def _post_chat_completion(api_key, system_instruction, user_prompt):
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": user_prompt}]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.4,
-            "maxOutputTokens": 4096
-        }
-    }
-    if system_instruction:
-        payload["systemInstruction"] = {
-            "parts": [{"text": system_instruction}]
-        }
-    
-    body = json.dumps(payload).encode("utf-8")
-    for model in ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        req = request.Request(
-            url,
-            data=body,
-            headers={
-                "Content-Type": "application/json"
-            },
-            method="POST",
+    """Delegate chat completion to centralised llm_gateway."""
+    try:
+        return call_llm(
+            system_instruction=system_instruction,
+            user_prompt=user_prompt,
+            temperature=0.4,
+            max_tokens=4096,
         )
-        try:
-            with request.urlopen(req, timeout=12) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                try:
-                    return res["candidates"][0]["content"]["parts"][0]["text"]
-                except (KeyError, IndexError):
-                    return ""
-        except Exception:
-            continue
-
-    # Fallback to mistral
-        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
-        if not mistral_key:
-            return ""
-        
-        mistral_url = "https://api.mistral.ai/v1/chat/completions"
-        mistral_payload = {
-            "model": "mistral-small-latest",
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.4,
-            "max_tokens": 4096
-        }
-        m_req = request.Request(
-            mistral_url,
-            data=json.dumps(mistral_payload).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {mistral_key}",
-                "Content-Type": "application/json"
-            },
-            method="POST",
-        )
-        try:
-            with request.urlopen(m_req, timeout=8) as m_resp:
-                m_res = json.loads(m_resp.read().decode("utf-8"))
-                return m_res["choices"][0]["message"]["content"]
-        except Exception:
-            return ""
+    except Exception:
+        return ""
 
 
 class ContentAgentLLMService:

@@ -1,32 +1,23 @@
 import json
 import os
+import sys
 from pathlib import Path
-from urllib import error, request
-from dotenv import load_dotenv
 
-from database.misconception_catalog import format_misconceptions_for_prompt
+# ── Add backend root to sys.path so llm_gateway is importable ──────────────
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
 
+from llm_gateway import call_llm  # centralised LLM gateway
+
+try:
+    from database.misconception_catalog import format_misconceptions_for_prompt
+except ImportError:
+    from backend.database.misconception_catalog import format_misconceptions_for_prompt
+
+
+# ── Kept for external callers that check this flag ──────────────────────────
 API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-_ENV_CANDIDATES = [
-	BACKEND_ROOT / ".env",
-	BACKEND_ROOT / "env",
-	BACKEND_ROOT.parent / ".env",
-]
-
-
-def _load_env_files():
-	for env_path in _ENV_CANDIDATES:
-		if env_path.exists():
-			load_dotenv(dotenv_path=env_path, override=False)
-
-
-_load_env_files()
-
-
-def _get_api_key():
-	_load_env_files()
-	return os.getenv("GEMINI_API_KEY", "").strip()
 
 
 def _friendly_error_message(exc):
@@ -39,75 +30,17 @@ def _friendly_error_message(exc):
 
 
 def _post_chat_completion(api_key, system_instruction, user_prompt, temperature=0.3):
-	payload = {
-		"contents": [
-			{
-				"role": "user",
-				"parts": [{"text": user_prompt}]
-			}
-		],
-		"generationConfig": {
-			"temperature": temperature,
-			"maxOutputTokens": 600,
-			"responseMimeType": "application/json"
-		}
-	}
-	if system_instruction:
-		payload["systemInstruction"] = {
-			"parts": [{"text": system_instruction}]
-		}
-	
-	body = json.dumps(payload).encode("utf-8")
-	for model in ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
-		url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-		req = request.Request(
-			url,
-			data=body,
-			headers={
-				"Content-Type": "application/json"
-			},
-			method="POST",
+	"""Thin shim → delegates entirely to the centralised gateway."""
+	try:
+		return call_llm(
+			system_instruction=system_instruction,
+			user_prompt=user_prompt,
+			temperature=temperature,
+			max_tokens=600,
+			json_mode=True,
 		)
-		try:
-			with request.urlopen(req, timeout=10) as resp:
-				res = json.loads(resp.read().decode("utf-8"))
-				try:
-					return res["candidates"][0]["content"]["parts"][0]["text"]
-				except (KeyError, IndexError):
-					return ""
-		except Exception:
-			continue
-
-	mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
-		if not mistral_key:
-			return ""
-		
-		mistral_url = "https://api.mistral.ai/v1/chat/completions"
-		mistral_payload = {
-			"model": "mistral-small-latest",
-			"messages": [
-				{"role": "system", "content": system_instruction},
-				{"role": "user", "content": user_prompt}
-			],
-			"temperature": temperature,
-			"max_tokens": 600,
-			"response_format": {"type": "json_object"}
-		}
-		m_req = request.Request(
-			mistral_url,
-			data=json.dumps(mistral_payload).encode("utf-8"),
-			headers={
-				"Authorization": f"Bearer {mistral_key}",
-				"Content-Type": "application/json"
-			},
-			method="POST",
-		)
-		try:
-			with request.urlopen(m_req, timeout=8) as m_resp:
-				m_res = json.loads(m_resp.read().decode("utf-8"))
-				return m_res["choices"][0]["message"]["content"]
-		except Exception:
-			return ""
+	except Exception:
+		return ""
 
 
 def _extract_json(raw):
@@ -136,17 +69,8 @@ def _extract_json(raw):
 
 
 def generate_reasoning(misconception_tag, topic, question_text=None, student_answer=None, correct_answer=None):
-	api_key = _get_api_key()
-
-	if not api_key:
-		return {
-			"reason": "LLM is not configured. Set GEMINI_API_KEY to enable explanations.",
-			"focus_area": "N/A",
-		}
-
 	# Build context with available information
 	context = f"Topic: {topic}\nMisconception: {misconception_tag}"
-	
 	if question_text:
 		context += f"\n\nQuestion: {question_text}"
 	if student_answer is not None:
@@ -166,26 +90,21 @@ Output JSON only with keys: reason, focus_area.
 """.strip()
 
 	try:
-		raw = _post_chat_completion(
-			api_key,
-			"You are a teaching assistant. Return JSON only with keys reason and focus_area.",
-			prompt,
-			temperature=0.3
+		raw = call_llm(
+			system_instruction="You are a teaching assistant. Return JSON only with keys reason and focus_area.",
+			user_prompt=prompt,
+			temperature=0.3,
+			max_tokens=600,
+			json_mode=True,
 		)
 		parsed = _extract_json(raw)
 		if not parsed:
-			return {
-				"reason": "Model returned non-JSON output.",
-				"focus_area": "N/A",
-			}
+			return {"reason": "Model returned non-JSON output.", "focus_area": "N/A"}
 		reason = str(parsed.get("reason", "")).strip() or "Reason unavailable"
 		focus_area = str(parsed.get("focus_area", "N/A")).strip() or "N/A"
 		return {"reason": reason, "focus_area": focus_area}
 	except Exception as exc:
-		return {
-			"reason": _friendly_error_message(exc),
-			"focus_area": "N/A",
-		}
+		return {"reason": _friendly_error_message(exc), "focus_area": "N/A"}
 
 
 def classify_misconception_tag(topic, question_text, student_answer, correct_answer, allowed_tags=None):
@@ -196,10 +115,6 @@ def classify_misconception_tag(topic, question_text, student_answer, correct_ans
 	Python code can make decisions (e.g., which video to show) without a
 	separate ML classifier.
 	"""
-	api_key = _get_api_key()
-	if not api_key:
-		return None
-
 	allowed_tags = [str(tag).strip() for tag in (allowed_tags or []) if str(tag).strip()]
 	allowed_block = format_misconceptions_for_prompt(topic)
 	if allowed_tags:
@@ -235,11 +150,12 @@ Return STRICT JSON ONLY:
 """.strip()
 
 	try:
-		raw = _post_chat_completion(
-			api_key,
-			"You are a teaching assistant. Return JSON only with key 'tag'.",
-			prompt,
-			temperature=0.1
+		raw = call_llm(
+			system_instruction="You are a teaching assistant. Return JSON only with key 'tag'.",
+			user_prompt=prompt,
+			temperature=0.1,
+			max_tokens=200,
+			json_mode=True,
 		)
 		parsed = _extract_json(raw) or {}
 		tag = str(parsed.get("tag", "")).strip()

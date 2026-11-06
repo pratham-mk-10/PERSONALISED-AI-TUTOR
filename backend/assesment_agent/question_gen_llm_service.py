@@ -275,78 +275,31 @@ def _fallback_response(prompt):
 
 
 def generate_text(prompt):
-    _load_env_files()
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    """Generate question text via the centralised llm_gateway (Gemini + Mistral fallback)."""
+    import sys as _sys
+    from pathlib import Path as _Path
+    _backend_root = str(_Path(__file__).resolve().parents[1])
+    if _backend_root not in _sys.path:
+        _sys.path.insert(0, _backend_root)
+    from llm_gateway import call_llm
 
-    if not gemini_key:
+    system_instruction = (
+        "You are an expert physics teacher. "
+        "You must output perfectly formatted JSON. Do not include markdown blocks."
+    )
+    try:
+        content = call_llm(
+            system_instruction=system_instruction,
+            user_prompt=prompt,
+            temperature=0.4,
+            max_tokens=8192,
+            json_mode=True,
+        )
+        # Wrap bare JSON arrays in {"questions": [...]} for downstream parsing
+        content_stripped = content.strip()
+        if content_stripped.startswith("[") and content_stripped.endswith("]"):
+            content = f'{{"questions": {content}}}'
+        return content
+    except Exception as exc:
+        print(f"generate_text: LLM gateway failed ({exc}), using fallback.")
         return _fallback_response(prompt)
-
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }
-        ],
-        "systemInstruction": {
-            "parts": [{"text": "You are an expert physics teacher. You must output perfectly formatted JSON. Do not include markdown blocks."}]
-        },
-        "generationConfig": {
-            "temperature": 0.4,
-            "maxOutputTokens": 8192,
-            "responseMimeType": "application/json"
-        }
-    }
-
-    for model in ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash", "gemini-flash-latest"]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=15)
-            response.raise_for_status()
-            result = response.json()
-            content = result["candidates"][0]["content"]["parts"][0]["text"]
-            
-            # Ensure it parses as a list of questions if the LLM outputted just the array
-            content_stripped = content.strip()
-            if content_stripped.startswith("[") and content_stripped.endswith("]"):
-                content = f'{{"questions": {content}}}'
-            return content
-        except Exception:
-            continue
-
-    print("Gemini API candidate models failed. Falling back to Mistral...")
-        
-        mistral_key = os.getenv("MISTRAL_API_KEY", "").strip()
-        if not mistral_key:
-            return _fallback_response(prompt)
-            
-        mistral_url = "https://api.mistral.ai/v1/chat/completions"
-        mistral_headers = {
-            "Authorization": f"Bearer {mistral_key}",
-            "Content-Type": "application/json"
-        }
-        mistral_data = {
-            "model": "mistral-small-latest",
-            "messages": [
-                {"role": "system", "content": "You are a physics teacher. You must generate valid JSON only. Do not use markdown blocks."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.4,
-            "max_tokens": 8192,
-            "response_format": {"type": "json_object"}
-        }
-        try:
-            m_resp = requests.post(mistral_url, headers=mistral_headers, json=mistral_data, timeout=45)
-            m_resp.raise_for_status()
-            content = m_resp.json()["choices"][0]["message"]["content"]
-            content_stripped = content.strip()
-            if content_stripped.startswith("[") and content_stripped.endswith("]"):
-                content = f'{{"questions": {content}}}'
-            return content
-        except Exception as m_exc:
-            print(f"Mistral fallback also failed: {m_exc}")
-            return _fallback_response(prompt)
