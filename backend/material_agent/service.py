@@ -228,7 +228,12 @@ class MaterialTutorAgent:
             '        "caption": "Short caption explaining the visual demonstration"\n'
             '      },\n'
             '      "narration_script": "Conversational, natural 2-4 sentence voice script explaining this slide to a student.",\n'
-            '      "estimated_duration_sec": 25\n'
+            '      "estimated_duration_sec": 25,\n'
+            '      "podcast_dialogue": [\n'
+            '        {"speaker": "host_1", "speaker_name": "Dr. Sarah", "text": "Conversational introduction explaining the slide concept."},\n'
+            '        {"speaker": "host_2", "speaker_name": "Alex", "text": "Inquisitive student question clarifying an intuitive doubt or formula."},\n'
+            '        {"speaker": "host_1", "speaker_name": "Dr. Sarah", "text": "Crisp pedagogical takeaway and intuition."}\n'
+            '      ]\n'
             '    }\n'
             '  ]\n'
             "}\n\n"
@@ -246,6 +251,8 @@ class MaterialTutorAgent:
             "- 'spherical_lenses': Convex and concave lenses (converging vs diverging)\n"
             "- 'lens_formula': Lens formula 1/f = 1/v - 1/u and magnification\n"
             "If the concept does not match these, set component_key to null and set widget_type to 'formula_card', 'concept_card', or 'comparison_table'.\n\n"
+            "NOTEBOOKLM 2-HOST PODCAST REQUIREMENT:\n"
+            "Every slide MUST provide 'podcast_dialogue' with 2 to 3 natural conversational turns between 'Dr. Sarah' (lead instructor, 'host_1') and 'Alex' (curious student co-host, 'host_2'). Make the conversation warm, lively, and pedagogically crisp.\n\n"
             "VOICE READINESS REQUIREMENT:\n"
             "Every slide MUST provide a clear, engaging 'narration_script' that directly narrates the slide's visual content.\n"
         )
@@ -268,11 +275,19 @@ class MaterialTutorAgent:
         if not deck_data or "slides" not in deck_data or not deck_data["slides"]:
             deck_data = self._build_fallback_deck(primary_filename, mode_clean, records)
 
-        # Ensure correct total count and timestamps
+        # Ensure correct total count, timestamps, and podcast dialogues
         deck_data["total_slides"] = len(deck_data.get("slides", []))
         deck_data["source_filename"] = primary_filename
         deck_data["mode"] = mode_clean
         deck_data["created_at"] = time.time()
+
+        # Guarantee rich 2-host podcast dialogue on every slide
+        try:
+            from backend.material_agent.podcast_audio import ensure_slide_dialogue
+            for slide in deck_data.get("slides", []):
+                slide["podcast_dialogue"] = ensure_slide_dialogue(slide)
+        except Exception as p_err:
+            print(f"[MaterialTutorAgent] Podcast dialogue assurance note: {p_err}")
 
         # Validate with Pydantic
         try:

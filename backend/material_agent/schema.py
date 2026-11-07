@@ -22,6 +22,12 @@ class VisualWidget(BaseModel):
     )
 
 
+class PodcastTurn(BaseModel):
+    speaker: str = Field(..., description="'host_1' (Dr. Sarah) or 'host_2' (Alex)")
+    speaker_name: str = Field(default="Dr. Sarah", description="'Dr. Sarah' or 'Alex'")
+    text: str = Field(..., description="Conversational dialogue line for this speaker")
+
+
 class SlideItem(BaseModel):
     slide_number: int = Field(..., description="1-indexed sequence number of the slide")
     title: str = Field(..., description="Slide title")
@@ -57,6 +63,10 @@ class SlideItem(BaseModel):
     estimated_duration_sec: int = Field(
         default=25,
         description="Estimated speech duration in seconds for this slide",
+    )
+    podcast_dialogue: List[PodcastTurn] = Field(
+        default_factory=list,
+        description="NotebookLM-style 2-host conversational dialogue turns between Dr. Sarah and Alex for this slide",
     )
 
 

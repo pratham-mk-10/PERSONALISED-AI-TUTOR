@@ -1,0 +1,34 @@
+{
+  "total_duration": 40.75,
+  "turn_boundaries": [
+    {
+      "speaker": "host_1",
+      "speaker_name": "Dr. Sarah",
+      "text": "Welcome everyone! Today we're sprinting through the core principles of optics. Let's start with reflection\u2014do these classic laws change when we switch from a flat plane mirror to a curved spherical mirror?",
+      "start_sec": 0.0,
+      "end_sec": 14.75,
+      "duration_sec": 14.75
+    },
+    {
+      "speaker": "host_2",
+      "speaker_name": "Alex",
+      "text": "That's a classic exam trap! The laws of reflection actually hold true for all reflecting surfaces, right? Angle i equals angle r, no matter how curved the mirror is.",
+      "start_sec": 14.75,
+      "end_sec": 28.93,
+      "duration_sec": 14.18
+    },
+    {
+      "speaker": "host_1",
+      "speaker_name": "Dr. Sarah",
+      "text": "Spot on, Alex! And for mirrors with small apertures, remember the geometric shortcut: radius of curvature R equals twice the focal length f.",
+      "start_sec": 28.93,
+      "end_sec": 40.75,
+      "duration_sec": 11.82
+    }
+  ],
+  "host_1_voice": "en-IN-NeerjaNeural",
+  "host_2_voice": "en-IN-PrabhatNeural",
+  "host_1_name": "Dr. Sarah",
+  "host_2_name": "Alex",
+  "turns_count": 3
+}

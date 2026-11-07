@@ -347,4 +347,19 @@ export const getSessionSlideDeck = async (sessionId = "default", mode = null) =>
   return res.json();
 };
 
+export const getSlidePodcastAudioUrl = (sessionId = "default", slideIndex = 0, mode = null) => {
+  const query = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  return `${BASE_URL}/api/material/${encodeURIComponent(sessionId)}/slides/${slideIndex}/podcast/audio${query}`;
+};
+
+export const fetchSlidePodcastTiming = async (sessionId = "default", slideIndex = 0, mode = null) => {
+  const query = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  const res = await fetch(`${BASE_URL}/api/material/${encodeURIComponent(sessionId)}/slides/${slideIndex}/podcast/timing${query}`);
+  if (!res.ok) {
+    return null;
+  }
+  return res.json();
+};
+
+
 

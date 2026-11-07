@@ -1,21 +1,22 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SlidePhysicsWidget from "./SlidePhysicsWidgetRegistry";
-import { BASE_URL } from "../../services/api";
+import SlidePodcastPlayer from "./SlidePodcastPlayer";
 
 /**
  * SlideShowViewer — NotebookLM-style presentation viewer for study materials.
  * Supports:
  *  - Architecture B: Hybrid text notes + embedded deterministic SVG Physics Engine simulations
+ *  - Architecture 2: Fullscale NotebookLM 2-Host AI Podcast Audio Engine (Dr. Sarah & Alex)
  *  - Dual display modes: Docked Expandable Panel vs Immersive Fullscreen Mode
  *  - Quick Overview vs Detailed Breakdown decks
  *  - Keyboard navigation (ArrowLeft, ArrowRight, F for fullscreen, Esc to close)
- *  - First-class voice readiness hooks (narration scripts, duration estimates, audio bar placeholder)
  *
  * Props:
  *  - deck        : SlideDeck object { deck_title, mode, source_filename, total_slides, slides: [...] }
  *  - isOpen      : boolean
  *  - initialMode : "panel" | "fullscreen" (default "panel")
  *  - onClose     : () => void
+ *  - sessionId   : string (default "default")
  */
 
 export default function SlideShowViewer({
@@ -23,95 +24,14 @@ export default function SlideShowViewer({
   isOpen,
   initialMode = "panel",
   onClose,
+  sessionId = "default",
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState(initialMode); // "panel" | "fullscreen"
-  const [showNarration, setShowNarration] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [audioLoading, setAudioLoading] = useState(false);
-  const audioRef = useRef(null);
 
   const slides = deck?.slides || [];
   const totalSlides = slides.length;
   const currentSlide = slides[currentIndex] || null;
-
-  // Stop audio whenever slide changes or viewer closes
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    setIsPlayingAudio(false);
-    setAudioLoading(false);
-  }, []);
-
-  useEffect(() => {
-    stopAudio();
-  }, [currentIndex, isOpen, stopAudio]);
-
-  // Audio Playback handler
-  const togglePlayAudio = useCallback(async () => {
-    if (isPlayingAudio) {
-      stopAudio();
-      return;
-    }
-
-    const script = currentSlide?.narration_script;
-    if (!script) return;
-
-    setAudioLoading(true);
-    try {
-      const audioUrl = `${BASE_URL}/api/tts?text=${encodeURIComponent(script)}`;
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      audio.onplay = () => {
-        setIsPlayingAudio(true);
-        setAudioLoading(false);
-      };
-
-      audio.onended = () => {
-        setIsPlayingAudio(false);
-        setAudioLoading(false);
-      };
-
-      audio.onerror = () => {
-        console.warn("Backend TTS stream interrupted, using browser speech fallback.");
-        setAudioLoading(false);
-        if (typeof window !== "undefined" && "speechSynthesis" in window) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(script);
-          utterance.rate = 1.0;
-          utterance.onend = () => setIsPlayingAudio(false);
-          utterance.onerror = () => setIsPlayingAudio(false);
-          window.speechSynthesis.speak(utterance);
-          setIsPlayingAudio(true);
-        } else {
-          setIsPlayingAudio(false);
-        }
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.warn("Audio playback exception:", err);
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(script);
-        utterance.rate = 1.0;
-        utterance.onend = () => setIsPlayingAudio(false);
-        utterance.onerror = () => setIsPlayingAudio(false);
-        window.speechSynthesis.speak(utterance);
-        setIsPlayingAudio(true);
-      } else {
-        setIsPlayingAudio(false);
-      }
-      setAudioLoading(false);
-    }
-  }, [isPlayingAudio, currentSlide, stopAudio]);
 
   // Sync initial mode
   useEffect(() => {
@@ -123,19 +43,16 @@ export default function SlideShowViewer({
 
   // Navigation handlers
   const handleNext = useCallback(() => {
-    stopAudio();
     setCurrentIndex((prev) => (prev < totalSlides - 1 ? prev + 1 : prev));
-  }, [totalSlides, stopAudio]);
+  }, [totalSlides]);
 
   const handlePrev = useCallback(() => {
-    stopAudio();
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
-  }, [stopAudio]);
+  }, []);
 
   const handleJumpTo = useCallback((index) => {
-    stopAudio();
     setCurrentIndex(index);
-  }, [stopAudio]);
+  }, []);
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === "fullscreen" ? "panel" : "fullscreen"));
@@ -154,7 +71,6 @@ export default function SlideShowViewer({
         handlePrev();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        stopAudio();
         onClose?.();
       } else if (e.key === "f" || e.key === "F") {
         // Toggle fullscreen
@@ -167,7 +83,7 @@ export default function SlideShowViewer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleNext, handlePrev, onClose, toggleViewMode, stopAudio]);
+  }, [isOpen, handleNext, handlePrev, onClose, toggleViewMode]);
 
   if (!isOpen || !deck || totalSlides === 0 || !currentSlide) {
     return null;
@@ -329,55 +245,16 @@ export default function SlideShowViewer({
         </div>
       </main>
 
-      {/* ── Future Voice Readiness Bar ── */}
-      <section style={styles.voiceBar}>
-        <div style={styles.voiceBarLeft}>
-          <button
-            onClick={() => setShowNarration((v) => !v)}
-            style={styles.narrationToggleBtn}
-          >
-            <span>🎙️</span>
-            <span>{showNarration ? "Hide Tutor Voice Script" : "Show Tutor Voice Script"}</span>
-          </button>
-          <span style={styles.voiceReadyBadge}>
-            Audio-Ready · ~{currentSlide.estimated_duration_sec || 25}s
-          </span>
-        </div>
-
-        {/* Real Audio Narration Player */}
-        <div style={styles.voiceBarRight}>
-          <button
-            style={{
-              ...styles.audioPlaceholderBtn,
-              borderColor: isPlayingAudio ? "#22C55E" : "rgba(59, 130, 246, 0.3)",
-              background: isPlayingAudio
-                ? "linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.2))"
-                : styles.audioPlaceholderBtn.background,
-            }}
-            onClick={togglePlayAudio}
-            title={isPlayingAudio ? "Pause Audio Narration" : "Play Tutor Voice Narration"}
-            disabled={audioLoading}
-          >
-            <span>{audioLoading ? "⏳" : isPlayingAudio ? "⏸️" : "🎧"}</span>
-            <span style={{ color: isPlayingAudio ? "#86EFAC" : "#93C5FD" }}>
-              {audioLoading
-                ? "Loading Voice…"
-                : isPlayingAudio
-                ? "Pause Voice Narration"
-                : "Play Voice Narration"}
-            </span>
-          </button>
-        </div>
-      </section>
-
-      {/* Narration Script Drawer (if expanded) */}
-      {showNarration && currentSlide.narration_script && (
-        <div style={styles.narrationScriptDrawer}>
-          <p style={styles.narrationScriptText}>
-            <em>"{currentSlide.narration_script}"</em>
-          </p>
-        </div>
-      )}
+      {/* ── NotebookLM 2-Host AI Podcast Audio Engine (Architecture 2) ── */}
+      <SlidePodcastPlayer
+        sessionId={sessionId}
+        deckMode={deck?.mode || "detailed"}
+        currentSlide={currentSlide}
+        currentIndex={currentIndex}
+        totalSlides={totalSlides}
+        onNextSlide={handleNext}
+        isOpen={isOpen}
+      />
 
       {/* ── Footer Navigation Bar ── */}
       <footer style={styles.footer}>

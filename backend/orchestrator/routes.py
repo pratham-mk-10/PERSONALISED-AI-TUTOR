@@ -1147,4 +1147,63 @@ async def get_session_slides(session_id: str, mode: str | None = None):
     return deck
 
 
+# ── NotebookLM Dual-Host Podcast Audio Endpoints ──
+
+@router.get("/api/material/{session_id}/slides/{slide_index}/podcast/audio")
+async def get_slide_podcast_audio(session_id: str, slide_index: int, mode: str | None = None):
+    """
+    Streams multi-voice audio (Dr. Sarah & Alex) for the given slide.
+    Uses cached disk storage with instant sub-millisecond retrieval on repeat listens.
+    """
+    from backend.material_agent.podcast_audio import get_or_create_podcast_audio, ensure_slide_dialogue
+
+    deck = material_tutor_agent.cache.get_slide_deck(session_id, mode=mode)
+    if not deck or "slides" not in deck or not deck["slides"]:
+        raise HTTPException(status_code=404, detail="Slide deck not found for this session")
+
+    slides = deck["slides"]
+    if slide_index < 0 or slide_index >= len(slides):
+        raise HTTPException(status_code=400, detail=f"Slide index {slide_index} out of bounds (0-{len(slides)-1})")
+
+    slide = slides[slide_index]
+    dialogue = ensure_slide_dialogue(slide)
+
+    try:
+        audio_bytes, _ = await get_or_create_podcast_audio(
+            dialogue, cache_prefix=f"{session_id}_{mode or 'deck'}_slide_{slide_index}"
+        )
+        return Response(content=audio_bytes, media_type="audio/mpeg")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Podcast synthesis failed: {str(exc)}")
+
+
+@router.get("/api/material/{session_id}/slides/{slide_index}/podcast/timing")
+async def get_slide_podcast_timing(session_id: str, slide_index: int, mode: str | None = None):
+    """
+    Returns dialogue turn boundaries, timestamps, and active speaker metadata
+    for precise real-time avatar highlighting and subtitle synchronization.
+    """
+    from backend.material_agent.podcast_audio import get_or_create_podcast_audio, ensure_slide_dialogue
+
+    deck = material_tutor_agent.cache.get_slide_deck(session_id, mode=mode)
+    if not deck or "slides" not in deck or not deck["slides"]:
+        raise HTTPException(status_code=404, detail="Slide deck not found for this session")
+
+    slides = deck["slides"]
+    if slide_index < 0 or slide_index >= len(slides):
+        raise HTTPException(status_code=400, detail=f"Slide index {slide_index} out of bounds (0-{len(slides)-1})")
+
+    slide = slides[slide_index]
+    dialogue = ensure_slide_dialogue(slide)
+
+    try:
+        _, metadata = await get_or_create_podcast_audio(
+            dialogue, cache_prefix=f"{session_id}_{mode or 'deck'}_slide_{slide_index}"
+        )
+        return metadata
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Podcast timing extraction failed: {str(exc)}")
+
+
+
 

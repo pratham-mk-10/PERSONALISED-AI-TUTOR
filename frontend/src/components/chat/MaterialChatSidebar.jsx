@@ -608,6 +608,7 @@ export default function MaterialChatSidebar({
         isOpen={isViewerOpen}
         initialMode={viewerMode}
         onClose={() => setIsViewerOpen(false)}
+        sessionId={sessionId}
       />
 
       {/* Typing-dot keyframes */}

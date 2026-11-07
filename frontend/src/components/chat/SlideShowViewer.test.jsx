@@ -74,13 +74,12 @@ describe("SlideShowViewer Component", () => {
     expect(screen.getByText("Parallel rays converge through principal focus F.")).toBeTruthy();
   });
 
-  it("toggles tutor narration voice script drawer", () => {
+  it("renders the NotebookLM 2-host podcast engine with Dr. Sarah and Alex", () => {
     render(<SlideShowViewer deck={mockDeck} isOpen={true} initialMode="panel" onClose={() => {}} />);
 
-    const narrationToggle = screen.getByText("Show Tutor Voice Script");
-    fireEvent.click(narrationToggle);
-
-    expect(screen.getByText(/"The First Law of Reflection states that angle i equals angle r."/)).toBeTruthy();
+    expect(screen.getByText("Dr. Sarah")).toBeTruthy();
+    expect(screen.getByText("Alex")).toBeTruthy();
+    expect(screen.getByText("Play 2-Host Podcast")).toBeTruthy();
   });
 
   it("does not render SVG physics simulation in quick overview mode", () => {
