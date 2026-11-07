@@ -495,6 +495,7 @@ export default function Dashboard({ onStartTopic }) {
         messages={chatMessages}
         onSend={handleChatSend}
         isTyping={chatIsTyping}
+        sessionId={sessionId}
       />
     </div>
   );

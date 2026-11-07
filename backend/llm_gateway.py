@@ -43,15 +43,12 @@ _MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
 # Ordered preference list — tested top-to-bottom; working model is cached
 _GEMINI_CANDIDATES: List[str] = [
-    "gemini-2.5-flash",
     "gemini-3.5-flash",
     "gemini-3.8-flash",
     "gemini-flash-latest",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
 ]
 
-_DEFAULT_TIMEOUT = 35  # seconds (headroom for large multi-page PDF summaries)
+_DEFAULT_TIMEOUT = 90  # seconds (ample headroom for large multi-page PDF summaries & detailed slide decks)
 
 log = logging.getLogger(__name__)
 

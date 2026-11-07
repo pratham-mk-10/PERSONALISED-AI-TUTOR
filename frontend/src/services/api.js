@@ -316,4 +316,35 @@ export const deleteMaterialFile = async (sessionId = "default", materialId) => {
   }
   return res.json();
 };
+
+export const generateMaterialSlideDeck = async ({ sessionId = "default", mode = "quick", materialIds = null }) => {
+  const res = await fetch(`${BASE_URL}/api/material/slides/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: sessionId,
+      mode,
+      material_ids: materialIds,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to generate slide deck (${res.status}): ${text}`);
+  }
+
+  return res.json();
+};
+
+export const getSessionSlideDeck = async (sessionId = "default", mode = null) => {
+  const query = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  const res = await fetch(`${BASE_URL}/api/material/${encodeURIComponent(sessionId)}/slides${query}`);
+  if (!res.ok) {
+    return null;
+  }
+  return res.json();
+};
+
 

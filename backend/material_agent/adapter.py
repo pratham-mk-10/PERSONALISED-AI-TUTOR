@@ -49,13 +49,14 @@ class GeminiFlashAdapter(BaseLLMAdapter):
         system_instruction: str,
         user_prompt: str,
         history: Optional[List[dict]] = None,
+        max_tokens: int = 8192,
     ) -> str:
         return call_llm(
             system_instruction=system_instruction,
             user_prompt=user_prompt,
             history=history,
             temperature=0.4,
-            max_tokens=4096,
+            max_tokens=max_tokens,
         )
 
 
@@ -67,6 +68,7 @@ class MistralAdapter(BaseLLMAdapter):
         system_instruction: str,
         user_prompt: str,
         history: Optional[List[dict]] = None,
+        max_tokens: int = 8192,
     ) -> str:
         # The gateway already includes Mistral as the final fallback.
         # Calling call_llm here will use Mistral if Gemini is unavailable.
@@ -75,7 +77,7 @@ class MistralAdapter(BaseLLMAdapter):
             user_prompt=user_prompt,
             history=history,
             temperature=0.4,
-            max_tokens=4096,
+            max_tokens=max_tokens,
         )
 
 
@@ -83,7 +85,7 @@ class ResilientLLMAdapter(BaseLLMAdapter):
     """Composite adapter that delegates entirely to the centralised llm_gateway.
 
     The gateway handles:
-    - Gemini model waterfall (gemini-2.5-flash → gemini-2.0-flash → ...)
+    - Gemini model waterfall (gemini-3.5-flash → gemini-3.8-flash → ...)
     - In-process model caching (no waterfall penalty after first success)
     - Mistral fallback when all Gemini models fail
 
@@ -96,6 +98,7 @@ class ResilientLLMAdapter(BaseLLMAdapter):
         system_instruction: str,
         user_prompt: str,
         history: Optional[List[dict]] = None,
+        max_tokens: int = 8192,
     ) -> str:
         try:
             return call_llm(
@@ -103,7 +106,7 @@ class ResilientLLMAdapter(BaseLLMAdapter):
                 user_prompt=user_prompt,
                 history=history,
                 temperature=0.4,
-                max_tokens=4096,
+                max_tokens=max_tokens,
             )
         except RuntimeError as exc:
             # Gateway exhausted all providers — return a user-facing message

@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import SlideShowViewer from "./SlideShowViewer";
+import { generateMaterialSlideDeck } from "../../services/api";
 
 /**
  * MaterialChatSidebar — slide-out right-side drawer where students can upload
- * study materials and chat with the Material AI Tutor agent.
+ * study materials, chat with the Material AI Tutor agent, and generate
+ * NotebookLM-style Summary Slide Shows (Quick Overview vs Detailed Breakdown)
+ * with embedded deterministic SVG physics simulations.
  *
  * Props:
  *  - isOpen        : boolean
@@ -27,10 +31,11 @@ const ACCEPTED_TYPES = [
 const ACCEPTED_EXT = ".pdf,.png,.jpg,.jpeg,.webp,.txt,.docx";
 
 const SUGGESTED_PROMPTS = [
+  "⚡ Quick Slide Overview",
+  "📚 Detailed Slide Breakdown",
   "📖 Summarize this material",
   "❓ Generate practice questions",
   "🧮 Explain the key formulas",
-  "🔍 Find important definitions",
 ];
 
 function formatFileSize(bytes) {
@@ -109,12 +114,60 @@ export default function MaterialChatSidebar({
   messages = [],
   onSend,
   isTyping = false,
+  sessionId = "default",
 }) {
   const [inputText, setInputText] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [decksByMode, setDecksByMode] = useState({ quick: null, detailed: null });
+  const [activeMode, setActiveMode] = useState("quick");
+  const [isGeneratingDeck, setIsGeneratingDeck] = useState(false);
+  const [deckError, setDeckError] = useState(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [viewerMode, setViewerMode] = useState("panel"); // "panel" | "fullscreen"
+
+  const activeDeck = decksByMode[activeMode] || decksByMode.quick || decksByMode.detailed || null;
+
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const handleGenerateSlides = useCallback(
+    async (mode = "quick") => {
+      setIsGeneratingDeck(true);
+      setDeckError(null);
+      setActiveMode(mode);
+      try {
+        const readyMaterialIds = files
+          .filter((f) => f.materialId)
+          .map((f) => f.materialId);
+
+        const deck = await generateMaterialSlideDeck({
+          sessionId,
+          mode,
+          materialIds: readyMaterialIds.length > 0 ? readyMaterialIds : null,
+        });
+
+        setDecksByMode((prev) => ({ ...prev, [mode]: deck }));
+        setActiveMode(mode);
+        setViewerMode("panel");
+        setIsViewerOpen(true);
+      } catch (err) {
+        console.error("Slide deck generation error:", err);
+        setDeckError(err.message || "Failed to generate slide show");
+      } finally {
+        setIsGeneratingDeck(false);
+      }
+    },
+    [files, sessionId]
+  );
+
+  const openViewer = useCallback((mode = "panel", slideDeckMode = null) => {
+    if (slideDeckMode) {
+      setActiveMode(slideDeckMode);
+    }
+    setViewerMode(mode);
+    setIsViewerOpen(true);
+  }, []);
 
   // Auto-scroll to newest message
   useEffect(() => {
@@ -192,9 +245,20 @@ export default function MaterialChatSidebar({
   const handleSend = useCallback(() => {
     const trimmed = inputText.trim();
     if (!trimmed) return;
+
+    // Check for slide trigger prompts
+    const lower = trimmed.toLowerCase();
+    if (lower.includes("quick slide") || lower.includes("quick overview deck")) {
+      handleGenerateSlides("quick");
+    } else if (lower.includes("detailed slide") || lower.includes("detailed breakdown deck")) {
+      handleGenerateSlides("detailed");
+    } else if (lower.includes("slide show") || lower.includes("slideshow") || lower.includes("slides")) {
+      handleGenerateSlides("quick");
+    }
+
     onSend(trimmed);
     setInputText("");
-  }, [inputText, onSend]);
+  }, [inputText, onSend, handleGenerateSlides]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -317,8 +381,128 @@ export default function MaterialChatSidebar({
           </div>
         )}
 
+        {/* ─── NotebookLM Artifact Bar: Slide Show Generator ─── */}
+        {files.length > 0 && (
+          <div style={styles.slideActionBanner}>
+            <div style={styles.slideActionHeader}>
+              <span style={styles.notebookBadge}>✨ NotebookLM Generator</span>
+              <span style={styles.slideActionSub}>Interactive Physics Deck</span>
+            </div>
+            <div style={styles.slideActionButtons}>
+              <button
+                style={{
+                  ...styles.actionPillBtn,
+                  opacity: isGeneratingDeck ? 0.6 : 1,
+                }}
+                disabled={isGeneratingDeck}
+                onClick={() => handleGenerateSlides("quick")}
+                title="Concise high-impact slide overview of formulas and laws"
+              >
+                <span>⚡</span> Quick Overview
+              </button>
+              <button
+                style={{
+                  ...styles.actionPillBtn,
+                  ...styles.actionPillDetailed,
+                  opacity: isGeneratingDeck ? 0.6 : 1,
+                }}
+                disabled={isGeneratingDeck}
+                onClick={() => handleGenerateSlides("detailed")}
+                title="Exhaustive step-by-step breakdown across all cases"
+              >
+                <span>📚</span> Detailed Breakdown
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ─── Chat Stream ─── */}
         <div style={styles.chatStream}>
+          {/* Slide Deck Generation State Card */}
+          {isGeneratingDeck && (
+            <div style={styles.generatingDeckCard}>
+              <div style={styles.generatingSpinner} />
+              <div>
+                <div style={styles.generatingDeckTitle}>Designing Slide Show…</div>
+                <div style={styles.generatingDeckSub}>
+                  Structuring study notes & connecting deterministic physics simulations
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Slide Deck Error Card */}
+          {deckError && (
+            <div style={styles.deckErrorCard}>
+              <span>⚠️ {deckError}</span>
+            </div>
+          )}
+
+          {/* Active Generated Slide Deck Card */}
+          {activeDeck && !isGeneratingDeck && (
+            <div style={styles.readyDeckCard}>
+              <div style={styles.readyDeckHeader}>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {decksByMode.quick && (
+                    <button
+                      onClick={() => setActiveMode("quick")}
+                      style={{
+                        ...styles.readyDeckBadge,
+                        opacity: activeMode === "quick" ? 1 : 0.5,
+                        cursor: "pointer",
+                        border: activeMode === "quick" ? "1px solid #3B82F6" : "1px solid transparent",
+                      }}
+                    >
+                      ⚡ Quick ({decksByMode.quick.total_slides}p)
+                    </button>
+                  )}
+                  {decksByMode.detailed && (
+                    <button
+                      onClick={() => setActiveMode("detailed")}
+                      style={{
+                        ...styles.readyDeckBadge,
+                        backgroundColor: "rgba(139, 92, 246, 0.15)",
+                        color: "#C4B5FD",
+                        opacity: activeMode === "detailed" ? 1 : 0.5,
+                        cursor: "pointer",
+                        border: activeMode === "detailed" ? "1px solid #8B5CF6" : "1px solid transparent",
+                      }}
+                    >
+                      📚 Detailed ({decksByMode.detailed.total_slides}p)
+                    </button>
+                  )}
+                  {!decksByMode.quick && !decksByMode.detailed && (
+                    <span style={styles.readyDeckBadge}>
+                      {activeDeck.mode === "quick" ? "⚡ Quick Overview" : "📚 Detailed Breakdown"}
+                    </span>
+                  )}
+                </div>
+                <span style={styles.readyDeckCount}>
+                  {activeDeck.total_slides} slides ready
+                </span>
+              </div>
+              <h4 style={styles.readyDeckTitle}>{activeDeck.deck_title}</h4>
+              <p style={styles.readyDeckText}>
+                {activeDeck.mode === "quick"
+                  ? "Concise high-yield formula & law summary."
+                  : "Comprehensive step-by-step breakdown with interactive physics simulations."}
+              </p>
+              <div style={styles.readyDeckActions}>
+                <button
+                  onClick={() => openViewer("panel")}
+                  style={styles.openPanelBtn}
+                >
+                  🗖 Open in Panel
+                </button>
+                <button
+                  onClick={() => openViewer("fullscreen")}
+                  style={styles.openFullscreenBtn}
+                >
+                  ⛶ Fullscreen Mode
+                </button>
+              </div>
+            </div>
+          )}
           {/* Welcome / empty state */}
           {messages.length === 0 && (
             <div style={styles.welcomeWrap}>
@@ -417,6 +601,14 @@ export default function MaterialChatSidebar({
           </button>
         </div>
       </aside>
+
+      {/* ─── NotebookLM Presentation Viewer (Architecture B) ─── */}
+      <SlideShowViewer
+        deck={activeDeck}
+        isOpen={isViewerOpen}
+        initialMode={viewerMode}
+        onClose={() => setIsViewerOpen(false)}
+      />
 
       {/* Typing-dot keyframes */}
       <style>{`
@@ -743,5 +935,161 @@ const styles = {
     cursor: "pointer",
     flexShrink: 0,
     transition: "opacity 0.15s, transform 0.15s",
+  },
+
+  /* ── NotebookLM Slide Generation Bar ── */
+  slideActionBanner: {
+    margin: "4px 16px 8px",
+    padding: "12px 14px",
+    borderRadius: "14px",
+    backgroundColor: "rgba(30, 41, 59, 0.7)",
+    border: "1px solid rgba(59, 130, 246, 0.25)",
+    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.2)",
+    flexShrink: 0,
+  },
+  slideActionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "10px",
+  },
+  notebookBadge: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#93C5FD",
+    letterSpacing: "0.4px",
+  },
+  slideActionSub: {
+    fontSize: "11px",
+    color: "#64748B",
+  },
+  slideActionButtons: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+  actionPillBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    padding: "8px 10px",
+    borderRadius: "10px",
+    backgroundColor: "rgba(59, 130, 246, 0.15)",
+    border: "1px solid rgba(59, 130, 246, 0.35)",
+    color: "#DBEAFE",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.15s",
+  },
+  actionPillDetailed: {
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
+    border: "1px solid rgba(139, 92, 246, 0.35)",
+    color: "#EDE9FE",
+  },
+
+  /* ── Slide Deck Loading / Ready Cards ── */
+  generatingDeckCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "14px 16px",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    border: "1px solid rgba(59, 130, 246, 0.3)",
+    borderRadius: "14px",
+    marginBottom: "8px",
+  },
+  generatingSpinner: {
+    width: "20px",
+    height: "20px",
+    border: "2px solid rgba(59, 130, 246, 0.2)",
+    borderTopColor: "#3B82F6",
+    borderRadius: "50%",
+    animation: "spwSpin 0.8s linear infinite",
+    flexShrink: 0,
+  },
+  generatingDeckTitle: {
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#93C5FD",
+  },
+  generatingDeckSub: {
+    fontSize: "11px",
+    color: "#94A3B8",
+    marginTop: "2px",
+  },
+  deckErrorCard: {
+    padding: "10px 14px",
+    borderRadius: "10px",
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    border: "1px solid rgba(239, 68, 68, 0.25)",
+    color: "#FCA5A5",
+    fontSize: "12px",
+    marginBottom: "8px",
+  },
+  readyDeckCard: {
+    padding: "14px 16px",
+    backgroundColor: "#162036",
+    border: "1px solid rgba(59, 130, 246, 0.3)",
+    borderRadius: "14px",
+    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+    marginBottom: "10px",
+  },
+  readyDeckHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "6px",
+  },
+  readyDeckBadge: {
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#60A5FA",
+    backgroundColor: "rgba(59, 130, 246, 0.15)",
+    padding: "2px 8px",
+    borderRadius: "9999px",
+  },
+  readyDeckCount: {
+    fontSize: "11px",
+    color: "#94A3B8",
+  },
+  readyDeckTitle: {
+    margin: "0 0 4px",
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#F8FAFC",
+  },
+  readyDeckText: {
+    margin: "0 0 12px",
+    fontSize: "12px",
+    color: "#94A3B8",
+    lineHeight: 1.4,
+  },
+  readyDeckActions: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "8px",
+  },
+  openPanelBtn: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
+    color: "#E2E8F0",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  openFullscreenBtn: {
+    padding: "8px 12px",
+    borderRadius: "8px",
+    background: "linear-gradient(135deg, #3B82F6, #1D4ED8)",
+    border: "none",
+    color: "#FFFFFF",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+    boxShadow: "0 2px 6px rgba(59, 130, 246, 0.3)",
   },
 };

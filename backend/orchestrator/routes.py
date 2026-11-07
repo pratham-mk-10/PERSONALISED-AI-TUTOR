@@ -1116,3 +1116,35 @@ async def delete_session_material(session_id: str, material_id: str):
     return {"deleted": deleted, "material_id": material_id}
 
 
+class MaterialSlidesRequest(BaseModel):
+    session_id: str = "default"
+    mode: str = "quick"  # "quick" or "detailed"
+    material_ids: list[str] | None = None
+
+
+@router.post("/api/material/slides/generate")
+async def generate_material_slides(req: MaterialSlidesRequest):
+    try:
+        res = material_tutor_agent.generate_slide_deck(
+            session_id=req.session_id,
+            mode=req.mode,
+            material_ids=req.material_ids,
+        )
+        if res.get("status") == "need_materials":
+            raise HTTPException(status_code=400, detail=res.get("error", "No materials found"))
+        return res
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to generate slide deck: {str(exc)}")
+
+
+@router.get("/api/material/{session_id}/slides")
+async def get_session_slides(session_id: str, mode: str | None = None):
+    deck = material_tutor_agent.cache.get_slide_deck(session_id, mode=mode)
+    if not deck:
+        raise HTTPException(status_code=404, detail="No generated slides found for this session")
+    return deck
+
+
+

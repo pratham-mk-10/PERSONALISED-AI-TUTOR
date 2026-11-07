@@ -26,6 +26,8 @@ class SessionMaterialCache:
         self._session_index: Dict[str, List[str]] = {}
         # session_id -> list of {"role": "user"|"agent", "text": "..."}
         self._chat_history: Dict[str, List[dict]] = {}
+        # session_id -> latest generated SlideDeck dict
+        self._slide_decks: Dict[str, dict] = {}
         self._lock = Lock()
         self.default_ttl = default_ttl_seconds
 
@@ -103,6 +105,22 @@ class SessionMaterialCache:
     def get_chat_history(self, session_id: str) -> List[dict]:
         with self._lock:
             return list(self._chat_history.get(session_id, []))
+
+    def store_slide_deck(self, session_id: str, deck_data: dict, mode: str = "quick") -> None:
+        with self._lock:
+            mode_clean = str(deck_data.get("mode") or mode).lower()
+            cache_key = f"{session_id}:{mode_clean}"
+            self._slide_decks[cache_key] = deck_data
+            # Also set default session_id as latest
+            self._slide_decks[session_id] = deck_data
+
+    def get_slide_deck(self, session_id: str, mode: Optional[str] = None) -> Optional[dict]:
+        with self._lock:
+            if mode:
+                cache_key = f"{session_id}:{str(mode).lower()}"
+                if cache_key in self._slide_decks:
+                    return self._slide_decks[cache_key]
+            return self._slide_decks.get(session_id)
 
     def _cleanup_expired_locked(self):
         now = time.time()
